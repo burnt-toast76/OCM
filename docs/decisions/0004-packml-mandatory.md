@@ -1,0 +1,22 @@
+# ADR-0004 — Every module implements PackML
+
+**Status:** Accepted
+
+## Context
+The cell coordinator has to sequence modules it has never seen.
+
+## Decision
+**PackML (ISA-TR88.00.02) is mandatory.** A module that doesn't implement it is not an OCM
+module. This is the one rigid part of the spec and it must stay rigid.
+
+## Rationale
+- The coordinator's logic is written **once**, not per-module.
+- An integrator who has never seen OCM already knows how our modules behave.
+- The agent has a fixed, small control vocabulary — it never invents a handshake.
+
+## Consequences
+- `state_machine.abort_safe` must be declared honestly. A screwdriver stopped mid-drive
+  leaves a half-seated fastener. A half-laid adhesive bead cannot be resumed — the part is
+  scrap and must be routed to reject, not back into flow. **Encoding this honestly is more
+  useful than pretending recovery is possible.**
+- Modules may omit Held/Suspended if they genuinely cannot be interrupted mid-operation.

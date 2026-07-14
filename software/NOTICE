@@ -1,0 +1,16 @@
+# Third-party notices
+
+This project (AGPL-3.0) incorporates permissively licensed components:
+
+| Component | License | Use |
+|---|---|---|
+| Tesseract (ROS-Industrial) | Apache-2.0 | Planning, collision, kinematics |
+| OMPL / TrajOpt / Descartes | Apache-2.0 / BSD | Planners |
+| Ruckig | MIT | Jerk-limited trajectory generation |
+| SOEM 2.0 | GPL-3.0 or commercial | EtherCAT master |
+| Bullet / FCL | zlib / BSD | Collision backends |
+
+⚠️ Apache-2.0 is compatible with GPLv3 and **incompatible with GPLv2**.
+⚠️ Do not add IgH EtherCAT Master or LinuxCNC — both GPLv2.
+
+See ../LICENSING.md before adding any dependency.

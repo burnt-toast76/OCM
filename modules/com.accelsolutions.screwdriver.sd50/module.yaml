@@ -1,0 +1,195 @@
+# ─────────────────────────────────────────────────────────────────────
+# OCM Module Definition — Robotic screwdriver, vacuum pickup, M2–M5
+# The canonical "hold still and do the thing" module.
+# ─────────────────────────────────────────────────────────────────────
+ocm_version: "1.0"
+id:       com.accelsolutions.screwdriver.sd50
+revision: "1.2.0"
+name:     "SD50 Robotic Screwdriver"
+vendor:   "Accel Solutions LLC"
+license:  CERN-OHL-S-2.0
+kind:     end_effector
+description: >
+  EC-servo screwdriver with vacuum bit retention and integrated feed.
+  Closed-loop torque + angle with seating detection. Reports achieved
+  torque and angle for every fastener — traceability comes free.
+
+mechanical:
+  mount:
+    interface: iso-9409-1-a50      # robot tool flange, 50 mm bolt circle
+    footprint_mm: [70, 70]
+
+  frames:
+    origin:
+      xyz_mm:  [0, 0, 0]
+      note:    "Robot tool flange face. Everything below is relative to this."
+    tcp:
+      xyz_mm:  [0, 0, 186.5]
+      rpy_deg: [0, 0, 0]
+      note:    "Bit tip, bit fully retracted. +Z points away from flange, i.e. INTO the screw."
+    feed_port:
+      xyz_mm:  [0, -42, 120]
+      note:    "Where the feed hose lands. Layout validator keeps this clear of the robot's own body."
+
+  geometry:
+    visual:        meshes/sd50.glb              # renders directly in the R3F viewer
+    collision:     meshes/sd50_convex.stl       # convex hull — Bullet is ~10x faster on this
+    urdf_fragment: urdf/sd50.urdf.xacro         # ← drops straight into the Tesseract scene
+
+  mass_kg: 1.94
+  com_mm:  [0, -6, 78]                          # matters: this is robot payload, not decoration
+
+electrical:
+  supplies:
+    - rail: 24VDC
+      current_nominal_a: 1.2
+      current_peak_a:    4.8                    # peak during final torque
+      inrush_a:          9.0
+  pneumatic:
+    pressure_bar: 5.5
+    flow_nl_min:  40                            # vacuum generator
+    port:         6mm-push-in
+  connectors:
+    - ref: X1
+      type: M12-A-5P
+      carries: power+fieldbus
+    - ref: X2
+      type: M8-4P
+      carries: safety                           # STO
+
+comms:
+  protocol: ethercat
+  esi: esi/AccelSolutions_SD50.xml
+
+  # These names become the PLC tag names in generated code.
+  # Which is exactly why they must be readable by a human at 2am.
+  signals:
+    - { name: packml_cmd,       direction: output, type: uint16, role: packml_cmd }
+    - { name: packml_state,     direction: input,  type: uint16, role: packml_state }
+    - { name: fault_code,       direction: input,  type: uint16, role: fault_code }
+    - { name: heartbeat,        direction: input,  type: bool,   role: heartbeat }
+
+    - { name: target_torque,    direction: output, type: real,   unit: "N.m",  role: process_param }
+    - { name: target_depth,     direction: output, type: real,   unit: "mm",   role: process_param }
+    - { name: spindle_speed,    direction: output, type: int16,  unit: "rpm",  role: process_param }
+
+    - { name: screw_present,    direction: input,  type: bool }      # vacuum confirms bit is loaded
+    - { name: bit_engaged,      direction: input,  type: bool }      # seating sensor
+    - { name: torque_achieved,  direction: input,  type: real,   unit: "N.m",  role: process_result }
+    - { name: angle_achieved,   direction: input,  type: real,   unit: "deg",  role: process_result }
+    - { name: result_ok,        direction: input,  type: bool,   role: process_result }
+    - { name: feed_ready,       direction: input,  type: bool }
+
+capabilities:
+
+  - name: load_screw
+    summary: "Pull a screw from the feed tube onto the bit and confirm it with vacuum."
+    preconditions:
+      - feed_ready == true
+      - screw_present == false
+    postconditions:
+      - screw_present == true
+    nominal_duration_s: 0.9
+    consumes: [screw]
+    # No 'motion' block: the robot doesn't have to be anywhere in particular.
+    # The generator is free to overlap this with the robot's move to the next hole.
+    # That overlap is where cycle time is won, and it's only possible because
+    # the manifest says so.
+
+  - name: drive_screw
+    summary: "Drive the loaded screw to a target torque with seating detection."
+    parameters:
+      torque_nm:
+        type: number
+        unit: "N.m"
+        min: 0.20
+        max: 5.00
+        summary: "Final seating torque. Hard limits — the generator rejects anything outside."
+      depth_mm:
+        type: number
+        unit: mm
+        min: 1.0
+        max: 30.0
+        summary: "Expected travel from TCP contact to seated. Used for cross-check; a screw that seats early is cross-threaded."
+      speed_rpm:
+        type: integer
+        unit: rpm
+        min: 100
+        max: 1200
+        default: 600
+        required: false
+      strategy:
+        type: enum
+        values: [torque_control, angle_control, torque_then_angle]
+        default: torque_control
+        required: false
+
+    motion:
+      frame:        tcp
+      approach_vec: [0, 0, 1]          # drive along +Z, into the work
+      approach_mm:  25.0               # standoff where the approach move begins
+      approach_speed_mm_s: 20.0
+      retract_vec:  [0, 0, -1]
+      retract_mm:   40.0
+      clearance_mm: 5.0
+      hold_still:   true               # ← robot must be STATIONARY. Planner enforces this.
+
+    preconditions:
+      - screw_present == true          # → generator emits a real interlock, not a comment
+    postconditions:
+      - screw_present == false
+      - result_ok == true
+
+    results:
+      torque_achieved: { type: number, unit: "N.m" }
+      angle_achieved:  { type: number, unit: deg }
+      ok:              { type: boolean }
+
+    nominal_duration_s: 1.8
+
+  - name: eject_screw
+    summary: "Blow off a screw stuck on the bit after a failed drive. Recovery op."
+    preconditions:
+      - screw_present == true
+    postconditions:
+      - screw_present == false
+    nominal_duration_s: 0.5
+
+state_machine:
+  model: packml
+  implements:
+    - idle
+    - starting
+    - execute
+    - completing
+    - complete
+    - resetting
+    - aborting
+    - aborted
+    - clearing
+    - stopping
+    - stopped
+  # NOT abort-safe. A screwdriver stopped mid-drive leaves a partially
+  # seated fastener that a human must clear. The cell coordinator has to
+  # know this to sequence e-stop recovery — it cannot just resume.
+  abort_safe: false
+
+safety:
+  hazards: [pinch, rotating]
+  required_performance_level: PLd
+  sto_required: true
+  guarding: interlocked
+  safe_state: "Spindle coasts to stop, vacuum HELD so the screw does not drop into the assembly."
+  notes: >
+    STO removes spindle drive power only. Vacuum is deliberately retained on
+    safety trip — a screw released into a populated assembly is worse than a
+    screw held on a dead spindle.
+
+maintenance:
+  wear_items:
+    - name: "Bit, PH1"
+      part_number: SD50-BIT-PH1
+      interval_cycles: 50000
+    - name: "Vacuum filter"
+      part_number: SD50-FLT-01
+      interval_hours: 500
