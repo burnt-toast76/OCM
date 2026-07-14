@@ -1,0 +1,14 @@
+OCM is multi-licensed by directory. There is no single project license.
+
+  software/                          AGPL-3.0-only
+  hardware/                          CERN-OHL-S-2.0
+  spec/ modules/ cells/ docs/
+  reference/                         CC-BY-SA-4.0
+
+Each directory contains its own LICENSE file with the full text.
+See LICENSING.md for the rationale, and for the dependency compatibility table.
+
+*** Software is GPLv3-family. NEVER GPLv2. ***
+Apache-2.0 (Tesseract, ROS 2, TrajOpt) is one-way compatible with GPLv3 and
+INCOMPATIBLE with GPLv2. A GPLv2 choice would leave this project with no motion
+planner. Do not add IgH EtherCAT Master or LinuxCNC -- both are GPLv2.

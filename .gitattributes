@@ -1,0 +1,12 @@
+# CAD / mesh / binary — never diff or merge these as text
+*.step   binary
+*.stp    binary
+*.stl    binary
+*.glb    binary
+*.f3d    binary
+*.dxf    binary
+*.pdf    binary
+*.png    binary
+
+# If meshes get large, migrate to Git LFS:
+#   git lfs install && git lfs track "*.glb" "*.stl" "*.step"

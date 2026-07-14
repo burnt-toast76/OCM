@@ -1,0 +1,29 @@
+# Notes for Claude
+
+**Read `docs/decisions/` before proposing changes.** Most "obvious" alternatives were
+considered and rejected for non-obvious reasons. The ADRs record the *context*, not just the
+conclusion — if the context changes, the decision should be revisited, but don't relitigate it
+blind.
+
+## Things that look like good ideas and are not
+
+- **LinuxCNC / Machinekit for gantry motion** — GPLv2. Breaks the Apache-2.0 planning chain.
+  Use Ruckig (MIT). See ADR-0001, ADR-0007.
+- **IgH EtherCAT Master** — GPLv2. Same trap. Use SOEM 2.0 (GPLv3).
+- **RoboDK** — good tool, but a proprietary dependency poisons an open platform. See ADR-0007.
+- **A welded frame** — kills the DIY and kit tiers. Bolted tab-and-slot. See ADR-0005.
+- **Central I/O panel** — breaks plug-and-produce. I/O lives on the module. See ADR-0003.
+- **Building the frame first** — the frame is the part we're least likely to get wrong, so it
+  carries no information. The generator comes first. See ADR-0010.
+
+## Current state
+
+Pre-alpha. Schema validates; generator does not exist; no hardware built.
+Next: freeze the bolt grid (ADR-0011, still open), then build the generator (ROADMAP step 1).
+
+## Conventions
+
+- Licensing is enforced by directory. A CAD file in `software/` or a Python module in
+  `hardware/` makes its license ambiguous. See LICENSING.md.
+- Module manifests must validate against `spec/schema/ocm-module-1.0.schema.json`.
+- Claims in `reference/` are **measured**, not from datasheets. Keep it that way.
