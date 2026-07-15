@@ -3,7 +3,7 @@
 
     ocm validate <module.yaml>
     ocm resolve  <cell.yaml> [--modules DIR]
-    ocm scene    <cell.yaml> [--modules DIR] [--out FILE.urdf]
+    ocm scene    <cell.yaml> [--modules DIR] [--dump-urdf FILE.urdf] [--view FILE.html]
 
 Each stage's collected-violations error (ManifestValidationError,
 CellResolutionError, SceneBuildError) is printed in full, not just the
@@ -108,9 +108,16 @@ def cmd_scene(args: argparse.Namespace) -> int:
         inst = scene.instances[name]
         print(f"  {name}: {inst.root_link} -> parent {inst.parent_link}")
 
-    if args.out:
-        Path(args.out).write_text(scene.urdf_xml, encoding="utf-8")
-        print(f"  wrote combined URDF to {args.out}")
+    if args.dump_urdf:
+        Path(args.dump_urdf).write_text(scene.urdf_xml, encoding="utf-8")
+        print(f"  wrote combined URDF to {args.dump_urdf}")
+
+    if args.view:
+        from ocm_generator.scene import render_html
+
+        Path(args.view).write_text(render_html(scene, resolved), encoding="utf-8")
+        print(f"  wrote HTML viewer to {args.view}")
+
     return 0
 
 
@@ -130,7 +137,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p_scene = subparsers.add_parser("scene", help="Resolve a cell and build its Tesseract scene.")
     p_scene.add_argument("cell", type=Path, help="Path to a cell.yaml")
     p_scene.add_argument("--modules", type=Path, default=Path("modules"), help="Module search path (default: ./modules)")
-    p_scene.add_argument("--out", type=Path, default=None, help="Write the combined URDF to this file")
+    p_scene.add_argument("--dump-urdf", type=Path, default=None, help="Write the composed URDF to this file (a plain cross-check, e.g. to open in another URDF tool)")
+    p_scene.add_argument("--view", type=Path, default=None, help="Write a self-contained three.js HTML viewer to this file (open by double-clicking)")
     p_scene.set_defaults(func=cmd_scene)
 
     return parser

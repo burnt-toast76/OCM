@@ -53,6 +53,10 @@ class SceneInstance:
     root_link: str
     parent_link: str
     joint_name: str
+    # Every namespaced link this instance contributed (root_link included) --
+    # lets a consumer (the debug viewer) map an arbitrary link name in the
+    # composed URDF back to the instance that owns it.
+    link_names: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -174,7 +178,11 @@ def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
         all_joints.append(joint)
         all_joints.extend(frag.joints)
         base_instance = SceneInstance(
-            name="base", root_link=frag.root_link, parent_link=WORLD_LINK, joint_name=joint.get("name")
+            name="base",
+            root_link=frag.root_link,
+            parent_link=WORLD_LINK,
+            joint_name=joint.get("name"),
+            link_names=frozenset(frag.link_names),
         )
 
     for name, ri in resolved.instances.items():
@@ -220,7 +228,11 @@ def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
         all_joints.append(joint)
         all_joints.extend(frag.joints)
         instances[name] = SceneInstance(
-            name=name, root_link=frag.root_link, parent_link=parent_link, joint_name=joint.get("name")
+            name=name,
+            root_link=frag.root_link,
+            parent_link=parent_link,
+            joint_name=joint.get("name"),
+            link_names=frozenset(frag.link_names),
         )
 
     if errors:

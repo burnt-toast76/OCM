@@ -44,11 +44,36 @@ pytest
 # `python -m` doesn't:
 ocm validate modules/com.accelsolutions.screwdriver.sd50/module.yaml
 python -m ocm_generator resolve cells/bracket-asm-01/cell.yaml --modules modules
-python -m ocm_generator scene cells/bracket-asm-01/cell.yaml --modules modules --out /tmp/cell.urdf
+python -m ocm_generator scene cells/bracket-asm-01/cell.yaml --modules modules --view /tmp/cell.html
 ```
 
 Three subcommands, one per stage: `validate` (a module manifest against the
 schema), `resolve` (a cell against a module search path), `scene` (resolve +
-build the Tesseract environment, optionally writing the combined URDF for
-inspection). Each prints every collected violation on failure, matching the
-libraries underneath -- see `ocm_generator/cli.py`.
+build the Tesseract environment). Each prints every collected violation on
+failure, matching the libraries underneath -- see `ocm_generator/cli.py`.
+
+`scene` takes two optional outputs, either or both at once:
+
+- `--dump-urdf FILE.urdf` -- the composed URDF as a plain file, e.g. to
+  cross-check in another URDF tool.
+- `--view FILE.html` -- a single self-contained HTML file: three.js loaded
+  from a CDN via an import map, no build step, no npm, no server. Open it
+  by double-clicking. It's a **debug viewer**, not the product viewer
+  (`ocm-viewer/`'s own R3F + GLB pipeline, per ADR-0007) -- geometry is
+  walked straight out of the composed URDF and drawn as box/cylinder/sphere
+  primitives (see `ocm_generator/scene/viewer.py`); links whose only
+  collision geometry is a mesh (currently just the vendored UR5e) get a
+  small translucent placeholder marker instead of their real shape, since
+  this tool deliberately doesn't add a mesh/URDF-loader JS dependency.
+  Distinct color per module instance, with a legend; orbit controls; a
+  ground grid at z=0; axes at the world origin; and a label at every
+  `mount.on` attachment point and every module's declared `frames.tcp`
+  (e.g. `bracket-asm-01` gets a "robot1__flange (mount for sd1)" marker and
+  a "sd1 TCP" marker, 186.5 mm apart -- exactly `sd50`'s declared
+  `frames.tcp` z-offset).
+
+The transform math the viewer (and eventually the planner) relies on --
+composing URDF's fixed-axis roll-pitch-yaw `<origin>`s along a joint
+chain -- lives on its own in `ocm_generator/scene/transforms.py`, unit
+tested independently of URDF parsing or Tesseract in
+`tests/test_transforms.py`.

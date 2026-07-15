@@ -70,7 +70,7 @@ def test_resolve_reports_every_violation(capsys, repo_root: Path, tmp_path: Path
 
 
 def test_scene_succeeds_on_the_real_bracket_cell(capsys, repo_root: Path, tmp_path: Path):
-    out_path = tmp_path / "bracket.urdf"
+    urdf_path = tmp_path / "bracket.urdf"
 
     exit_code = main(
         [
@@ -78,8 +78,8 @@ def test_scene_succeeds_on_the_real_bracket_cell(capsys, repo_root: Path, tmp_pa
             str(repo_root / "cells" / "bracket-asm-01" / "cell.yaml"),
             "--modules",
             str(repo_root / "modules"),
-            "--out",
-            str(out_path),
+            "--dump-urdf",
+            str(urdf_path),
         ]
     )
 
@@ -87,8 +87,56 @@ def test_scene_succeeds_on_the_real_bracket_cell(capsys, repo_root: Path, tmp_pa
     out = capsys.readouterr().out
     assert "18 links, 17 joints" in out
     assert "sd1: sd1__origin -> parent robot1__flange" in out
-    assert out_path.is_file()
-    assert "<robot" in out_path.read_text(encoding="utf-8")
+    assert urdf_path.is_file()
+    assert "<robot" in urdf_path.read_text(encoding="utf-8")
+
+
+def test_scene_view_writes_a_self_contained_html_file(capsys, repo_root: Path, tmp_path: Path):
+    html_path = tmp_path / "bracket.html"
+
+    exit_code = main(
+        [
+            "scene",
+            str(repo_root / "cells" / "bracket-asm-01" / "cell.yaml"),
+            "--modules",
+            str(repo_root / "modules"),
+            "--view",
+            str(html_path),
+        ]
+    )
+
+    assert exit_code == 0
+    out = capsys.readouterr().out
+    assert f"wrote HTML viewer to {html_path}" in out
+    assert html_path.is_file()
+
+    page = html_path.read_text(encoding="utf-8")
+    assert "<script type=\"importmap\">" in page
+    assert "unpkg.com/three" in page
+    assert "com.accelsolutions.cell.bracket-asm-01" in page
+    assert "robot1__flange" in page  # sd1's mount point, as an embedded marker
+
+
+def test_scene_can_write_both_dump_urdf_and_view_together(capsys, repo_root: Path, tmp_path: Path):
+    urdf_path = tmp_path / "bracket.urdf"
+    html_path = tmp_path / "bracket.html"
+
+    exit_code = main(
+        [
+            "scene",
+            str(repo_root / "cells" / "bracket-asm-01" / "cell.yaml"),
+            "--modules",
+            str(repo_root / "modules"),
+            "--dump-urdf",
+            str(urdf_path),
+            "--view",
+            str(html_path),
+        ]
+    )
+
+    assert exit_code == 0
+    assert urdf_path.is_file()
+    assert html_path.is_file()
 
 
 def test_scene_fails_cleanly_when_resolve_fails(capsys, repo_root: Path, tmp_path: Path):
