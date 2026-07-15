@@ -1,14 +1,19 @@
 # ─────────────────────────────────────────────────────────────────────
 # OCM Module Definition — Universal Robots UR5e, 6-axis collaborative arm
 #
-# STUB. Enough to resolve cell.yaml end-to-end (mount chain + mechanical
-# envelope). No urdf_fragment/collision mesh authored yet -- ocm-generator's
-# scene/ needs UR's own published URDF before this becomes real. See
-# ROADMAP Step 1.
+# urdf_fragment / meshes/collision are vendored from Universal Robots'
+# own Universal_Robots_ROS2_Description (BSD-3-Clause), flattened from
+# the real vendored kinematics/inertials -- not hand-estimated like the
+# box-primitive stubs elsewhere in modules/. See NOTICE.md for the exact
+# source, license text, and what was (collision geometry, kinematics,
+# inertials) and wasn't (visual DAE meshes, ros2_control tags) carried
+# over, and urdf/generate_flat_urdf.py for how it was derived.
 #
 # Proprietary vendor hardware: `license` below is NOT CERN-OHL-S-2.0 (that
 # would misrepresent someone else's closed design). It only applies to
-# Accel Solutions' own open modules (sd50, dh200, frame1200, ...).
+# Accel Solutions' own open modules (sd50, dh200, frame1200, ...). The
+# vendored URDF/mesh subtree carries its own BSD-3-Clause license
+# (NOTICE.md), independent of this manifest's `license:` field below.
 # ─────────────────────────────────────────────────────────────────────
 ocm_version: "1.0"
 id:       com.universal-robots.ur5e
@@ -35,8 +40,8 @@ mechanical:
       note:   "Base mounting face. Per-instance placement comes from cell.yaml's mount.pose."
 
   geometry:
-    collision:     meshes/ur5e_convex.stl       # placeholder -- not authored yet
-    urdf_fragment: urdf/ur5e.urdf.xacro         # placeholder -- swap in UR's official URDF when scene/ exists
+    collision:     meshes/collision/base.stl    # representative single mesh; urdf_fragment carries the real per-link set
+    urdf_fragment: urdf/ur5e.urdf.xacro         # vendored + flattened from Universal_Robots_ROS2_Description -- see NOTICE.md
 
   mass_kg: 20.6
 

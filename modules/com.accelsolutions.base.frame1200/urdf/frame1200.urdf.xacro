@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!--
+  STUB collision geometry: an axis-aligned box, not real CAD. Footprint
+  from mechanical.mount.footprint_mm (1200x900 mm, itself an estimate;
+  see module.yaml); height estimated at 150 mm for a bolted tab-and-slot
+  frame + ground plate stack (ADR-0005/0006). Replace when a real convex
+  hull / vendor mesh is authored.
+-->
+<robot name="frag">
+  <link name="origin">
+    <collision>
+      <origin xyz="0 0 0.075" rpy="0 0 0"/>
+      <geometry><box size="1.2 0.9 0.15"/></geometry>
+    </collision>
+  </link>
+</robot>

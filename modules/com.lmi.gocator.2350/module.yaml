@@ -29,7 +29,8 @@ mechanical:
       xyz_mm: [0, 0, 0]
       note:   "Sensor housing mount face, per cell.yaml's mount.pose (looking straight down at the nest)."
   geometry:
-    collision: meshes/gocator-2350_convex.stl   # placeholder -- not authored yet
+    collision:     meshes/gocator-2350_convex.stl   # placeholder -- not authored yet
+    urdf_fragment: urdf/gocator-2350.urdf.xacro
   mass_kg: 0.9
 
 capabilities:

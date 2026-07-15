@@ -9,6 +9,9 @@ dependencies = [
     "tesseract-robotics>=0.35.0",
 ]
 
+[project.scripts]
+ocm = "ocm_generator.cli:main"
+
 [project.optional-dependencies]
 # ocm-core and ocm-resolve are sibling packages in this monorepo, not
 # published to an index. Install all three editable from the same venv:

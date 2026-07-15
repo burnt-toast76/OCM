@@ -19,12 +19,14 @@ description: >
 mechanical:
   mount:
     interface: custom             # the base doesn't mount TO anything; it IS the datum
+    footprint_mm: [1200, 900]     # estimate from the "1200" working-envelope name, not measured
   frames:
     origin:
       xyz_mm: [0, 0, 0]
       note:   "cell_origin. Every module's mount.pose in cell.yaml is relative to this."
   geometry:
-    collision: meshes/frame1200_convex.stl   # placeholder -- not authored yet
+    collision:     meshes/frame1200_convex.stl   # placeholder -- not authored yet
+    urdf_fragment: urdf/frame1200.urdf.xacro
   mass_kg: 85.0
 
 state_machine:

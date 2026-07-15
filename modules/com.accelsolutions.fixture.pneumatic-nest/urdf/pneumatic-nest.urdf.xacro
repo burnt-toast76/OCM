@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!--
+  STUB collision geometry: an axis-aligned box, not real CAD. Footprint
+  from mechanical.mount.footprint_mm (220x160 mm); height from the
+  frames.part_datum z-offset already in module.yaml (60 mm, where a
+  seated part's own origin lands); both numbers this file derives from
+  are declared in the manifest, not measured here. Replace when a real
+  convex hull / vendor mesh is authored.
+-->
+<robot name="frag">
+  <link name="origin">
+    <collision>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+      <geometry><box size="0.22 0.16 0.06"/></geometry>
+    </collision>
+  </link>
+</robot>

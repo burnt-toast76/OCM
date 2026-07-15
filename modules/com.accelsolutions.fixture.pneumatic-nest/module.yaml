@@ -29,7 +29,8 @@ mechanical:
       xyz_mm:  [0, 0, 60]
       note:    "Where a correctly seated part's own origin lands. What cam1's locate_part corrects against."
   geometry:
-    collision: meshes/pneumatic-nest_convex.stl   # placeholder -- not authored yet
+    collision:     meshes/pneumatic-nest_convex.stl   # placeholder -- not authored yet
+    urdf_fragment: urdf/pneumatic-nest.urdf.xacro
   mass_kg: 6.5
 
 electrical:

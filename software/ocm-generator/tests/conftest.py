@@ -25,6 +25,11 @@ def repo_root() -> Path:
     return REPO_ROOT
 
 
+@pytest.fixture
+def sd50_manifest_path(repo_root: Path) -> Path:
+    return repo_root / "modules" / "com.accelsolutions.screwdriver.sd50" / "module.yaml"
+
+
 def fragment_xml(root_link: str, extra_link: str | None = None, extra_xyz=(0.0, 0.0, 0.05)) -> str:
     """A tiny, valid, standalone URDF fragment: one link, or two joined by a
     fixed joint (the second link is used as a mount.on attachment point).

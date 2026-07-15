@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<!--
+  STUB collision geometry: an axis-aligned box, not real CAD. Footprint
+  from mechanical.mount.footprint_mm (90x60 mm); height is a rough
+  estimate (70 mm) for a compact snapshot-sensor housing; no z-bearing
+  frame exists in module.yaml to derive it from, unlike the other five
+  stubs. Replace when a real convex hull / vendor mesh is authored.
+-->
+<robot name="frag">
+  <link name="origin">
+    <collision>
+      <origin xyz="0 0 0.035" rpy="0 0 0"/>
+      <geometry><box size="0.09 0.06 0.07"/></geometry>
+    </collision>
+  </link>
+</robot>

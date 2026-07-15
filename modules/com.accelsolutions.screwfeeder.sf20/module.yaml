@@ -32,7 +32,8 @@ mechanical:
       xyz_mm: [0, -110, 180]
       note:   "End of the linear track. Where the feed hose (sd50's feed_port) picks up a singulated screw."
   geometry:
-    collision: meshes/sf20_convex.stl   # placeholder -- not authored yet
+    collision:     meshes/sf20_convex.stl   # placeholder -- not authored yet
+    urdf_fragment: urdf/sf20.urdf.xacro
   mass_kg: 4.2
 
 electrical:
