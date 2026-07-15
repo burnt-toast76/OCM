@@ -46,7 +46,7 @@ modules:
   - instance: nest1
     module: com.accelsolutions.fixture.pneumatic-nest@1.1.0
     mount:
-      pose: { xyz_mm: [640, 300, 60], rpy_deg: [0, 0, 90] }
+      pose: { xyz_mm: [640, 300, 0], rpy_deg: [0, 0, 90] }   # mounting face ON the deck (z=0 = deck surface)
     address:
       ethercat_position: 6
 

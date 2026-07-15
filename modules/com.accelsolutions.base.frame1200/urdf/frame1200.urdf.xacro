@@ -1,16 +1,43 @@
 <?xml version="1.0"?>
 <!--
-  STUB collision geometry: an axis-aligned box, not real CAD. Footprint
-  from mechanical.mount.footprint_mm (1200x900 mm, itself an estimate;
-  see module.yaml); height estimated at 150 mm for a bolted tab-and-slot
-  frame + ground plate stack (ADR-0005/0006). Replace when a real convex
-  hull / vendor mesh is authored.
+  STUB collision geometry - boxes, not real CAD.
+
+  DATUM CONVENTION (spec/02):
+    - origin (0,0,0) is the TOP surface of the datum plate, at the PLATE CORNER
+    - the machined reference edge lies along X=0
+    - +Z up. The slab hangs BELOW the origin.
+    - plate spans X: 0..1.2  Y: 0..0.9  Z: -0.15..0
+
+  GUARD WALLS: four perimeter walls, 1.8 m above deck, 50 mm thick,
+  centered ON the footprint boundary. They are collision geometry - the
+  planner must keep the robot inside them. Real guarding needs openings
+  (load station, door interlocks per spec/06); model those per-cell when
+  they exist. A solid perimeter is the CONSERVATIVE stub: any plan valid
+  inside solid walls stays valid when you cut a doorway.
 -->
 <robot name="frag">
   <link name="origin">
+    <!-- datum plate / frame stack -->
     <collision>
-      <origin xyz="0 0 0.075" rpy="0 0 0"/>
+      <origin xyz="0.6 0.45 -0.075" rpy="0 0 0"/>
       <geometry><box size="1.2 0.9 0.15"/></geometry>
+    </collision>
+    <!-- guard walls: -Y (front), +Y (back), -X (left), +X (right) -->
+    <collision>
+      <origin xyz="0.6 0.0 0.9" rpy="0 0 0"/>
+      <geometry><box size="1.3 0.05 1.8"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.6 0.9 0.9" rpy="0 0 0"/>
+      <geometry><box size="1.3 0.05 1.8"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.0 0.45 0.9" rpy="0 0 0"/>
+      <geometry><box size="0.05 1.0 1.8"/></geometry>
+    </collision>
+    <collision>
+      <origin xyz="1.2 0.45 0.9" rpy="0 0 0"/>
+      <geometry><box size="0.05 1.0 1.8"/></geometry>
     </collision>
   </link>
 </robot>
