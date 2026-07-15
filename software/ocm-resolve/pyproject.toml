@@ -1,0 +1,21 @@
+[project]
+name = "ocm-resolve"
+version = "0.1.0"
+description = "Resolve a cell composition against a module search path into a ResolvedCell."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0-or-later" }
+# ocm-core is a sibling package in this monorepo, not published to an
+# index. Install both editable from the same venv: `pip install -e
+# ../ocm-core -e .`. See README.
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8.0", "PyYAML>=6.0"]
+
+[tool.setuptools.packages.find]
+include = ["ocm_resolve*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

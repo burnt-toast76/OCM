@@ -1,0 +1,72 @@
+# ─────────────────────────────────────────────────────────────────────
+# OCM Module Definition — SF20 vibratory screw feeder
+#
+# STUB. Enough to resolve cell.yaml end-to-end. Not directly named by any
+# plan step -- sd1.load_screw's `feed_ready` precondition is what actually
+# gates on this module at runtime (via its own signal, not a cross-module
+# reference the schema can express yet). Declared here so the module
+# itself, and the `feed1` instance sd1's `consumables.screw.source` points
+# at, both exist.
+# ─────────────────────────────────────────────────────────────────────
+ocm_version: "1.0"
+id:       com.accelsolutions.screwfeeder.sf20
+revision: "1.0.0"
+name:     "SF20 Screw Feeder"
+vendor:   "Accel Solutions LLC"
+license:  CERN-OHL-S-2.0
+kind:     feeder
+description: >
+  Vibratory bowl feeder with a linear track, singulating M2-M5 fasteners
+  to a fixed pick point. Reports hopper level and jam state so a stockout
+  shows up before it stalls the cell, not after.
+
+mechanical:
+  mount:
+    interface: ocm-base-grid-50
+    footprint_mm: [260, 260]
+  frames:
+    origin:
+      xyz_mm: [0, 0, 0]
+      note:   "Feeder base, per cell.yaml's mount.pose."
+    pick:
+      xyz_mm: [0, -110, 180]
+      note:   "End of the linear track. Where the feed hose (sd50's feed_port) picks up a singulated screw."
+  geometry:
+    collision: meshes/sf20_convex.stl   # placeholder -- not authored yet
+  mass_kg: 4.2
+
+electrical:
+  supplies:
+    - rail: 24VDC
+      current_nominal_a: 0.8
+      current_peak_a: 2.0
+
+comms:
+  protocol: ethercat
+  signals:
+    - { name: packml_cmd,    direction: output, type: uint16, role: packml_cmd }
+    - { name: packml_state,  direction: input,  type: uint16, role: packml_state }
+    - { name: fault_code,    direction: input,  type: uint16, role: fault_code }
+    - { name: heartbeat,     direction: input,  type: bool,   role: heartbeat }
+    - { name: bowl_enable,   direction: output, type: bool }
+    - { name: screw_at_pick, direction: input,  type: bool }
+    - { name: hopper_low,    direction: input,  type: bool }
+    - { name: jam_detected,  direction: input,  type: bool }
+
+capabilities:
+  - name: present_screw
+    summary: "Run the bowl/track until a screw is singulated and held at the pick point."
+    preconditions:
+      - hopper_low == false
+      - jam_detected == false
+    postconditions:
+      - screw_at_pick == true
+    results:
+      ok: { type: boolean }
+    nominal_duration_s: 1.2
+    consumes: [screw]
+
+state_machine:
+  model: packml
+  implements: [idle, starting, execute, completing, complete, resetting, holding, held, unholding, aborting, aborted, clearing, stopping, stopped]
+  abort_safe: true   # worst case a part-singulated screw falls back into the bowl; no scrap, no damage

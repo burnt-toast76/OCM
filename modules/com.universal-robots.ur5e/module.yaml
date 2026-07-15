@@ -1,0 +1,75 @@
+# ─────────────────────────────────────────────────────────────────────
+# OCM Module Definition — Universal Robots UR5e, 6-axis collaborative arm
+#
+# STUB. Enough to resolve cell.yaml end-to-end (mount chain + mechanical
+# envelope). No urdf_fragment/collision mesh authored yet -- ocm-generator's
+# scene/ needs UR's own published URDF before this becomes real. See
+# ROADMAP Step 1.
+#
+# Proprietary vendor hardware: `license` below is NOT CERN-OHL-S-2.0 (that
+# would misrepresent someone else's closed design). It only applies to
+# Accel Solutions' own open modules (sd50, dh200, frame1200, ...).
+# ─────────────────────────────────────────────────────────────────────
+ocm_version: "1.0"
+id:       com.universal-robots.ur5e
+revision: "3.1.0"
+name:     "UR5e"
+vendor:   "Universal Robots A/S"
+license:  LicenseRef-Proprietary
+kind:     robot
+description: >
+  6-axis collaborative arm. 5 kg payload, 850 mm reach. Programmed over
+  URScript, a raw TCP socket (port 30002) -- see cell.yaml's `address.ip`.
+  That motion channel is separate from `comms` below, which is the UR
+  controller's Modbus TCP register interface, used here only to carry
+  PackML status/command so the cell coordinator's logic stays generic.
+
+mechanical:
+  mount:
+    interface: ocm-base-grid-50
+    footprint_mm: [190, 190]        # base flange envelope
+
+  frames:
+    origin:
+      xyz_mm: [0, 0, 0]
+      note:   "Base mounting face. Per-instance placement comes from cell.yaml's mount.pose."
+
+  geometry:
+    collision:     meshes/ur5e_convex.stl       # placeholder -- not authored yet
+    urdf_fragment: urdf/ur5e.urdf.xacro         # placeholder -- swap in UR's official URDF when scene/ exists
+
+  mass_kg: 20.6
+
+comms:
+  protocol: modbus-tcp
+  signals:
+    - { name: packml_cmd,   direction: output, type: uint16, role: packml_cmd }
+    - { name: packml_state, direction: input,  type: uint16, role: packml_state }
+    - { name: fault_code,   direction: input,  type: uint16, role: fault_code }
+    - { name: heartbeat,    direction: input,  type: bool,   role: heartbeat }
+
+state_machine:
+  model: packml
+  implements:
+    - idle
+    - starting
+    - execute
+    - completing
+    - complete
+    - resetting
+    - aborting
+    - aborted
+    - clearing
+    - stopping
+    - stopped
+  # Protective stop decelerates the arm without damaging it or (typically)
+  # a held part. Whether that's actually safe for a GIVEN op is the
+  # capability's own abort_safe concern (e.g. sd50's drive_screw is not).
+  abort_safe: true
+
+safety:
+  hazards: [pinch, crush]
+  required_performance_level: PLd
+  sto_required: true
+  guarding: interlocked
+  safe_state: "Category 0/1 stop per configured safety I/O; joints hold position under brake."

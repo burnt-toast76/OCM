@@ -1,0 +1,101 @@
+# ─────────────────────────────────────────────────────────────────────
+# OCM Module Definition — Pneumatic nest fixture
+#
+# STUB. Enough to resolve cell.yaml end-to-end -- clamp/unclamp match the
+# ops the dogfood plan actually calls, with bounds covering the plan's
+# force_n: 120.
+# ─────────────────────────────────────────────────────────────────────
+ocm_version: "1.0"
+id:       com.accelsolutions.fixture.pneumatic-nest
+revision: "1.1.0"
+name:     "Pneumatic Nest Fixture"
+vendor:   "Accel Solutions LLC"
+license:  CERN-OHL-S-2.0
+kind:     fixture
+description: >
+  Two-jaw pneumatic nest. Locates and clamps the part for the fasten and
+  dispense stations. Clamp force is closed-loop via regulator feedback,
+  not just "valve on."
+
+mechanical:
+  mount:
+    interface: ocm-base-grid-50
+    footprint_mm: [220, 160]
+  frames:
+    origin:
+      xyz_mm: [0, 0, 0]
+      note:   "Nest base, per cell.yaml's mount.pose."
+    part_datum:
+      xyz_mm:  [0, 0, 60]
+      note:    "Where a correctly seated part's own origin lands. What cam1's locate_part corrects against."
+  geometry:
+    collision: meshes/pneumatic-nest_convex.stl   # placeholder -- not authored yet
+  mass_kg: 6.5
+
+electrical:
+  pneumatic:
+    pressure_bar: 5.5
+    flow_nl_min: 25
+    port: 6mm-push-in
+
+comms:
+  protocol: ethercat
+  signals:
+    - { name: packml_cmd,   direction: output, type: uint16, role: packml_cmd }
+    - { name: packml_state, direction: input,  type: uint16, role: packml_state }
+    - { name: fault_code,   direction: input,  type: uint16, role: fault_code }
+    - { name: heartbeat,    direction: input,  type: bool,   role: heartbeat }
+    - { name: target_force, direction: output, type: real,   unit: "N", role: process_param }
+    - { name: clamped,      direction: input,  type: bool }
+    - { name: force_actual, direction: input,  type: real,   unit: "N", role: process_result }
+
+capabilities:
+  - name: clamp
+    summary: "Close both jaws and hold the part at a target force."
+    parameters:
+      force_n:
+        type: number
+        unit: "N"
+        min: 20.0
+        max: 300.0
+        summary: "Target clamp force. Too low: part walks under drive torque. Too high: marks a soft part."
+    preconditions:
+      - clamped == false
+    postconditions:
+      - clamped == true
+    results:
+      force_achieved: { type: number, unit: "N" }
+    nominal_duration_s: 0.6
+
+  - name: unclamp
+    summary: "Open both jaws and release the part."
+    preconditions:
+      - clamped == true
+    postconditions:
+      - clamped == false
+    nominal_duration_s: 0.4
+
+state_machine:
+  model: packml
+  implements:
+    - idle
+    - starting
+    - execute
+    - completing
+    - complete
+    - resetting
+    - aborting
+    - aborted
+    - clearing
+    - stopping
+    - stopped
+  # A part clamped mid-cycle stays clamped on abort -- dropping it is worse
+  # than holding it. Recovery is a human opening the jaws deliberately.
+  abort_safe: false
+
+safety:
+  hazards: [pinch, crush]
+  required_performance_level: PLc
+  sto_required: false
+  guarding: interlocked
+  safe_state: "Jaws hold last commanded position; air supply may be locked out without dropping the part (check valve on the clamp cylinder)."

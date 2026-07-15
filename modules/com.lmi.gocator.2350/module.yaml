@@ -1,0 +1,53 @@
+# ─────────────────────────────────────────────────────────────────────
+# OCM Module Definition — LMI Gocator 2350 3D snapshot sensor
+#
+# STUB. Enough to resolve cell.yaml end-to-end. `locate_part` matches the
+# op the dogfood plan calls. The schema's `results` are scalar-typed
+# (no pose/transform type exists yet -- see $defs/parameter), so a located
+# pose is reported as six named scalars rather than one composite value.
+# That's a real schema gap, not an oversight; worth revisiting if more
+# vision modules show up wanting the same shape.
+# ─────────────────────────────────────────────────────────────────────
+ocm_version: "1.0"
+id:       com.lmi.gocator.2350
+revision: "1.0.0"
+name:     "Gocator 2350"
+vendor:   "LMI Technologies"
+license:  LicenseRef-Proprietary
+kind:     sensor
+description: >
+  3D snapshot laser profiler. Locates the part against nest1's part_datum
+  and returns a correction transform that every downstream frame in the
+  plan is composed against (see cell.yaml's `binds: part_pose`).
+
+mechanical:
+  mount:
+    interface: ocm-base-grid-50
+    footprint_mm: [90, 60]
+  frames:
+    origin:
+      xyz_mm: [0, 0, 0]
+      note:   "Sensor housing mount face, per cell.yaml's mount.pose (looking straight down at the nest)."
+  geometry:
+    collision: meshes/gocator-2350_convex.stl   # placeholder -- not authored yet
+  mass_kg: 0.9
+
+capabilities:
+  - name: locate_part
+    summary: "Snapshot the part in the nest and return its pose correction relative to nest1's part_datum."
+    motion:
+      hold_still: true   # the robot isn't involved; this runs off nest1's fixed camera
+    results:
+      x_mm:    { type: number, unit: mm }
+      y_mm:    { type: number, unit: mm }
+      z_mm:    { type: number, unit: mm }
+      rx_deg:  { type: number, unit: deg }
+      ry_deg:  { type: number, unit: deg }
+      rz_deg:  { type: number, unit: deg }
+      ok:      { type: boolean, summary: "false if no part / low confidence match -- plan must not proceed on a stale pose." }
+    nominal_duration_s: 0.3
+
+state_machine:
+  model: packml
+  implements: [idle, starting, execute, completing, complete, resetting, aborting, aborted, clearing, stopping, stopped]
+  abort_safe: true   # a snapshot has no moving parts and nothing to leave half-done

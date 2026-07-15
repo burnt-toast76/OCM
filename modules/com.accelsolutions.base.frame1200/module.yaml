@@ -1,0 +1,32 @@
+# ─────────────────────────────────────────────────────────────────────
+# OCM Module Definition — Frame1200 cell base
+#
+# STUB. Enough to resolve cell.yaml end-to-end. The real bolt grid this
+# base carries is ADR-0011 -- still OPEN -- so treat mount.interface and
+# footprint here as provisional, not load-bearing on that decision.
+# ─────────────────────────────────────────────────────────────────────
+ocm_version: "1.0"
+id:       com.accelsolutions.base.frame1200
+revision: "2.0.0"
+name:     "Frame1200 Cell Base"
+vendor:   "Accel Solutions LLC"
+license:  CERN-OHL-S-2.0
+kind:     base
+description: >
+  Bolted tab-and-slot base frame, 1200 mm working envelope (ADR-0005).
+  Carries the datum plate every module's `mount.pose` is measured from.
+
+mechanical:
+  mount:
+    interface: custom             # the base doesn't mount TO anything; it IS the datum
+  frames:
+    origin:
+      xyz_mm: [0, 0, 0]
+      note:   "cell_origin. Every module's mount.pose in cell.yaml is relative to this."
+  geometry:
+    collision: meshes/frame1200_convex.stl   # placeholder -- not authored yet
+  mass_kg: 85.0
+
+state_machine:
+  model: packml
+  abort_safe: true    # passive structure; nothing to abort

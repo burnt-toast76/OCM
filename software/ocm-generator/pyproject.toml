@@ -1,0 +1,23 @@
+[project]
+name = "ocm-generator"
+version = "0.1.0"
+description = "cell.yaml -> Tesseract scene -> collision-checked motion -> URScript/PLCopen XML."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0-or-later" }
+dependencies = [
+    "tesseract-robotics>=0.35.0",
+]
+
+[project.optional-dependencies]
+# ocm-core and ocm-resolve are sibling packages in this monorepo, not
+# published to an index. Install all three editable from the same venv:
+# `pip install -e ../ocm-core -e ../ocm-resolve -e ".[test]"`. See README.
+test = ["pytest>=8.0", "PyYAML>=6.0"]
+
+[tool.setuptools.packages.find]
+include = ["ocm_generator*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
