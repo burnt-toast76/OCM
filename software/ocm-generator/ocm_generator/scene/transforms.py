@@ -40,6 +40,23 @@ class Pose:
     def from_xyz_rpy(cls, xyz: Vec3, rpy: Vec3) -> "Pose":
         return cls(tuple(xyz), _rotation_from_rpy(tuple(rpy)))
 
+    @classmethod
+    def from_axis_angle(cls, axis: Vec3, angle: float) -> "Pose":
+        """A pure rotation of `angle` radians about `axis` (need not be unit
+        length; normalized here) -- URDF's <joint><axis>/revolute-joint
+        convention, via Rodrigues' rotation formula.
+        """
+        return cls((0.0, 0.0, 0.0), _rotation_from_axis_angle(axis, angle))
+
+    def transform_point(self, point: Vec3) -> Vec3:
+        """p_parent = rotation @ point + translation."""
+        rotated = _mat3_vec(self.rotation, point)
+        return (
+            rotated[0] + self.translation[0],
+            rotated[1] + self.translation[1],
+            rotated[2] + self.translation[2],
+        )
+
     def compose(self, local: "Pose") -> "Pose":
         """`local` is expressed in this pose's own frame; return the
         equivalent pose one frame up (e.g. self=world_T_parent,
@@ -76,6 +93,20 @@ def _rot_y(a: float) -> Mat3:
 def _rot_z(a: float) -> Mat3:
     c, s = math.cos(a), math.sin(a)
     return ((c, -s, 0.0), (s, c, 0.0), (0.0, 0.0, 1.0))
+
+
+def _rotation_from_axis_angle(axis: Vec3, angle: float) -> Mat3:
+    length = math.sqrt(axis[0] ** 2 + axis[1] ** 2 + axis[2] ** 2)
+    if length == 0.0:
+        raise ValueError("rotation axis must not be the zero vector")
+    ux, uy, uz = (axis[0] / length, axis[1] / length, axis[2] / length)
+    c, s = math.cos(angle), math.sin(angle)
+    t = 1.0 - c
+    return (
+        (t * ux * ux + c, t * ux * uy - s * uz, t * ux * uz + s * uy),
+        (t * ux * uy + s * uz, t * uy * uy + c, t * uy * uz - s * ux),
+        (t * ux * uz - s * uy, t * uy * uz + s * ux, t * uz * uz + c),
+    )
 
 
 def _mat3_mul(a: Mat3, b: Mat3) -> Mat3:

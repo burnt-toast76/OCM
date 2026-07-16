@@ -34,6 +34,36 @@ derived from each manifest's own `footprint_mm`/frame offsets, and a real
 vendored-and-flattened UR5e (see `modules/com.universal-robots.ur5e/NOTICE.md`).
 See `tests/test_scene_build_real_bracket_cell.py`.
 
+A link may carry several `<collision>` boxes (frame1200's own link is a
+deck slab plus four guard walls -- see its `urdf/frame1200.urdf.xacro`
+comment and spec/02's datum convention); `ocm_generator.scene.kinematics`
+parses and forward-kinematics-places all of them, not just the first, and
+that same module backs both the viewer and:
+
+**Workspace containment.** The base module's own collision geometry (deck
++ walls) *is* the workspace footprint. `build_scene` computes every
+non-base instance's world AABB and refuses the cell if it extends past
+that footprint (X/Y only), naming the instance and the overhang in mm.
+The robot itself is exempt -- its reach is configuration-dependent by
+design, and keeping it inside the walls at every commanded pose is the
+planner's job, not a static check (spec/02: the walls are collision
+geometry *for the planner*; this check is a cheap stand-in for one part of
+that, done now, before there is a planner). Anything mounted ON the robot
+(e.g. `sd1`) is *not* exempt, because it has a well-defined static pose to
+check once a `joint_state` is given:
+
+**`joint_state`.** A cell.yaml module instance may declare an optional
+`joint_state:` map (joint name -> radians, applied as-is -- no mm/deg
+conversion, unlike `mount.pose`). Composed into the scene via the same
+kinematics used for the viewer/containment check; any joint left
+unspecified, and every fixed joint, sits at zero. `bracket-asm-01`'s
+`robot1` carries a folded home pose for exactly this reason: at the arm's
+default all-zero pose, `sd1` lands about 2 mm outside the guard-wall
+footprint; folding `shoulder_lift`/`elbow` brings it back inside with
+~400 mm to spare. See `test_real_bracket_cell_without_the_folded_joint_state_pokes_through_the_wall`
+for the regression test that pins this down by removing the block and
+watching `build_scene` refuse the cell again.
+
 ## CLI
 
 ```

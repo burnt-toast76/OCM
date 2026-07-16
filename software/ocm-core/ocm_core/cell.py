@@ -105,6 +105,13 @@ class ModuleInstance:
     tool: str | None = None
     consumables: dict[str, Consumable] = field(default_factory=dict)
     calibration: str | None = None
+    # Named joint -> radians, applied when composing the scene (only
+    # meaningful for instances whose module has movable joints of its own,
+    # e.g. a robot). Unlike mount.pose's xyz_mm/rpy_deg, this is radians
+    # directly -- no mm/deg convention to convert, matching how joint
+    # values are written everywhere else in robotics tooling. Absent ->
+    # every joint defaults to zero.
+    joint_state: dict[str, float] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ModuleInstance":
@@ -120,6 +127,7 @@ class ModuleInstance:
                 k: Consumable.from_dict(v) for k, v in data.get("consumables", {}).items()
             },
             calibration=data.get("calibration"),
+            joint_state={k: float(v) for k, v in data.get("joint_state", {}).items()},
         )
 
 

@@ -31,6 +31,37 @@ def test_module_instance_mount_and_address(bracket_cell_path):
     assert sd1.consumables["screw"].source == "feed1"
 
 
+def test_module_instance_joint_state_defaults_to_empty(bracket_cell_path):
+    cell = load_cell(bracket_cell_path)
+    assert cell.module("sd1").joint_state == {}
+
+
+def test_robot1_carries_its_folded_home_joint_state(bracket_cell_path):
+    # robot1 is the one instance in the real cell that actually needs
+    # this: without it, the arm defaults to all-zero, which puts sd1
+    # outside the workspace footprint (see ocm-generator's containment
+    # check and its regression test for this exact cell).
+    cell = load_cell(bracket_cell_path)
+    joint_state = cell.module("robot1").joint_state
+    assert joint_state["shoulder_lift_joint"] == pytest.approx(-1.5707963267948966)
+    assert joint_state["elbow_joint"] == pytest.approx(1.5707963267948966)
+
+
+def test_module_instance_joint_state_is_parsed_as_radians(tmp_path, bracket_cell_path):
+    data = yaml.safe_load(bracket_cell_path.read_text(encoding="utf-8"))
+    robot1 = next(m for m in data["modules"] if m["instance"] == "robot1")
+    robot1["joint_state"] = {"shoulder_lift_joint": -1.5707963267948966, "elbow_joint": 1}
+    path = tmp_path / "cell_with_joint_state.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    cell = load_cell(path)
+
+    joint_state = cell.module("robot1").joint_state
+    assert joint_state["shoulder_lift_joint"] == pytest.approx(-1.5707963267948966)
+    assert joint_state["elbow_joint"] == pytest.approx(1.0)
+    assert isinstance(joint_state["elbow_joint"], float)  # coerced, not left as a YAML int
+
+
 def test_controller_and_safety(bracket_cell_path):
     cell = load_cell(bracket_cell_path)
     assert cell.controller.runtime == "beremiz"

@@ -30,6 +30,24 @@ def sd50_manifest_path(repo_root: Path) -> Path:
     return repo_root / "modules" / "com.accelsolutions.screwdriver.sd50" / "module.yaml"
 
 
+def base_fragment_xml(root_link: str) -> str:
+    """A base module's deck, sized to comfortably contain the default
+    build_cell_dict() layout (robot1 at xyz_mm=[400,300,...], so tool1's
+    X/Y lands at 0.4, 0.3 m too -- see build.py's workspace containment
+    check) rather than the tiny 5cm box fragment_xml() gives everything
+    else.
+    """
+    return f"""<?xml version="1.0"?>
+<robot name="frag">
+  <link name="{root_link}">
+    <collision>
+      <origin xyz="0.5 0.5 -0.05" rpy="0 0 0"/>
+      <geometry><box size="1.0 1.0 0.1"/></geometry>
+    </collision>
+  </link>
+</robot>"""
+
+
 def fragment_xml(root_link: str, extra_link: str | None = None, extra_xyz=(0.0, 0.0, 0.05)) -> str:
     """A tiny, valid, standalone URDF fragment: one link, or two joined by a
     fixed joint (the second link is used as a mount.on attachment point).
@@ -186,7 +204,7 @@ def modules_root(tmp_path: Path) -> Path:
     a tool -- all schema-valid, all with real, tiny, on-disk URDF fragments.
     """
     root = tmp_path / "modules"
-    write_module(root, minimal_base_manifest(), "base.urdf", fragment_xml("origin"))
+    write_module(root, minimal_base_manifest(), "base.urdf", base_fragment_xml("origin"))
     write_module(
         root,
         minimal_robot_manifest(),

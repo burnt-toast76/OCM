@@ -90,3 +90,45 @@ def test_quaternion_from_matrix_matches_known_axis_rotations():
     assert Pose.from_xyz_rpy((0, 0, 0), (0, 0, 0)).quaternion_xyzw() == pytest.approx(
         (0.0, 0.0, 0.0, 1.0), abs=1e-9
     )
+
+
+def test_axis_angle_matches_rpy_for_each_principal_axis():
+    # Two independent ways to build "rotate pi/3 about a principal axis"
+    # must agree -- this is what a revolute joint's <axis> + joint value
+    # needs to match the fixed-axis rpy convention everything else uses.
+    angle = math.pi / 3
+    for axis, rpy in (
+        ((1.0, 0.0, 0.0), (angle, 0.0, 0.0)),
+        ((0.0, 1.0, 0.0), (0.0, angle, 0.0)),
+        ((0.0, 0.0, 1.0), (0.0, 0.0, angle)),
+    ):
+        from_axis = Pose.from_axis_angle(axis, angle)
+        from_rpy = Pose.from_xyz_rpy((0.0, 0.0, 0.0), rpy)
+        assert from_axis.quaternion_xyzw() == pytest.approx(from_rpy.quaternion_xyzw(), abs=1e-9)
+
+
+def test_axis_angle_rotation_of_a_perpendicular_point_is_rodrigues_textbook():
+    # Rotating (1,0,0) by +90 deg about +Z should land at (0,1,0) -- the
+    # textbook right-hand-rule case, independent of the rpy machinery.
+    pose = Pose.from_axis_angle((0.0, 0.0, 1.0), math.pi / 2)
+
+    result = pose.transform_point((1.0, 0.0, 0.0))
+
+    assert result == pytest.approx((0.0, 1.0, 0.0), abs=1e-9)
+
+
+def test_axis_angle_normalizes_a_non_unit_axis():
+    a = Pose.from_axis_angle((0.0, 0.0, 1.0), math.pi / 2)
+    b = Pose.from_axis_angle((0.0, 0.0, 5.0), math.pi / 2)  # same direction, not unit length
+
+    assert a.quaternion_xyzw() == pytest.approx(b.quaternion_xyzw(), abs=1e-9)
+
+
+def test_transform_point_matches_compose_with_a_translation_only_pose():
+    pose = Pose.from_xyz_rpy((1.0, 2.0, 3.0), (0.1, -0.2, 0.3))
+    point = (0.5, -0.5, 0.25)
+
+    via_transform_point = pose.transform_point(point)
+    via_compose = pose.compose(Pose(point)).translation
+
+    assert via_transform_point == pytest.approx(via_compose, abs=1e-9)

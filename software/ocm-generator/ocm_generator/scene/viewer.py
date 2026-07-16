@@ -6,15 +6,17 @@ actually assembled, not the product viewer (see ADR-0007's note on
 ocm-viewer's own R3F + GLB pipeline -- a different, much bigger tool this
 doesn't touch).
 
-Geometry is walked directly out of the composed URDF (Scene.urdf_xml):
-every joint's <origin> is composed along the chain from "world" down (see
-.transforms), evaluating any revolute/continuous joint at its zero
-position since this is a static snapshot, not a live simulator. Links
-whose only <collision><geometry> is a <mesh> (currently just the vendored
-UR5e) get a small translucent placeholder marker instead of their real
-shape -- adding an STL/mesh loader is explicitly out of scope for this
-tool; box/cylinder/sphere primitives are simple enough to serialize as
-plain JSON and hand to three.js directly.
+Geometry (every collision primitive a link carries, not just its first --
+see .kinematics) is walked directly out of the composed URDF
+(Scene.urdf_xml), through the same joint-state-aware forward kinematics
+the workspace containment check uses (.kinematics.compute_world_poses),
+so a cell.yaml joint_state is reflected in what gets drawn. Anything left
+unspecified -- and every fixed joint -- sits at zero: a static snapshot,
+not a live simulator. Links whose only <collision><geometry> is a <mesh>
+(currently just the vendored UR5e) get a small translucent placeholder
+marker instead of their real shape -- adding an STL/mesh loader is
+explicitly out of scope for this tool; box/cylinder/sphere primitives are
+simple enough to serialize as plain JSON and hand to three.js directly.
 """
 
 from __future__ import annotations
@@ -23,12 +25,12 @@ import html
 import json
 import math
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 from ocm_resolve import ResolvedCell
 
 from .build import WORLD_LINK, Scene
+from .kinematics import compute_world_poses, list_collision_primitives
 from .transforms import Pose
 
 _PALETTE = [
@@ -44,88 +46,6 @@ def _mm_to_m(xyz_mm: tuple[float, float, float]) -> tuple[float, float, float]:
 
 def _deg_to_rad(rpy_deg: tuple[float, float, float]) -> tuple[float, float, float]:
     return (math.radians(rpy_deg[0]), math.radians(rpy_deg[1]), math.radians(rpy_deg[2]))
-
-
-def _origin_pose(elem: Optional[ET.Element]) -> Pose:
-    if elem is None:
-        return Pose.identity()
-    xyz = tuple(float(v) for v in elem.get("xyz", "0 0 0").split())
-    rpy = tuple(float(v) for v in elem.get("rpy", "0 0 0").split())
-    return Pose.from_xyz_rpy(xyz, rpy)  # type: ignore[arg-type]
-
-
-def _world_poses(root: ET.Element) -> dict[str, Pose]:
-    """BFS the composed URDF's joints from 'world', composing each joint's
-    <origin> along the chain. Every joint (fixed or otherwise) is treated
-    as its <origin> alone -- revolute/continuous joints are evaluated at
-    their zero position, a deliberate simplification for a static
-    snapshot, not a live simulator.
-    """
-    children: dict[str, list[tuple[ET.Element, str]]] = {}
-    for joint in root.findall("joint"):
-        parent_el = joint.find("parent")
-        child_el = joint.find("child")
-        if parent_el is None or child_el is None:
-            continue
-        parent_name = parent_el.get("link")
-        child_name = child_el.get("link")
-        if not parent_name or not child_name:
-            continue
-        children.setdefault(parent_name, []).append((joint, child_name))
-
-    poses: dict[str, Pose] = {WORLD_LINK: Pose.identity()}
-    frontier = [WORLD_LINK]
-    while frontier:
-        next_frontier: list[str] = []
-        for parent_name in frontier:
-            parent_pose = poses[parent_name]
-            for joint, child_name in children.get(parent_name, []):
-                local = _origin_pose(joint.find("origin"))
-                poses[child_name] = parent_pose.compose(local)
-                next_frontier.append(child_name)
-        frontier = next_frontier
-    return poses
-
-
-@dataclass
-class _GeometryResult:
-    kind: str  # "box" | "cylinder" | "sphere"
-    dims: dict[str, float]
-    world: Pose
-    placeholder: bool
-
-
-def _geometry_of(link: ET.Element, link_world: Pose) -> Optional[_GeometryResult]:
-    collision = link.find("collision")
-    if collision is None:
-        return None
-    geometry = collision.find("geometry")
-    if geometry is None:
-        return None
-    world = link_world.compose(_origin_pose(collision.find("origin")))
-
-    box = geometry.find("box")
-    if box is not None and box.get("size"):
-        x, y, z = (float(v) for v in box.get("size").split())
-        return _GeometryResult("box", {"x": x, "y": y, "z": z}, world, False)
-
-    cylinder = geometry.find("cylinder")
-    if cylinder is not None:
-        radius = float(cylinder.get("radius", "0.02"))
-        length = float(cylinder.get("length", "0.05"))
-        return _GeometryResult("cylinder", {"radius": radius, "length": length}, world, False)
-
-    sphere = geometry.find("sphere")
-    if sphere is not None:
-        return _GeometryResult("sphere", {"radius": float(sphere.get("radius", "0.02"))}, world, False)
-
-    mesh = geometry.find("mesh")
-    if mesh is not None:
-        # No STL/mesh loader in this debug viewer -- a small marker stands
-        # in for whatever the real mesh looks like. See module docstring.
-        return _GeometryResult("sphere", {"radius": 0.035}, world, True)
-
-    return None
 
 
 def _instance_of(link_name: str, scene: Scene) -> str:
@@ -169,11 +89,11 @@ def _markers(scene: Scene, resolved: ResolvedCell, world_poses: dict[str, Pose])
 
 def scene_to_payload(scene: Scene, resolved: ResolvedCell) -> dict[str, Any]:
     """Everything the HTML/JS side needs, as plain JSON-able data: one
-    entry per renderable link (primitive kind, dimensions, world pose,
-    owning instance), a color per instance, and attachment/TCP markers.
+    entry per collision primitive (a link may carry several -- see
+    .kinematics), a color per instance, and attachment/TCP markers.
     """
     root = ET.fromstring(scene.urdf_xml)
-    world_poses = _world_poses(root)
+    world_poses = compute_world_poses(root, scene.joint_state, WORLD_LINK)
 
     instance_names = ["base"] + sorted(scene.instances)
     colors = {name: _PALETTE[i % len(_PALETTE)] for i, name in enumerate(instance_names)}
@@ -183,20 +103,18 @@ def scene_to_payload(scene: Scene, resolved: ResolvedCell) -> dict[str, Any]:
         name = link.get("name")
         if not name or name == WORLD_LINK or name not in world_poses:
             continue
-        result = _geometry_of(link, world_poses[name])
-        if result is None:
-            continue
-        primitives.append(
-            {
-                "link": name,
-                "instance": _instance_of(name, scene),
-                "kind": result.kind,
-                "dims": result.dims,
-                "position": list(result.world.translation),
-                "quaternion": list(result.world.quaternion_xyzw()),
-                "placeholder": result.placeholder,
-            }
-        )
+        for prim in list_collision_primitives(link, world_poses[name]):
+            primitives.append(
+                {
+                    "link": name,
+                    "instance": _instance_of(name, scene),
+                    "kind": prim.kind,
+                    "dims": prim.dims,
+                    "position": list(prim.world.translation),
+                    "quaternion": list(prim.world.quaternion_xyzw()),
+                    "placeholder": prim.placeholder,
+                }
+            )
 
     return {
         "cell_id": resolved.cell.id,

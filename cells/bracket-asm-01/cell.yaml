@@ -26,6 +26,17 @@ modules:
     address:
       ip: 192.168.1.10               # URScript over TCP :30002 — no vendor option, no license fee
     tool: sd1                        # ← which end effector is on the flange
+    # Folded home pose. Radians, not mm/deg (matches how joint values are
+    # written everywhere else in robotics tooling — no unit conversion
+    # here, unlike mount.pose above). Composed at scene-build time; without
+    # it the arm defaults to all-zero, which is straight up and puts sd1
+    # ~2 mm outside the guard-wall footprint (spec/02) — this keeps the
+    # composed scene inside the walls. It is NOT a proof the planner can
+    # keep every commanded motion inside them; that's still the planner's
+    # job (see ocm_generator/scene/containment.py).
+    joint_state:
+      shoulder_lift_joint: -1.5707963267948966   # -90 deg
+      elbow_joint: 1.5707963267948966            #  90 deg
 
   - instance: sd1
     module: com.accelsolutions.screwdriver.sd50@1.2.0

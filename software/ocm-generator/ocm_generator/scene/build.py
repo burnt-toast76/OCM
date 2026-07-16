@@ -20,6 +20,18 @@ mount.on's *target instance* existing is already guaranteed by ocm_resolve
 What it adds is the one thing ocm_resolve has no way to know: whether the
 named *attachment link* actually exists in the target's own urdf_fragment.
 
+Two more things happen here once the geometry is assembled, before an
+Environment is ever built:
+
+- Each instance's optional `joint_state` (cell.yaml, radians, applied as-is
+  -- unlike mount.pose there's no mm/deg convention to convert, matching
+  how the rest of the robotics ecosystem writes joint values) is validated
+  against that instance's own fragment (unknown joint name, or a joint
+  that isn't revolute/continuous/prismatic, is a collected violation) and
+  namespaced onto Scene.joint_state.
+- Workspace containment (see .containment): does every non-base, non-robot
+  instance's world AABB stay within the base module's own footprint.
+
 Like ocm-core and ocm-resolve, this collects every violation before
 raising, rather than stopping at the first.
 """
@@ -38,7 +50,9 @@ from ocm_resolve import ResolvedCell
 from tesseract_robotics.tesseract_common import GeneralResourceLocator
 from tesseract_robotics.tesseract_environment import Environment
 
+from .containment import check_workspace_containment
 from .errors import FragmentError, SceneBuildError
+from .kinematics import JointState
 from .urdf import TESSERACT_NS, load_fragment, namespace_fragment
 
 WORLD_LINK = "world"
@@ -65,6 +79,10 @@ class Scene:
     urdf_xml: str
     base: SceneInstance
     instances: dict[str, SceneInstance] = field(default_factory=dict)
+    # Namespaced joint name -> radians, assembled from every instance's
+    # cell.yaml joint_state. Absent joints (and every fixed joint) sit at
+    # zero. What the viewer renders and the containment check evaluates.
+    joint_state: JointState = field(default_factory=dict)
 
     def instance(self, name: str) -> SceneInstance:
         try:
@@ -142,6 +160,38 @@ def _load_and_namespace(module: Module, prefix: str, modules_root: Path) -> _Loa
     return _LoadedFragment(links=links, joints=joints, root_link=root_link, link_names=link_names)
 
 
+def _validate_joint_state(
+    name: str,
+    frag: _LoadedFragment,
+    raw_joint_state: dict[str, float],
+    joint_state_out: JointState,
+    errors: list[str],
+) -> None:
+    """Namespace and validate one instance's cell.yaml joint_state against
+    its own (already-namespaced) fragment joints, appending to
+    `joint_state_out` and collecting any violation into `errors` -- an
+    unknown joint name, or one that isn't revolute/continuous/prismatic
+    (a fixed joint has no configurable position to set).
+    """
+    if not raw_joint_state:
+        return
+
+    joints_by_name = {j.get("name"): j for j in frag.joints}
+    for joint_name, value in raw_joint_state.items():
+        namespaced = f"{name}__{joint_name}"
+        joint_el = joints_by_name.get(namespaced)
+        if joint_el is None:
+            known = sorted(j.removeprefix(f"{name}__") for j in joints_by_name)
+            errors.append(f"module {name}: joint_state names unknown joint {joint_name!r} (has: {known})")
+            continue
+        if joint_el.get("type") == "fixed":
+            errors.append(
+                f"module {name}: joint_state names {joint_name!r}, which is a fixed joint (no configurable position)"
+            )
+            continue
+        joint_state_out[namespaced] = float(value)
+
+
 def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
     """Compile a resolved cell into a real tesseract_robotics Environment.
 
@@ -170,6 +220,7 @@ def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
     all_joints: list[ET.Element] = []
     instances: dict[str, SceneInstance] = {}
     base_instance: Optional[SceneInstance] = None
+    joint_state: JointState = {}
 
     if _BASE_KEY in loaded:
         frag = loaded[_BASE_KEY]
@@ -235,10 +286,27 @@ def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
             link_names=frozenset(frag.link_names),
         )
 
+        _validate_joint_state(name, frag, ri.instance.joint_state, joint_state, errors)
+
     if errors:
         raise SceneBuildError(resolved.cell.id, errors)
 
     urdf_xml = _render_urdf(resolved.cell.id, all_links, all_joints)
+
+    assert base_instance is not None  # no base errors above => it loaded
+    errors.extend(
+        check_workspace_containment(
+            cell_id=resolved.cell.id,
+            urdf_xml=urdf_xml,
+            joint_state=joint_state,
+            base_link_names=base_instance.link_names,
+            instance_link_names={name: si.link_names for name, si in instances.items()},
+            instance_kinds={name: resolved.instances[name].module.kind for name in instances},
+            world_link=WORLD_LINK,
+        )
+    )
+    if errors:
+        raise SceneBuildError(resolved.cell.id, errors)
 
     locator = GeneralResourceLocator()
     env = Environment()
@@ -248,5 +316,6 @@ def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
             ["tesseract Environment.init() rejected the composed URDF (see stderr for the parser error)"],
         )
 
-    assert base_instance is not None  # no base errors above => it loaded
-    return Scene(environment=env, urdf_xml=urdf_xml, base=base_instance, instances=instances)
+    return Scene(
+        environment=env, urdf_xml=urdf_xml, base=base_instance, instances=instances, joint_state=joint_state
+    )
