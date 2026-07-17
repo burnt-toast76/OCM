@@ -15,15 +15,16 @@ cell.yaml + plan.yaml
 ## scene/ (`ocm_generator.scene`)
 
 Takes a `ResolvedCell` (from `ocm-resolve`) and a module search path and
-compiles it into a real `tesseract_robotics.tesseract_environment.Environment`
--- ADR-0007's "cell.yaml compiles directly into a Tesseract scene graph,"
-built. Every instance's `mechanical.geometry.urdf_fragment` gets namespaced
-and spliced into one combined URDF, attached either to `world` (mount.pose,
-converted from the schema's mm/deg to URDF's m/rad) or, for `mount.on`
-chains (e.g. `sd1` on `robot1.flange`), kinematically parented to the
-target's own named link with an identity offset -- not a computed
-world-frame pose, since a tool's position on a moving robot depends on live
-joint state.
+composes it into a single combined URDF (a `Scene`) -- ADR-0007's "cell.yaml
+compiles directly into a Tesseract scene graph," half of it. `build_scene`
+itself never touches `tesseract_robotics`: it's plain Python/XML, so the
+base `ocm-generator` install doesn't need Tesseract at all. Every instance's
+`mechanical.geometry.urdf_fragment` gets namespaced and spliced into the
+combined URDF, attached either to `world` (mount.pose, converted from the
+schema's mm/deg to URDF's m/rad) or, for `mount.on` chains (e.g. `sd1` on
+`robot1.flange`), kinematically parented to the target's own named link with
+an identity offset -- not a computed world-frame pose, since a tool's
+position on a moving robot depends on live joint state.
 
 `build_scene(resolved, modules_root)` raises `SceneBuildError` -- carrying
 every violation found, not just the first -- if any urdf_fragment is
@@ -64,28 +65,51 @@ footprint; folding `shoulder_lift`/`elbow` brings it back inside with
 for the regression test that pins this down by removing the block and
 watching `build_scene` refuse the cell again.
 
+**`--collision`** (the only thing here that needs the `tesseract` extra --
+see CLI section below): loads the composed URDF into a real Tesseract
+`Environment`, applies `Scene.joint_state`, and runs a real discrete
+contact check with an actual Bullet backend
+(`ocm_generator/scene/collision.py`). Two things are structurally exempted
+from ever counting as a crash, not just tolerated within the margin: an
+instance and whatever it's *directly* mounted on (a robot's base flush
+against the deck it's bolted to, a tool flush against the flange it's
+bolted to) -- but only one hop of it, deliberately not transitively, since
+"sd1 safely touches robot1" and "robot1 safely touches base" do not
+compose into "sd1 safely touches base." `sd1` actually punching into a
+guard wall at the arm's zeroed pose is exactly the case that must still
+fire, and does (see `tests/test_collision.py`).
+
 ## CLI
 
 ```
-pip install -e ../ocm-core -e ../ocm-resolve -e ".[test]"
+pip install -e ../ocm-core -e ../ocm-resolve -e ".[test,tesseract]"
 pytest
+
+# drop ",tesseract" above to skip the --collision tests and run without
+# installing Tesseract at all -- everything else still works, including
+# `ocm scene` itself.
 
 # either of these work -- the console script needs Scripts/ on PATH,
 # `python -m` doesn't:
 ocm validate modules/com.accelsolutions.screwdriver.sd50/module.yaml
 python -m ocm_generator resolve cells/bracket-asm-01/cell.yaml --modules modules
 python -m ocm_generator scene cells/bracket-asm-01/cell.yaml --modules modules --view /tmp/cell.html
+python -m ocm_generator scene cells/bracket-asm-01/cell.yaml --modules modules --collision
 ```
 
 Three subcommands, one per stage: `validate` (a module manifest against the
 schema), `resolve` (a cell against a module search path), `scene` (resolve +
-build the Tesseract environment). Each prints every collected violation on
-failure, matching the libraries underneath -- see `ocm_generator/cli.py`.
+compose the scene). Each prints every collected violation on failure,
+matching the libraries underneath -- see `ocm_generator/cli.py`.
 
-`scene` takes two optional outputs, either or both at once:
+`scene` takes three optional actions, any combination at once:
 
 - `--dump-urdf FILE.urdf` -- the composed URDF as a plain file, e.g. to
   cross-check in another URDF tool.
+- `--collision [--collision-margin-mm MM]` -- a real Tesseract discrete
+  collision check (needs the `tesseract` extra). Exits nonzero on any real
+  contact; see the "Workspace containment"/`--collision` sections above
+  for exactly what does and doesn't count as one.
 - `--view FILE.html` -- a single self-contained HTML file: three.js loaded
   from a CDN via an import map, no build step, no npm, no server. Open it
   by double-clicking. It's a **debug viewer**, not the product viewer

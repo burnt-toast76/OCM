@@ -5,17 +5,20 @@ description = "cell.yaml -> Tesseract scene -> collision-checked motion -> URScr
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "AGPL-3.0-or-later" }
-dependencies = [
-    "tesseract-robotics>=0.35.0",
-]
+dependencies = []
 
 [project.scripts]
 ocm = "ocm_generator.cli:main"
 
 [project.optional-dependencies]
+# Only `ocm scene --collision` needs this (see
+# ocm_generator/scene/collision.py) -- everything else, including scene
+# composition and the workspace containment check, is plain Python/XML.
+tesseract = ["tesseract-robotics>=0.35.0"]
 # ocm-core and ocm-resolve are sibling packages in this monorepo, not
 # published to an index. Install all three editable from the same venv:
-# `pip install -e ../ocm-core -e ../ocm-resolve -e ".[test]"`. See README.
+# `pip install -e ../ocm-core -e ../ocm-resolve -e ".[test,tesseract]"`
+# (drop `,tesseract` to skip the --collision tests). See README.
 test = ["pytest>=8.0", "PyYAML>=6.0"]
 
 [tool.setuptools.packages.find]

@@ -33,6 +33,19 @@ def test_payload_has_one_box_primitive_per_collision_link(tiny_resolved_cell, mo
     assert by_link["robot1__flange"]["dims"] == {"x": 0.02, "y": 0.02, "z": 0.02}
 
 
+def test_payload_primitives_carry_instance_kind(tiny_resolved_cell, modules_root):
+    scene = build_scene(tiny_resolved_cell, modules_root)
+
+    payload = scene_to_payload(scene, tiny_resolved_cell)
+
+    by_link = {p["link"]: p for p in payload["primitives"]}
+    assert by_link["robot1__origin"]["instance_kind"] == "robot"
+    assert by_link["robot1__flange"]["instance_kind"] == "robot"
+    assert by_link["tool1__origin"]["instance_kind"] == "end_effector"
+    base_link = scene.base.root_link
+    assert by_link[base_link]["instance_kind"] == "base"
+
+
 def test_mount_attachment_marker_lands_on_the_real_flange_position(tiny_resolved_cell, modules_root):
     # robot1's mount.pose is xyz_mm=[400,300,0], rpy_deg=[0,0,90] (0.4, 0.3, 0
     # m, 90 deg yaw). Its 'flange' link is a further +0.4m along LOCAL Z from
@@ -62,6 +75,20 @@ def test_tcp_marker_present_for_tool1_and_positioned_past_the_flange(tiny_resolv
     tcp_markers = [m for m in payload["markers"] if m["label"] == "tool1 TCP"]
     assert len(tcp_markers) == 1
     assert tcp_markers[0]["position"] == pytest.approx([0.4, 0.3, 0.5], abs=1e-9)
+
+
+def test_render_html_bases_material_on_instance_kind_not_instance_name(tiny_resolved_cell, modules_root):
+    # The whole point: a cell whose base instance happened to be named
+    # something other than "base" must still render translucent. The JS
+    # must key off instance_kind, not off comparing p.instance to the
+    # literal string "base".
+    scene = build_scene(tiny_resolved_cell, modules_root)
+
+    page = render_html(scene, tiny_resolved_cell)
+    script = page.split('<script type="module">')[1]
+
+    assert 'p.instance_kind === "base"' in script
+    assert 'p.instance === "base"' not in script
 
 
 def test_render_html_is_self_contained_and_includes_expected_pieces(tiny_resolved_cell, modules_root):

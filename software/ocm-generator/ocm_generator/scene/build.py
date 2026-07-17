@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Build a Tesseract Environment from a ResolvedCell.
+"""Compose a ResolvedCell into a single combined URDF (Scene).
 
 Second half of ADR-0007's thesis ("cell.yaml compiles directly into a
 Tesseract scene graph"). Every resolved instance's urdf_fragment gets
@@ -20,8 +20,7 @@ mount.on's *target instance* existing is already guaranteed by ocm_resolve
 What it adds is the one thing ocm_resolve has no way to know: whether the
 named *attachment link* actually exists in the target's own urdf_fragment.
 
-Two more things happen here once the geometry is assembled, before an
-Environment is ever built:
+Two more things happen here once the geometry is assembled:
 
 - Each instance's optional `joint_state` (cell.yaml, radians, applied as-is
   -- unlike mount.pose there's no mm/deg convention to convert, matching
@@ -31,6 +30,13 @@ Environment is ever built:
   namespaced onto Scene.joint_state.
 - Workspace containment (see .containment): does every non-base, non-robot
   instance's world AABB stay within the base module's own footprint.
+
+Neither of those -- nor anything else in this module -- touches
+tesseract_robotics. A `Scene` is plain data (a URDF string plus the
+bookkeeping to make sense of it); building an actual Tesseract Environment
+or running a collision check from it is .collision's job, imported lazily
+and only when needed, so the base install of ocm-generator works without
+Tesseract installed at all (see pyproject.toml's `tesseract` extra).
 
 Like ocm-core and ocm-resolve, this collects every violation before
 raising, rather than stopping at the first.
@@ -46,9 +52,6 @@ from typing import Optional
 
 from ocm_core import Module
 from ocm_resolve import ResolvedCell
-
-from tesseract_robotics.tesseract_common import GeneralResourceLocator
-from tesseract_robotics.tesseract_environment import Environment
 
 from .containment import check_workspace_containment
 from .errors import FragmentError, SceneBuildError
@@ -75,7 +78,6 @@ class SceneInstance:
 
 @dataclass(frozen=True)
 class Scene:
-    environment: Environment
     urdf_xml: str
     base: SceneInstance
     instances: dict[str, SceneInstance] = field(default_factory=dict)
@@ -193,12 +195,14 @@ def _validate_joint_state(
 
 
 def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
-    """Compile a resolved cell into a real tesseract_robotics Environment.
+    """Compose a resolved cell into a single combined URDF (a Scene).
 
     Raises SceneBuildError (carrying every violation found) if any
     instance's urdf_fragment is missing/malformed, any instance has neither
-    a mount.pose nor a mount.on, or any mount.on names an attachment link
-    that doesn't exist on its target.
+    a mount.pose nor a mount.on, any mount.on names an attachment link
+    that doesn't exist on its target, any joint_state entry is invalid, or
+    any non-base/non-robot instance's geometry extends past the base
+    module's workspace footprint (see .containment).
     """
     modules_root = Path(modules_root)
     errors: list[str] = []
@@ -308,14 +312,4 @@ def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
     if errors:
         raise SceneBuildError(resolved.cell.id, errors)
 
-    locator = GeneralResourceLocator()
-    env = Environment()
-    if not env.init(urdf_xml, locator):
-        raise SceneBuildError(
-            resolved.cell.id,
-            ["tesseract Environment.init() rejected the composed URDF (see stderr for the parser error)"],
-        )
-
-    return Scene(
-        environment=env, urdf_xml=urdf_xml, base=base_instance, instances=instances, joint_state=joint_state
-    )
+    return Scene(urdf_xml=urdf_xml, base=base_instance, instances=instances, joint_state=joint_state)

@@ -27,9 +27,7 @@ from ocm_resolve import resolve_cell
 
 
 def _link_names(scene: Scene) -> set[str]:
-    sg = scene.environment.getSceneGraph()
-    links = sg.getLinks()
-    return {links[i].getName() for i in range(len(links))}
+    return {el.get("name") for el in ET.fromstring(scene.urdf_xml).findall("link")}
 
 
 def test_real_bracket_cell_scene_builds_end_to_end(repo_root: Path):

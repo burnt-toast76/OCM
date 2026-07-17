@@ -4,11 +4,15 @@
     ocm validate <module.yaml>
     ocm resolve  <cell.yaml> [--modules DIR]
     ocm scene    <cell.yaml> [--modules DIR] [--dump-urdf FILE.urdf] [--view FILE.html]
+                             [--collision [--collision-margin-mm MM]]
 
 Each stage's collected-violations error (ManifestValidationError,
 CellResolutionError, SceneBuildError) is printed in full, not just the
 first problem -- same as the underlying libraries. Exit code is 0 on
 success, 1 if that stage reported errors.
+
+`--collision` needs the `tesseract` extra (pip install ocm-generator
+[tesseract]); nothing else here does -- see ocm_generator/scene/collision.py.
 
 This is a developer/trial tool, not the agent layer (see ROADMAP Step 6 --
 "the agent is a thin tool-calling wrapper over a generator that already
@@ -19,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -98,11 +103,11 @@ def cmd_scene(args: argparse.Namespace) -> int:
         _print_errors(f"FAILED: {args.cell} scene did not build", e.errors)
         return 1
 
-    sg = scene.environment.getSceneGraph()
-    links = sg.getLinks()
-    joints = sg.getJoints()
+    root = ET.fromstring(scene.urdf_xml)
+    n_links = len(root.findall("link"))
+    n_joints = len(root.findall("joint"))
     print(f"OK: {resolved.cell.id}")
-    print(f"  {len(links)} links, {len(joints)} joints")
+    print(f"  {n_links} links, {n_joints} joints")
     print(f"  base: {scene.base.root_link} -> parent {scene.base.parent_link}")
     for name in sorted(scene.instances):
         inst = scene.instances[name]
@@ -117,6 +122,35 @@ def cmd_scene(args: argparse.Namespace) -> int:
 
         Path(args.view).write_text(render_html(scene, resolved), encoding="utf-8")
         print(f"  wrote HTML viewer to {args.view}")
+
+    if args.collision:
+        return cmd_scene_collision(scene, args)
+
+    return 0
+
+
+def cmd_scene_collision(scene, args: argparse.Namespace) -> int:
+    from ocm_generator.scene import CollisionCheckError, CollisionCheckUnavailable, check_collisions
+
+    try:
+        result = check_collisions(scene, contact_distance_mm=args.collision_margin_mm)
+    except CollisionCheckUnavailable as e:
+        print(f"FAILED: collision check unavailable: {e}", file=sys.stderr)
+        return 1
+    except CollisionCheckError as e:
+        print(f"FAILED: collision check did not complete: {e}", file=sys.stderr)
+        return 1
+
+    print(f"  collision check (margin {result.margin_mm:g} mm):")
+    if not result.contacts:
+        print("    no contacts within the margin")
+    for c in sorted(result.contacts, key=lambda c: c.distance_mm):
+        tag = "COLLISION" if c.is_violation else "resting contact (ok)"
+        print(f"    {c.instance_a} <-> {c.instance_b}  ({c.link_a} / {c.link_b})  {c.distance_mm:+.2f} mm  {tag}")
+
+    if result.violations:
+        print(f"  FAILED: {len(result.violations)} real contact(s) (penetration beyond the margin)", file=sys.stderr)
+        return 1
 
     return 0
 
@@ -134,11 +168,28 @@ def _build_parser() -> argparse.ArgumentParser:
     p_resolve.add_argument("--modules", type=Path, default=Path("modules"), help="Module search path (default: ./modules)")
     p_resolve.set_defaults(func=cmd_resolve)
 
-    p_scene = subparsers.add_parser("scene", help="Resolve a cell and build its Tesseract scene.")
+    p_scene = subparsers.add_parser("scene", help="Resolve a cell and compose its scene.")
     p_scene.add_argument("cell", type=Path, help="Path to a cell.yaml")
     p_scene.add_argument("--modules", type=Path, default=Path("modules"), help="Module search path (default: ./modules)")
     p_scene.add_argument("--dump-urdf", type=Path, default=None, help="Write the composed URDF to this file (a plain cross-check, e.g. to open in another URDF tool)")
     p_scene.add_argument("--view", type=Path, default=None, help="Write a self-contained three.js HTML viewer to this file (open by double-clicking)")
+    p_scene.add_argument(
+        "--collision",
+        action="store_true",
+        help="Run a discrete Tesseract collision check on the composed scene at its joint_state "
+        "(needs the 'tesseract' extra: pip install ocm-generator[tesseract]). Exits nonzero on any "
+        "real contact (penetration). Touching/near contact within --collision-margin-mm is reported "
+        "but does not fail the check -- e.g. a module resting flush on the base deck.",
+    )
+    p_scene.add_argument(
+        "--collision-margin-mm",
+        type=float,
+        default=1.0,
+        metavar="MM",
+        help="Contact distance margin in mm (default: 1.0). Two shapes closer than this are reported; "
+        "only ones that actually interpenetrate (not just touch) count as a real contact. Raise this "
+        "to tolerate looser resting fits; lower it to catch closer near-misses too.",
+    )
     p_scene.set_defaults(func=cmd_scene)
 
     return parser

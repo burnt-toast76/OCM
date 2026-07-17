@@ -57,6 +57,19 @@ def _instance_of(link_name: str, scene: Scene) -> str:
     return "?"
 
 
+def _instance_kinds(resolved: ResolvedCell) -> dict[str, str]:
+    """Instance name -> its module's declared `kind` (base/robot/fixture/...).
+
+    Keyed on the module's own kind, not the instance name "base" -- a cell
+    whose base instance happens to be named/aliased differently still
+    renders (and dims) correctly, since the JS side keys off this field,
+    not off `instance === "base"`.
+    """
+    kinds = {name: ri.module.kind for name, ri in resolved.instances.items()}
+    kinds["base"] = resolved.base.kind
+    return kinds
+
+
 def _markers(scene: Scene, resolved: ResolvedCell, world_poses: dict[str, Pose]) -> list[dict[str, Any]]:
     """Points worth calling out: where each mount.on chain actually attaches
     (e.g. sd1 onto robot1's real flange link), and any instance's declared
@@ -97,6 +110,7 @@ def scene_to_payload(scene: Scene, resolved: ResolvedCell) -> dict[str, Any]:
 
     instance_names = ["base"] + sorted(scene.instances)
     colors = {name: _PALETTE[i % len(_PALETTE)] for i, name in enumerate(instance_names)}
+    instance_kinds = _instance_kinds(resolved)
 
     primitives: list[dict[str, Any]] = []
     for link in root.findall("link"):
@@ -104,10 +118,12 @@ def scene_to_payload(scene: Scene, resolved: ResolvedCell) -> dict[str, Any]:
         if not name or name == WORLD_LINK or name not in world_poses:
             continue
         for prim in list_collision_primitives(link, world_poses[name]):
+            instance = _instance_of(name, scene)
             primitives.append(
                 {
                     "link": name,
-                    "instance": _instance_of(name, scene),
+                    "instance": instance,
+                    "instance_kind": instance_kinds.get(instance, "?"),
                     "kind": prim.kind,
                     "dims": prim.dims,
                     "position": list(prim.world.translation),
@@ -231,10 +247,29 @@ const group = new THREE.Group();
 scene.add(group);
 
 for (const p of DATA.primitives) {
+  // Base-module geometry (keyed on instance_kind, not instance === "base"
+  // -- a cell whose base instance happens to be named something else
+  // still renders correctly) is translucent so it doesn't hide whatever
+  // it's meant to be a boundary for. Guard walls (tall boxes) go nearly
+  // invisible with depthWrite off and both faces drawn, so they read as a
+  // faint enclosure rather than a solid wall blocking the view; the deck
+  // stays more visible as a ground-plane reference.
+  const isBase = p.instance_kind === "base";
+  const isWall = isBase && p.kind === "box" && p.dims.z > 1.0;
+  let opacity = 1.0;
+  if (p.placeholder) {
+    opacity = 0.35;
+  } else if (isWall) {
+    opacity = 0.12;
+  } else if (isBase) {
+    opacity = 0.55;
+  }
   const material = new THREE.MeshStandardMaterial({
     color: new THREE.Color(DATA.colors[p.instance] || "#888888"),
-    transparent: p.placeholder,
-    opacity: p.placeholder ? 0.35 : 1.0,
+    transparent: p.placeholder || isBase,
+    opacity,
+    depthWrite: !isWall,
+    side: isWall ? THREE.DoubleSide : THREE.FrontSide,
     roughness: 0.6,
     metalness: 0.05,
   });
