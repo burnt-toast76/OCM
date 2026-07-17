@@ -48,7 +48,7 @@ but not skipped.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from ocm_resolve import ResolvedCell
 
@@ -88,6 +88,13 @@ class PathSegment:
     hole_id: str | None  # the hole this segment leads into (transit/approach) or out of (withdraw); None for the final transit home
     start_joints: tuple[float, ...]
     end_joints: tuple[float, ...]
+    # Every joint-angle tuple `.path.check_joint_segment` sampled AND
+    # already proved collision-free for this exact segment, in travel
+    # order (start_joints == frames[0], end_joints == frames[-1]) --
+    # `.scene.animation` reuses these directly for `--view-animation`,
+    # never re-interpolating its own. Empty until plan_fastening_sequence
+    # runs the check (see that function's own two-pass construction).
+    frames: tuple[tuple[float, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -226,8 +233,9 @@ def plan_fastening_sequence(
         end_joints=home_joints,
     ))
 
+    checked_segments: list[PathSegment] = []
     for segment in segments:
-        check_joint_segment(
+        frames = check_joint_segment(
             scene=scene,
             robot_instance=robot_instance,
             label=segment.label,
@@ -236,6 +244,8 @@ def plan_fastening_sequence(
             samples=path_samples,
             collision_margin_mm=collision_margin_mm,
         )
+        checked_segments.append(replace(segment, frames=frames))
+    segments = checked_segments
 
     load_screw_nominal_duration_s = None
     if fasten.load_screw_module is not None:

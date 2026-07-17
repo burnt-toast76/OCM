@@ -7,6 +7,7 @@
                              [--collision [--collision-margin-mm MM]]
     ocm plan     <cell.yaml> [--modules DIR] --emit-urscript FILE.script
                              [--collision-margin-mm MM] [--path-samples N]
+                             [--view-animation FILE.html]
 
 Each stage's collected-violations error (ManifestValidationError,
 CellResolutionError, SceneBuildError) is printed in full, not just the
@@ -160,8 +161,8 @@ def cmd_scene_collision(scene, args: argparse.Namespace) -> int:
 
 def cmd_plan(args: argparse.Namespace) -> int:
     from ocm_core import load_cell
-    from ocm_generator.emitters import emit_urscript, render_cycle_time_table
-    from ocm_generator.planner import PlanningError, PlanningUnavailable, plan_fastening_sequence
+    from ocm_generator.emitters import emit_urscript, render_cycle_time_table, render_html_animation
+    from ocm_generator.planner import PlanningError, PlanningUnavailable, estimate_cycle_time, plan_fastening_sequence
     from ocm_generator.scene import SceneBuildError, build_scene
     from ocm_resolve import CellResolutionError, resolve_cell
 
@@ -202,8 +203,15 @@ def cmd_plan(args: argparse.Namespace) -> int:
     print(f"OK: {plan.tool_instance} fastening sequence ({len(plan.holes)} hole(s)): "
           f"{', '.join(h.hole_id for h in plan.holes)}")
     print(f"  wrote URScript to {args.emit_urscript}")
+
+    report = estimate_cycle_time(plan)
     print()
-    print(render_cycle_time_table(plan))
+    print(render_cycle_time_table(plan, report))
+
+    if args.view_animation:
+        args.view_animation.write_text(render_html_animation(scene, resolved, plan, report), encoding="utf-8")
+        print(f"  wrote animated HTML viewer to {args.view_animation}")
+
     return 0
 
 
@@ -269,6 +277,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default=50,
         metavar="N",
         help="Number of joint-space states to collision-check along home->standoff (default: 50).",
+    )
+    p_plan.add_argument(
+        "--view-animation",
+        type=Path,
+        default=None,
+        metavar="FILE.html",
+        help="Write a self-contained, animated three.js HTML viewer of the planned motion to this file "
+        "(vendored three.js, no CDN -- open by double-clicking, works offline). Reuses the exact "
+        "joint states already collision-checked; does not recompute or retime the motion.",
     )
     p_plan.set_defaults(func=cmd_plan)
 

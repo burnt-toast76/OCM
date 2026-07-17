@@ -50,6 +50,12 @@ class CycleTimeRow:
     duration_s: float
     source: str  # "ESTIMATE" (motion) | "nominal_duration_s" (a stationary op) | "overlapped" (a load_screw hidden inside a transit)
     overlapped_with: str | None = None  # the segment label this op's duration is hidden inside, if source == "overlapped"
+    # The PathSegment.label whose LAST frame is this row's own held pose,
+    # if this row is a stationary dwell (source != "ESTIMATE") -- None for
+    # a motion row, which owns real per-frame motion of its own.
+    # `.scene.animation` uses this directly, so a dwell's held frame is
+    # always looked up, never assumed from row order.
+    held_at_segment: str | None = None
 
 
 @dataclass(frozen=True)
@@ -92,6 +98,7 @@ def estimate_cycle_time(plan: FasteningPlan, joint_speed_rad_s: float = DEFAULT_
                     duration_s=load_duration,
                     source="overlapped",
                     overlapped_with=segment.label,
+                    held_at_segment=segment.label,  # held at the standoff this transit arrives at
                 )
             )
             naive_total += load_duration
@@ -100,7 +107,12 @@ def estimate_cycle_time(plan: FasteningPlan, joint_speed_rad_s: float = DEFAULT_
         if segment.kind == "approach" and segment.hole_id is not None and plan.drive_screw_nominal_duration_s is not None:
             drive_duration = plan.drive_screw_nominal_duration_s
             rows.append(
-                CycleTimeRow(label=f"drive_screw @ {segment.hole_id}", duration_s=drive_duration, source="nominal_duration_s")
+                CycleTimeRow(
+                    label=f"drive_screw @ {segment.hole_id}",
+                    duration_s=drive_duration,
+                    source="nominal_duration_s",
+                    held_at_segment=segment.label,  # held at contact, the approach segment's own end frame
+                )
             )
             naive_total += drive_duration
 
