@@ -24,6 +24,12 @@ test = ["pytest>=8.0", "PyYAML>=6.0"]
 [tool.setuptools.packages.find]
 include = ["ocm_generator*"]
 
+[tool.setuptools.package-data]
+# The vendored three.js `--view-animation` embeds as data: URIs (see
+# ocm_generator/scene/vendor/three/NOTICE.md) -- not .py files, so
+# setuptools won't pick them up automatically.
+ocm_generator = ["scene/vendor/three/*"]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"

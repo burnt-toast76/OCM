@@ -209,6 +209,47 @@ totals both a naive serial time (everything back to back) and the
 overlapped time (each `load_screw` running concurrently with the transit
 into its hole), and reports the difference as the overlap savings.
 
+**`--view-animation`** (`ocm_generator/emitters/animation.py`): embeds the
+planned motion into the same self-contained HTML viewer `ocm scene --view`
+builds, and animates it. **Reuses the collision-check states -- never
+recomputes or re-derives motion**: every animation frame is one of the
+joint-angle samples `.planner.path.check_joint_segment` already
+interpolated and ran a real discrete collision check against for this
+exact plan (`PathSegment.frames`), run through the same forward
+kinematics the static viewer uses to get link poses -- an animation frame
+is therefore always a state that has already been proven collision-free.
+`DATA.animation` is a flat list matching the printed cycle-time table's
+own rows one-for-one, so a segment's caption and duration are the literal
+numbers in that table:
+
+- **motion** segments carry every checked frame for a real
+  standoff/contact/retract/transit move.
+- **dwell** segments -- `drive_screw` actually driving (1.8 s), a wait at
+  standoff for `load_screw`'s own precondition -- carry exactly ONE held
+  frame for their whole duration. The pause is visible on purpose: it's
+  where spec/08's handshake actually lives (a standoff sync withholding
+  `hs_done_step`, a contact sync running `drive_screw`'s own PackML
+  cycle).
+
+Only the robot and whatever's mounted on it (transitively -- `sd1` rides
+`robot1`'s flange) gets a new pose per frame; every static module (base,
+`nest1`, `feed1`, `cam1`, ...) is emitted once, exactly as `--view`
+already does (reused directly, filtered). **No smoothing, no retiming --
+linear playback of exactly the checked states, at a constant per-frame
+timestep within each segment; jerk-limited timing arrives with Ruckig
+later (ADR-0007).** The viewer adds play/pause, a scrub slider spanning
+the whole sequence, 0.5&times;/1&times;/2&times; speed, and a caption
+showing the current segment name and elapsed/total time (for a dwell:
+`drive_screw @ hole_2 — waiting on PLC`).
+
+Unlike the plain `--view` debug viewer (unchanged -- still loads three.js
+from a CDN via an import map), `--view-animation`'s output vendors
+three.js: the core library plus the OrbitControls/CSS2DRenderer addons
+(MIT-licensed, see `ocm_generator/scene/vendor/three/NOTICE.md`) are
+embedded as `data:` URIs directly in the page's own import map, so the
+generated file has no runtime dependency on any external host at all --
+truly self-contained, openable offline.
+
 ## coordinator/ (`ocm_generator.coordinator`)
 
 The other side of spec/08's handshake: a generated Python (asyncio)
@@ -314,16 +355,16 @@ ocm validate modules/com.accelsolutions.screwdriver.sd50/module.yaml
 python -m ocm_generator resolve cells/bracket-asm-01/cell.yaml --modules modules
 python -m ocm_generator scene cells/bracket-asm-01/cell.yaml --modules modules --view /tmp/cell.html
 python -m ocm_generator scene cells/bracket-asm-01/cell.yaml --modules modules --collision
-python -m ocm_generator plan  cells/bracket-asm-01/cell.yaml --modules modules --emit-urscript /tmp/out.script
+python -m ocm_generator plan  cells/bracket-asm-01/cell.yaml --modules modules --emit-urscript /tmp/out.script --view-animation /tmp/anim.html
 ```
 
 Four subcommands, one per stage: `validate` (a module manifest against the
 schema), `resolve` (a cell against a module search path), `scene` (resolve +
 compose the scene), `plan` (plan the full fastening `for_each` sequence's
-motion, emit URScript, and print a cycle-time estimate -- see the
-planner/emitters section above). Each prints every collected violation (or,
-for `plan`, its one refusal) on failure, matching the libraries underneath
--- see `ocm_generator/cli.py`.
+motion, emit URScript, optionally an animated HTML viewer, and print a
+cycle-time estimate -- see the planner/emitters section above). Each
+prints every collected violation (or, for `plan`, its one refusal) on
+failure, matching the libraries underneath -- see `ocm_generator/cli.py`.
 
 `scene` takes three optional actions, any combination at once:
 
