@@ -1,0 +1,153 @@
+# ─────────────────────────────────────────────────────────────────────
+# CELL COMPOSITION — the instance layer.
+#
+# Note what is NOT here: no waypoints, no joint angles, no I/O addresses
+# typed by hand, no ladder logic. Those are all DERIVED. This file says
+# what is in the cell and where; the generator does the rest.
+# ─────────────────────────────────────────────────────────────────────
+ocm_version: "1.0"
+kind: cell
+id: com.accelsolutions.cell.bracket-asm-01
+name: "Bracket Assembly Cell 01"
+license: CERN-OHL-S-2.0
+
+base:
+  module: com.accelsolutions.base.frame1200@2.0.0
+  datum: cell_origin                 # everything below is in this frame
+  grid: ocm-base-grid-50             # 50 mm bolt grid
+
+modules:
+
+  - instance: robot1
+    module: com.universal-robots.ur5e@3.1.0
+    mount:
+      station: [400, 300]            # grid coords, mm from cell_origin
+      pose: { xyz_mm: [400, 300, 0], rpy_deg: [0, 0, 0] }
+    address:
+      ip: 192.168.1.10               # URScript over TCP :30002 — no vendor option, no license fee
+    tool: sd1                        # ← which end effector is on the flange
+    # Folded home pose. Radians, not mm/deg (matches how joint values are
+    # written everywhere else in robotics tooling — no unit conversion
+    # here, unlike mount.pose above). Composed at scene-build time; without
+    # it the arm defaults to all-zero, which is straight up and puts sd1
+    # ~2 mm outside the guard-wall footprint (spec/02) — this keeps the
+    # composed scene inside the walls. It is NOT a proof the planner can
+    # keep every commanded motion inside them; that's still the planner's
+    # job (see ocm_generator/scene/containment.py).
+    joint_state:
+      shoulder_lift_joint: -1.5707963267948966   # -90 deg
+      elbow_joint: 1.5707963267948966            #  90 deg
+
+  - instance: sd1
+    module: com.accelsolutions.screwdriver.sd50@1.2.0
+    mount:
+      on: robot1.flange              # mounted on the robot, not the base
+    address:
+      ethercat_position: 4
+    consumables:
+      screw: { part: "M3x8 SHCS", source: feed1 }
+
+  - instance: feed1
+    module: com.accelsolutions.screwfeeder.sf20@1.0.0
+    mount:
+      pose: { xyz_mm: [180, 640, 0], rpy_deg: [0, 0, 0] }
+    address:
+      ethercat_position: 5
+
+  - instance: nest1
+    module: com.accelsolutions.fixture.pneumatic-nest@1.1.0
+    mount:
+      pose: { xyz_mm: [640, 300, 0], rpy_deg: [0, 0, 90] }   # mounting face ON the deck (z=0 = deck surface)
+    address:
+      ethercat_position: 6
+
+  - instance: cam1
+    module: com.lmi.gocator.2350@1.0.0
+    mount:
+      pose: { xyz_mm: [640, 300, 600], rpy_deg: [180, 0, 0] }
+    address:
+      ip: 192.168.1.20
+    calibration: cal/cam1_2026-07-01.yaml   # per-CELL, not per-module. Extrinsics live here.
+
+controller:
+  runtime: beremiz                          # PLCopen XML → MatIEC → LGPL runtime
+  target:  revpi-connect-5
+  fieldbus: ethercat
+  # Generated from the union of every module's `signals` block.
+  # No hand-typed tag list. No transcription errors.
+  tags: generated
+
+safety:
+  # NOT GENERATED. Hardwired, separately certified, human-signed.
+  # The manifests declare that sd1 needs PLd + STO; a human must satisfy that.
+  # The generator's only job here is to REFUSE to build a cell whose declared
+  # safety requirements aren't met by the declared safety hardware.
+  circuit: safety/bracket-cell-01.pdf
+  relay: "Pilz PNOZ s4"
+  performance_level: PLd
+  verified_by: "(human signature required — the tool will not sign this)"
+
+# ─────────────────────────────────────────────────────────────────────
+# THE PLAN — what to build. Human- or agent-authored.
+#
+# This is the layer an agent writes. It reads the manifests, knows the
+# verbs, knows the bounds, knows the pre/postconditions — and composes.
+# ─────────────────────────────────────────────────────────────────────
+part:
+  id: BRK-4471
+  cad: cad/BRK-4471.step
+  features:
+    hole_1: { xyz_mm: [12, 12, 0],  normal: [0, 0, 1] }
+    hole_2: { xyz_mm: [12, 88, 0],  normal: [0, 0, 1] }
+    hole_3: { xyz_mm: [64, 50, 0],  normal: [0, 0, 1] }
+
+plan:
+  - step: clamp
+    module: nest1
+    op: clamp
+    params: { force_n: 120 }
+
+  - step: locate
+    module: cam1
+    op: locate_part
+    binds: part_pose                 # result feeds every downstream frame
+
+  - step: fasten
+    for_each: [hole_1, hole_2, hole_3]
+    sequence:
+      - module: sd1
+        op: load_screw               # generator will overlap this with the robot's
+                                     # move to the next hole — the manifest says it
+                                     # has no motion constraint, so it's free to.
+      - module: sd1
+        op: drive_screw
+        at: part.features.${item}    # transformed by part_pose from `locate`
+        params:
+          torque_nm: 2.4             # ← generator checks: within sd50's 0.20–5.00. OK.
+          depth_mm: 8.0
+        on_fail:
+          - module: sd1
+            op: eject_screw
+          - action: reject_part      # NOT abort_safe → cannot resume. Route to reject.
+
+  - step: release
+    module: nest1
+    op: unclamp
+
+# ─────────────────────────────────────────────────────────────────────
+# WHAT THE GENERATOR PRODUCES FROM THE ABOVE
+#
+#  1. Tesseract scene   ← union of every module's urdf_fragment, placed at
+#                          its mount pose. Collision-checked automatically.
+#  2. Robot program     ← Tesseract plans the moves, honoring each op's
+#                          approach_vec / approach_mm / hold_still / clearance.
+#                          Emitted as URScript.
+#  3. PLC program       ← PackML coordinator + interlocks derived from every
+#                          op's preconditions. Emitted as PLCopen XML.
+#  4. Tag list          ← union of all `signals`.
+#  5. Cycle time est.   ← sum of nominal_duration_s + planned motion times.
+#  6. Consumable rates  ← 3 screws/part, from `consumes`.
+#  7. A refusal         ← if torque_nm were 6.0, or if the safety circuit
+#                          didn't meet sd1's declared PLd, the build FAILS.
+#                          The generator's most valuable output is "no."
+# ─────────────────────────────────────────────────────────────────────
