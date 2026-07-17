@@ -28,7 +28,9 @@ from .poses import (
     ToolPoses,
     compute_flange_poses,
     compute_part_datum_world,
+    contact_step_number,
     find_fastening_plan,
+    standoff_step_number,
 )
 
 __all__ = [
@@ -48,8 +50,10 @@ __all__ = [
     "UR_JOINT_ORDER",
     "compute_flange_poses",
     "compute_part_datum_world",
+    "contact_step_number",
     "estimate_cycle_time",
     "find_fastening_plan",
     "plan_fastening_sequence",
     "solve_ur_ik",
+    "standoff_step_number",
 ]

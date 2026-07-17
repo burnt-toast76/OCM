@@ -26,9 +26,11 @@ from ocm_generator.planner import (  # noqa: E402
     UR_JOINT_ORDER,
     PathCollisionError,
     PoseUnreachableError,
+    contact_step_number,
     estimate_cycle_time,
     find_fastening_plan,
     plan_fastening_sequence,
+    standoff_step_number,
 )
 from ocm_generator.scene import build_scene  # noqa: E402
 from ocm_resolve import resolve_cell  # noqa: E402
@@ -162,9 +164,17 @@ def test_three_hole_cell_emits_three_approach_groups_in_order_with_direct_transi
     assert len(movej_lines) == 4  # standoff_1, standoff_2, standoff_3, home
     assert lines[-1].startswith("movej(")
 
-    # Three approach groups, in order: standoff/contact/handshake/retract each.
-    for hole_id in ("hole_1", "hole_2", "hole_3"):
-        assert f"# TODO PLC handshake: drive_screw @ {hole_id}" in lines
+    # Three approach groups, in order: a real spec/08 sync (not a TODO
+    # placeholder) at each hole's standoff and contact, sharing step
+    # numbers with .planner's own standoff_step_number/contact_step_number.
+    for i, hole_id in enumerate(("hole_1", "hole_2", "hole_3"), start=1):
+        assert any(ln.startswith(f"# sync: standoff @ {hole_id} (step {standoff_step_number(i)})") for ln in lines)
+        assert any(ln.startswith(f"# sync: contact @ {hole_id} (step {contact_step_number(i)})") for ln in lines)
+        assert f"write_output_integer_register(0, {standoff_step_number(i)})" in lines
+        assert f"write_output_integer_register(0, {contact_step_number(i)})" in lines
+    # 6 sync points total (2 per hole) -> 6 abort checks, 6 heartbeat increments.
+    assert sum(1 for ln in lines if ln.strip() == "if read_input_integer_register(1) != 0:") == 6
+    assert sum(1 for ln in lines if ln.strip() == "hb = hb + 1") == 6
     # load_screw's handshake precedes each hole's own transit movej.
     load_lines = [i for i, ln in enumerate(lines) if ln == "# PLC handshake: load_screw (overlaps following transit)"]
     assert len(load_lines) == 3
@@ -277,13 +287,20 @@ def test_a_single_hole_cell_still_emits_a_clean_script(repo_root: Path):
 
     script = emit_urscript(plan)
     lines = script.splitlines()
-    # header, on_fail note, load_screw handshake, movej standoff, movel
-    # contact, drive_screw handshake, movel retract, movej home.
-    assert lines[3].startswith("movej(")
-    assert lines[4].startswith("movel(") and "v=0.020000" in lines[4]
-    assert lines[5] == "# TODO PLC handshake: drive_screw @ hole_1"
-    assert lines[6].startswith("movel(")
-    assert lines[7].startswith("movej(")
+
+    movej_lines = [ln for ln in lines if ln.startswith("movej(")]
+    movel_lines = [ln for ln in lines if ln.startswith("movel(")]
+    assert len(movej_lines) == 2  # standoff, home
+    assert len(movel_lines) == 2  # contact, retract
+    assert "v=0.020000" in movel_lines[0]  # contact, at the capability's own approach speed
+
+    standoff_sync_idx = next(i for i, ln in enumerate(lines) if ln.startswith("# sync: standoff @ hole_1 (step 1)"))
+    contact_sync_idx = next(i for i, ln in enumerate(lines) if ln.startswith("# sync: contact @ hole_1 (step 2)"))
+    assert lines[standoff_sync_idx + 1] == f"write_output_integer_register(0, {standoff_step_number(1)})"
+    assert lines[contact_sync_idx + 1] == f"write_output_integer_register(0, {contact_step_number(1)})"
+    # Order: standoff sync happens (and is satisfied) before the contact movel.
+    contact_movel_idx = lines.index(movel_lines[0])
+    assert standoff_sync_idx < contact_movel_idx
 
 
 # ---------------------------------------------------------------------------

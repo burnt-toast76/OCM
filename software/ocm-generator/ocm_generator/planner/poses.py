@@ -81,6 +81,22 @@ class FastenPlan:
     on_fail_summary: str | None  # e.g. "eject_screw, reject_part" -- PLC-side, not emitted as URScript
 
 
+def standoff_step_number(hole_index: int) -> int:
+    """spec/08's monotonic handshake step number for hole `hole_index`'s
+    (1-based) standoff sync point -- the gate `.emitters.urscript` and
+    `.coordinator` must agree on byte-for-byte, so both call this (and
+    `contact_step_number`) instead of each computing `2 * i - 1` locally.
+    """
+    return 2 * hole_index - 1
+
+
+def contact_step_number(hole_index: int) -> int:
+    """spec/08's monotonic handshake step number for hole `hole_index`'s
+    (1-based) contact sync point. See `standoff_step_number`.
+    """
+    return 2 * hole_index
+
+
 def _substitute_item(value: Any, item: str | None) -> Any:
     if isinstance(value, str) and item is not None:
         return value.replace("${item}", item)

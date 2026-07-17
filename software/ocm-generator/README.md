@@ -4,10 +4,11 @@
 
 ```
 cell.yaml + plan.yaml
-  -> scene/    URDF fragments -> Tesseract environment   <- built
-  -> planner/  Tesseract IK + a collision-checked joint-space line  <- built (v0: first drive_screw step only)
-  -> emitters/ URScript, PLCopen XML                     <- built (URScript only)
-  -> validate/ THE REFUSAL LOGIC
+  -> scene/        URDF fragments -> Tesseract environment          <- built
+  -> planner/      Tesseract IK + collision-checked joint-space     <- built (full fastening for_each)
+  -> emitters/     URScript (spec/08 handshake), PLCopen XML        <- built (URScript only)
+  -> coordinator/  spec/08 handshake, generated per resolved cell   <- built (asyncio, simulated I/O)
+  -> validate/     THE REFUSAL LOGIC
 ```
 
 **The most valuable output of this tool is "no."**
@@ -164,26 +165,36 @@ manifest note: "the generator is free to overlap this with the robot's
 move to the next hole." Its PLC-handshake placeholder (`# PLC handshake:
 load_screw (overlaps following transit)`) is emitted immediately before
 the transit `movej` that carries the robot to that hole's standoff -- for
-hole 1, that's `home -> standoff_1`.
+hole 1, that's `home -> standoff_1`. It is not itself a numbered spec/08
+sync point: its completion is observed indirectly, through drive_screw's
+own `screw_present` precondition at the FOLLOWING standoff sync.
 
 **`on_fail`** (e.g. `eject_screw`, `reject_part`) is PLC coordinator logic
 (ADR-0004: PackML sequences modules, and abort/recovery routing is the
-coordinator's job) -- noted as a comment, never emitted as robot motion.
+coordinator's job) -- noted as a comment, never emitted as robot motion. A
+failed result (`result_ok == false`) still reaches the robot for real,
+though: as `hs_abort`, same as any other abort.
 
-**URScript emission** (`ocm_generator/emitters/urscript.py`): per hole,
-`movej` standoff -> `movel` contact (at the capability's own
-`approach_speed_mm_s`, converted to m/s) -> a `# TODO PLC handshake: <op>
-@ <hole>` placeholder -> `movel` retract; one trailing `movej` home at the
-very end, not one per hole. Positions in metres, rotations as axis-angle
-radians (URScript's own `p[x,y,z,rx,ry,rz]` convention), real UR joint
-names (named in a trailing comment; UR's own joint order otherwise, not
-this package's namespaced ones). No leading `movej(home)` -- the script
-assumes the robot starts at its own resting `joint_state`, which is
-exactly the path this already collision-checked. No `set_tcp()` either --
-every `movel` targets the FLANGE, the same frame IK solved reachability
-against; the bit lands correctly as a direct consequence of the flange
-being placed correctly, since sd50 is bolted on at a fixed, known,
-purely-translational offset.
+**URScript emission** (`ocm_generator/emitters/urscript.py`) implements
+[spec/08-robot-handshake.md](../../spec/08-robot-handshake.md)'s
+step-counter protocol for real, over its `ur-rtde` binding -- not a
+`# TODO` comment. Per hole: `movej` standoff -> a sync (announce arrival,
+then block -- checking abort and incrementing the heartbeat every
+iteration -- until the coordinator raises `hs_done_step` to meet it) ->
+`movel` contact (at the capability's own `approach_speed_mm_s`) -> another
+sync -> `movel` retract; one trailing `movej` home at the very end, not
+one per hole. Step numbers are monotonic in plan order (one at each
+standoff, one at each contact -- `.planner.poses.standoff_step_number`/
+`contact_step_number`, the exact same functions `.coordinator` uses, so
+the two generated programs can't drift on what step N means). The header
+comment documents the full register map and states outright that every
+pose is a FLANGE pose -- no `set_tcp()` is issued; the screwdriver's own
+TCP offset is a fixed, known translation from the flange, so the bit
+lands correctly as a direct consequence of the flange landing correctly.
+Positions in metres, rotations as axis-angle radians (URScript's own
+`p[x,y,z,rx,ry,rz]` convention), real UR joint names. No leading
+`movej(home)` -- the script assumes the robot starts at its own resting
+`joint_state`, which is exactly the path this already collision-checked.
 
 **Cycle-time estimate** (`ocm_generator/planner/cycle_time.py` +
 `ocm_generator/emitters/cycle_time.py`, printed by the CLI after planning
@@ -197,6 +208,95 @@ capability's own declared `nominal_duration_s`, unmodified. The table
 totals both a naive serial time (everything back to back) and the
 overlapped time (each `load_screw` running concurrently with the transit
 into its hole), and reports the difference as the overlap savings.
+
+## coordinator/ (`ocm_generator.coordinator`)
+
+The other side of spec/08's handshake: a generated Python (asyncio)
+coordinator program that walks a resolved cell's fastening for_each
+sequence in lockstep with the URScript `.emitters.urscript` emits for the
+same plan -- not PLCopen yet (ROADMAP Step 1's `emitters/plcopen.py` is
+still future work), but the same protocol logic that will eventually sit
+behind it.
+
+Every module's I/O -- the four handshake signals AND the ordinary
+capability/process signals a precondition or a result reads -- goes
+through one interface, `.signals.SignalBus`, so the real EtherCAT/SOEM
+layer (ADR-0002) is a driver this v0 doesn't need yet, not a rewrite
+later. `SimulatedSignalBus` is the only implementation so far: an
+in-memory table, no transport, no timing.
+
+**`.robot_link.RobotLink`** binds spec/08's four signals
+(`hs_at_step`/`hs_done_step`/`hs_abort`/`hs_heartbeat`) to a robot
+instance BY ROLE (`handshake_at_step`/`handshake_done_step`/
+`handshake_abort`/`handshake_heartbeat` in that module's own
+`comms.signals` block) -- see `com.universal-robots.ur5e`'s manifest for
+the real binding (RTDE registers 0/0/1/1). Never a hardcoded register
+number; a missing or ambiguous role binding is a startup-time refusal
+(`HandshakeBindingError`), not a hang mid-cycle.
+
+**`.program.Coordinator`** walks the same `find_fastening_plan` result
+`.planner` uses (so both programs agree on the sequence and the step
+numbering without sharing anything but that one function), and per hole:
+
+- Fires `load_screw` (if the sequence has one) without waiting on it --
+  mirroring exactly where the URScript places its own "overlaps following
+  transit" comment.
+- Waits for the robot's arrival at that hole's standoff sync, THEN
+  withholds `hs_done_step` until `drive_screw`'s own declared
+  `preconditions` (plain `signal == literal` expressions, `.packml`) hold
+  against the tool module's live signals -- spec/08's "interlocks become
+  motion gates" made real, not a comment.
+- Waits for arrival at contact, runs `drive_screw`'s PackML
+  start->Execute->Complete cycle against the module (simulated -- see
+  `.packml`'s own module docstring on why its numeric encoding is this
+  project's placeholder, not a spec: nothing in this repo pins one down
+  yet), reads back `torque_achieved`/`angle_achieved`/`result_ok`, and
+  appends a trace entry.
+- A false `result_ok` raises `hs_abort` (the robot halts in place, per
+  spec/08) and returns an aborted `CoordinatorResult` instead of writing
+  `hs_done_step` -- `on_fail`'s `eject_screw`/`reject_part` routing is PLC
+  logic this v0 doesn't implement yet, but the abort signal that would
+  drive it is real.
+- Watches `hs_heartbeat` in the background; static for more than 2s (spec/08's
+  own threshold, `heartbeat_timeout_s`) while the walk should still be
+  running raises `HeartbeatStaleError`.
+
+Every hole's results are written to a JSON traceability log
+(`write_trace_log`, or pass `trace_log_path=` to `Coordinator`).
+
+**The loopback proof** (`tests/test_coordinator.py`) runs a real generated
+`Coordinator` against two simulated peers on one shared bus:
+
+- **`.urscript_sim.SimulatedRobot`** -- a stand-in for the physical UR
+  controller. It PARSES an actual emitted URScript string for
+  `write_output_integer_register(0, N)` / `while
+  read_input_integer_register(0) < N: ...` and replays that exact
+  sequence; it does not know the plan, the hole count, or the step
+  numbering in advance. If the emitter's output shape changes, this
+  adapts with it -- it is not a second, hand-maintained copy of the
+  protocol the coordinator and the emitter already share.
+- **`.simulated_module.SimulatedPackMLModule`** -- a stand-in for sd1's
+  own EtherCAT firmware: watches for a start request and, after a short
+  delay, produces whatever signals the requested op's manifest declares
+  (`load_screw` sets `screw_present`; `drive_screw` clears it and reports
+  torque/angle/`result_ok` -- the latter overridable per hole, which is
+  how the abort test forces a specific failure).
+
+The three tests this proves: the full 3-hole sequence completes
+end-to-end (both generated programs, no shortcuts); the coordinator
+provably withholds `hs_done_step` while `screw_present` is false --
+proven by real elapsed wall-clock time, not just an internal counter --
+and the robot genuinely blocks waiting for it; and a forced
+`result_ok=false` on hole 2 raises `hs_abort`, the simulated robot halts
+(`RobotAborted`), and hole 3 is never reached.
+
+*(A real bug caught building this: the simulated module's own internal
+`packml_cmd`/`packml_state` cycle was edge-based, and a stale
+pre-`await`-captured "last command" value let a second request's edge go
+undetected if the first request's own processing delay was long enough --
+exactly the "missed edge" failure mode spec/08's REAL handshake is
+deliberately level-based to avoid. Fixed by re-reading the command fresh
+after the slow part, rather than trusting a snapshot taken before it.)*
 
 ## CLI
 
