@@ -10,4 +10,5 @@ CC BY-SA 4.0. The standard, independently implementable.
 | [04-fieldbus.md](04-fieldbus.md) | ✅ EtherCAT + IO-Link, pneumatics, vacuum |
 | [05-state-machine.md](05-state-machine.md) | ✅ PackML, mandatory |
 | [06-safety.md](06-safety.md) | ✅ The hard boundary |
+| [08-robot-handshake.md](08-robot-handshake.md) | ✅ Step-counter handshake — RTDE binding, no coordination wiring |
 | [schema/](schema/) | JSON Schema |

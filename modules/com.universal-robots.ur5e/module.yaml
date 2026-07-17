@@ -46,12 +46,17 @@ mechanical:
   mass_kg: 20.6
 
 comms:
-  protocol: modbus-tcp
+  # UR e-Series RTDE, TCP :30004 — the robot's built-in channel. Zero coordination
+  # wiring; safety stays hardwired per spec/06 and is NOT on this channel.
+  protocol: ur-rtde
   signals:
-    - { name: packml_cmd,   direction: output, type: uint16, role: packml_cmd }
-    - { name: packml_state, direction: input,  type: uint16, role: packml_state }
-    - { name: fault_code,   direction: input,  type: uint16, role: fault_code }
-    - { name: heartbeat,    direction: input,  type: bool,   role: heartbeat }
+    # spec/08 handshake contract. offset = RTDE general-purpose int register index.
+    # Direction is from the COORDINATOR's point of view (schema convention):
+    #   the robot WRITES at_step/heartbeat -> coordinator reads them -> 'input'.
+    - { name: hs_at_step,    direction: input,  type: int32, offset: 0, role: handshake_at_step }
+    - { name: hs_heartbeat,  direction: input,  type: int32, offset: 1, role: handshake_heartbeat }
+    - { name: hs_done_step,  direction: output, type: int32, offset: 0, role: handshake_done_step }
+    - { name: hs_abort,      direction: output, type: int32, offset: 1, role: handshake_abort }
 
 state_machine:
   model: packml

@@ -4,32 +4,50 @@
   "title": "OCM Module Definition v1.0",
   "description": "Declarative self-description of an assembly-cell module. Consumed by motion planners, PLC code generators, and AI agents.",
   "type": "object",
-  "required": ["ocm_version", "id", "revision", "kind", "license", "mechanical", "state_machine"],
+  "required": [
+    "ocm_version",
+    "id",
+    "revision",
+    "kind",
+    "license",
+    "mechanical",
+    "state_machine"
+  ],
   "additionalProperties": false,
-
   "properties": {
-    "ocm_version": { "const": "1.0" },
-
+    "ocm_version": {
+      "const": "1.0"
+    },
     "id": {
       "type": "string",
       "description": "Reverse-DNS unique identifier. Immutable.",
       "pattern": "^[a-z0-9]+(\\.[a-z0-9_-]+)+$",
-      "examples": ["com.accelsolutions.screwdriver.nx1500"]
+      "examples": [
+        "com.accelsolutions.screwdriver.nx1500"
+      ]
     },
     "revision": {
       "type": "string",
       "description": "SemVer. MAJOR bump = breaking change to frames, capabilities, or signals.",
       "pattern": "^\\d+\\.\\d+\\.\\d+$"
     },
-    "name":   { "type": "string" },
-    "vendor": { "type": "string" },
+    "name": {
+      "type": "string"
+    },
+    "vendor": {
+      "type": "string"
+    },
     "license": {
       "type": "string",
       "description": "SPDX identifier. Hardware modules should use CERN-OHL-S-2.0."
     },
-    "description": { "type": "string" },
-    "datasheet":   { "type": "string", "format": "uri" },
-
+    "description": {
+      "type": "string"
+    },
+    "datasheet": {
+      "type": "string",
+      "format": "uri"
+    },
     "kind": {
       "type": "string",
       "description": "Determines which sections are required. See allOf conditionals.",
@@ -45,16 +63,22 @@
         "base"
       ]
     },
-
     "mechanical": {
       "type": "object",
-      "required": ["mount", "frames", "geometry", "mass_kg"],
+      "required": [
+        "mount",
+        "frames",
+        "geometry",
+        "mass_kg"
+      ],
       "additionalProperties": false,
       "properties": {
         "mount": {
           "type": "object",
           "description": "How this module attaches to the cell base or to a robot flange.",
-          "required": ["interface"],
+          "required": [
+            "interface"
+          ],
           "properties": {
             "interface": {
               "type": "string",
@@ -70,8 +94,11 @@
             },
             "footprint_mm": {
               "type": "array",
-              "items": { "type": "number" },
-              "minItems": 2, "maxItems": 2,
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2,
               "description": "[x, y] envelope on the mounting plane."
             },
             "keepout_mm": {
@@ -81,32 +108,38 @@
             }
           }
         },
-
         "frames": {
           "type": "object",
           "description": "Named coordinate frames. 'origin' is REQUIRED and is the mounting datum; all other frames are relative to it.",
-          "required": ["origin"],
-          "additionalProperties": { "$ref": "#/$defs/frame" },
+          "required": [
+            "origin"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/frame"
+          },
           "properties": {
-            "origin": { "$ref": "#/$defs/frame" },
+            "origin": {
+              "$ref": "#/$defs/frame"
+            },
             "tcp": {
               "$ref": "#/$defs/frame",
               "description": "Tool center point. REQUIRED for kind=end_effector."
             }
           }
         },
-
         "geometry": {
           "type": "object",
-          "required": ["collision"],
+          "required": [
+            "collision"
+          ],
           "properties": {
             "visual": {
               "type": "string",
-              "description": "Path to display mesh (GLB preferred — renders directly in a three.js/R3F viewer)."
+              "description": "Path to display mesh (GLB preferred \u2014 renders directly in a three.js/R3F viewer)."
             },
             "collision": {
               "type": "string",
-              "description": "Path to collision mesh. Convex hull or convex decomposition STRONGLY preferred — Tesseract's Bullet backend is far faster on convex geometry."
+              "description": "Path to collision mesh. Convex hull or convex decomposition STRONGLY preferred \u2014 Tesseract's Bullet backend is far faster on convex geometry."
             },
             "urdf_fragment": {
               "type": "string",
@@ -114,19 +147,30 @@
             }
           }
         },
-
-        "mass_kg": { "type": "number", "exclusiveMinimum": 0 },
+        "mass_kg": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
         "com_mm": {
-          "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3,
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
           "description": "Center of mass in the origin frame. Needed for robot payload calc when kind=end_effector."
         },
         "inertia_kgm2": {
-          "type": "array", "items": { "type": "number" }, "minItems": 6, "maxItems": 6,
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 6,
+          "maxItems": 6,
           "description": "[Ixx, Iyy, Izz, Ixy, Ixz, Iyz]. Optional; required for high-dynamic payloads."
         }
       }
     },
-
     "electrical": {
       "type": "object",
       "properties": {
@@ -134,21 +178,49 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["rail", "current_nominal_a"],
+            "required": [
+              "rail",
+              "current_nominal_a"
+            ],
             "properties": {
-              "rail": { "type": "string", "enum": ["24VDC", "48VDC", "120VAC", "240VAC", "400VAC-3P"] },
-              "current_nominal_a": { "type": "number" },
-              "current_peak_a":    { "type": "number" },
-              "inrush_a":          { "type": "number" }
+              "rail": {
+                "type": "string",
+                "enum": [
+                  "24VDC",
+                  "48VDC",
+                  "120VAC",
+                  "240VAC",
+                  "400VAC-3P"
+                ]
+              },
+              "current_nominal_a": {
+                "type": "number"
+              },
+              "current_peak_a": {
+                "type": "number"
+              },
+              "inrush_a": {
+                "type": "number"
+              }
             }
           }
         },
         "pneumatic": {
           "type": "object",
           "properties": {
-            "pressure_bar":    { "type": "number" },
-            "flow_nl_min":     { "type": "number" },
-            "port":            { "type": "string", "examples": ["G1/8", "6mm-push-in"] }
+            "pressure_bar": {
+              "type": "number"
+            },
+            "flow_nl_min": {
+              "type": "number"
+            },
+            "port": {
+              "type": "string",
+              "examples": [
+                "G1/8",
+                "6mm-push-in"
+              ]
+            }
           }
         },
         "connectors": {
@@ -156,50 +228,24 @@
           "items": {
             "type": "object",
             "properties": {
-              "ref":  { "type": "string" },
-              "type": { "type": "string", "examples": ["M12-A-5P", "M8-4P", "HAN-6B"] },
-              "carries": { "type": "string", "enum": ["power", "fieldbus", "safety", "power+fieldbus"] }
-            }
-          }
-        }
-      }
-    },
-
-    "comms": {
-      "type": "object",
-      "required": ["protocol", "signals"],
-      "properties": {
-        "protocol": {
-          "type": "string",
-          "enum": ["ethercat", "ethernet-ip", "profinet", "modbus-tcp", "opc-ua", "io-link", "discrete-io"]
-        },
-        "esi": {
-          "type": "string",
-          "description": "Path to EtherCAT ESI file / EDS / GSDML as applicable."
-        },
-        "signals": {
-          "type": "array",
-          "description": "The semantic I/O map. Names here become PLC tag names in generated code — so they must be meaningful, not IN_00/OUT_03.",
-          "items": {
-            "type": "object",
-            "required": ["name", "direction", "type"],
-            "properties": {
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9_]*$",
-                "description": "snake_case. Becomes the generated PLC tag."
+              "ref": {
+                "type": "string"
               },
-              "direction": { "type": "string", "enum": ["input", "output"], "description": "Direction FROM THE PLC's point of view." },
-              "type":      { "type": "string", "enum": ["bool", "int16", "uint16", "int32", "uint32", "real", "string"] },
-              "unit":      { "type": "string" },
-              "offset":    { "type": "integer", "description": "Byte offset in the process image." },
-              "bit":       { "type": "integer", "minimum": 0, "maximum": 7 },
-              "role": {
+              "type": {
                 "type": "string",
-                "description": "Binds a signal to its PackML meaning so the cell coordinator can be generated. Signals without a role are process data.",
+                "examples": [
+                  "M12-A-5P",
+                  "M8-4P",
+                  "HAN-6B"
+                ]
+              },
+              "carries": {
+                "type": "string",
                 "enum": [
-                  "packml_cmd", "packml_state", "packml_reset", "packml_abort",
-                  "process_param", "process_result", "fault_code", "heartbeat"
+                  "power",
+                  "fieldbus",
+                  "safety",
+                  "power+fieldbus"
                 ]
               }
             }
@@ -207,113 +253,316 @@
         }
       }
     },
-
-    "capabilities": {
-      "type": "array",
-      "description": "The verbs this module offers. This is the agent-facing surface — it is deliberately shaped like a tool schema.",
-      "items": {
-        "type": "object",
-        "required": ["name", "summary"],
-        "additionalProperties": false,
-        "properties": {
-          "name":    { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-          "summary": { "type": "string", "description": "One line, plain English. The agent reads this." },
-
-          "parameters": {
+    "comms": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "signals"
+      ],
+      "properties": {
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "ethercat",
+            "ethernet-ip",
+            "profinet",
+            "modbus-tcp",
+            "opc-ua",
+            "io-link",
+            "discrete-io",
+            "ur-rtde"
+          ]
+        },
+        "esi": {
+          "type": "string",
+          "description": "Path to EtherCAT ESI file / EDS / GSDML as applicable."
+        },
+        "signals": {
+          "type": "array",
+          "description": "The semantic I/O map. Names here become PLC tag names in generated code \u2014 so they must be meaningful, not IN_00/OUT_03.",
+          "items": {
             "type": "object",
-            "description": "Typed inputs. Ranges are HARD LIMITS — the generator must reject a plan that exceeds them, and the agent must never propose one.",
-            "additionalProperties": { "$ref": "#/$defs/parameter" }
-          },
-
-          "motion": {
-            "type": "object",
-            "description": "How the robot (or this module's own axes) must move to execute the op. Consumed directly by the planner.",
+            "required": [
+              "name",
+              "direction",
+              "type"
+            ],
             "properties": {
-              "frame":         { "type": "string", "default": "tcp", "description": "Which named frame does the work." },
-              "approach_vec":  { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3,
-                                 "description": "Unit vector in the working frame. e.g. [0,0,-1] = drive down along tool Z." },
-              "approach_mm":   { "type": "number", "description": "Standoff distance where the approach move begins." },
-              "approach_speed_mm_s": { "type": "number" },
-              "retract_vec":   { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
-              "retract_mm":    { "type": "number" },
-              "clearance_mm":  { "type": "number", "description": "Collision-check inflation during the op. The planner adds this to the module's collision geometry." },
-              "hold_still":    { "type": "boolean", "default": true,
-                                 "description": "If true, the robot must be stationary during execution (screwdriving, press). If false, the op is executed ALONG a path (dispense, weld) and 'path' below applies." },
-              "path": {
-                "type": "object",
-                "description": "For hold_still=false ops. Declares what the process needs of the path.",
-                "properties": {
-                  "speed_mm_s":      { "$ref": "#/$defs/parameter" },
-                  "max_accel_mm_s2": { "type": "number" },
-                  "corner_radius_mm":{ "type": "number", "description": "Minimum blend radius the process tolerates. A dispense bead cannot survive a sharp corner at speed." },
-                  "orientation":     { "type": "string", "enum": ["fixed", "tangent", "normal_to_surface"] }
-                }
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "description": "snake_case. Becomes the generated PLC tag."
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "input",
+                  "output"
+                ],
+                "description": "Direction FROM THE PLC's point of view."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "bool",
+                  "int16",
+                  "uint16",
+                  "int32",
+                  "uint32",
+                  "real",
+                  "string"
+                ]
+              },
+              "unit": {
+                "type": "string"
+              },
+              "offset": {
+                "type": "integer",
+                "description": "Byte offset in the process image."
+              },
+              "bit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 7
+              },
+              "role": {
+                "type": "string",
+                "description": "Binds a signal to its PackML meaning so the cell coordinator can be generated. Signals without a role are process data. handshake_* roles bind the spec/08 robot handshake contract to this module's transport.",
+                "enum": [
+                  "packml_cmd",
+                  "packml_state",
+                  "packml_reset",
+                  "packml_abort",
+                  "process_param",
+                  "process_result",
+                  "fault_code",
+                  "heartbeat",
+                  "handshake_at_step",
+                  "handshake_done_step",
+                  "handshake_abort",
+                  "handshake_heartbeat"
+                ]
               }
             }
-          },
-
-          "preconditions": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Boolean expressions over this module's signals and cell state. The generator emits interlock logic from these — they are not documentation.",
-            "examples": [["screw_present == true", "torque_ok == false"]]
-          },
-          "postconditions": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "What is true after a SUCCESSFUL execution. The agent uses these to chain operations."
-          },
-
-          "results": {
-            "type": "object",
-            "description": "Data the module returns. Becomes traceability records.",
-            "additionalProperties": { "$ref": "#/$defs/parameter" }
-          },
-
-          "nominal_duration_s": { "type": "number", "description": "For cycle-time estimation and takt balancing." },
-          "consumes": {
-            "type": "array",
-            "items": { "type": "string" },
-            "description": "Consumable ids drawn down per execution (screws, adhesive volume). Feeds replenishment planning.",
-            "examples": [["screw_m3x8"]]
           }
         }
       }
     },
-
+    "capabilities": {
+      "type": "array",
+      "description": "The verbs this module offers. This is the agent-facing surface \u2014 it is deliberately shaped like a tool schema.",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "summary"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One line, plain English. The agent reads this."
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Typed inputs. Ranges are HARD LIMITS \u2014 the generator must reject a plan that exceeds them, and the agent must never propose one.",
+            "additionalProperties": {
+              "$ref": "#/$defs/parameter"
+            }
+          },
+          "motion": {
+            "type": "object",
+            "description": "How the robot (or this module's own axes) must move to execute the op. Consumed directly by the planner.",
+            "properties": {
+              "frame": {
+                "type": "string",
+                "default": "tcp",
+                "description": "Which named frame does the work."
+              },
+              "approach_vec": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "Unit vector in the working frame. e.g. [0,0,-1] = drive down along tool Z."
+              },
+              "approach_mm": {
+                "type": "number",
+                "description": "Standoff distance where the approach move begins."
+              },
+              "approach_speed_mm_s": {
+                "type": "number"
+              },
+              "retract_vec": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "retract_mm": {
+                "type": "number"
+              },
+              "clearance_mm": {
+                "type": "number",
+                "description": "Collision-check inflation during the op. The planner adds this to the module's collision geometry."
+              },
+              "hold_still": {
+                "type": "boolean",
+                "default": true,
+                "description": "If true, the robot must be stationary during execution (screwdriving, press). If false, the op is executed ALONG a path (dispense, weld) and 'path' below applies."
+              },
+              "path": {
+                "type": "object",
+                "description": "For hold_still=false ops. Declares what the process needs of the path.",
+                "properties": {
+                  "speed_mm_s": {
+                    "$ref": "#/$defs/parameter"
+                  },
+                  "max_accel_mm_s2": {
+                    "type": "number"
+                  },
+                  "corner_radius_mm": {
+                    "type": "number",
+                    "description": "Minimum blend radius the process tolerates. A dispense bead cannot survive a sharp corner at speed."
+                  },
+                  "orientation": {
+                    "type": "string",
+                    "enum": [
+                      "fixed",
+                      "tangent",
+                      "normal_to_surface"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Boolean expressions over this module's signals and cell state. The generator emits interlock logic from these \u2014 they are not documentation.",
+            "examples": [
+              [
+                "screw_present == true",
+                "torque_ok == false"
+              ]
+            ]
+          },
+          "postconditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What is true after a SUCCESSFUL execution. The agent uses these to chain operations."
+          },
+          "results": {
+            "type": "object",
+            "description": "Data the module returns. Becomes traceability records.",
+            "additionalProperties": {
+              "$ref": "#/$defs/parameter"
+            }
+          },
+          "nominal_duration_s": {
+            "type": "number",
+            "description": "For cycle-time estimation and takt balancing."
+          },
+          "consumes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Consumable ids drawn down per execution (screws, adhesive volume). Feeds replenishment planning.",
+            "examples": [
+              [
+                "screw_m3x8"
+              ]
+            ]
+          }
+        }
+      }
+    },
     "process": {
       "type": "object",
       "description": "Recipe-level parameters for kind=process modules. Distinct from capability parameters: these are set once per PART, not per operation.",
       "properties": {
         "recipe_parameters": {
           "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/parameter" }
+          "additionalProperties": {
+            "$ref": "#/$defs/parameter"
+          }
         },
-        "warmup_s":      { "type": "number", "description": "Time from enable to process-ready. The cell coordinator must sequence this." },
-        "purge_required":{ "type": "boolean" },
-        "idle_timeout_s":{ "type": "number", "description": "Beyond this idle time, a purge is required before the next op. Adhesive skins over." }
+        "warmup_s": {
+          "type": "number",
+          "description": "Time from enable to process-ready. The cell coordinator must sequence this."
+        },
+        "purge_required": {
+          "type": "boolean"
+        },
+        "idle_timeout_s": {
+          "type": "number",
+          "description": "Beyond this idle time, a purge is required before the next op. Adhesive skins over."
+        }
       }
     },
-
     "state_machine": {
       "type": "object",
-      "required": ["model"],
+      "required": [
+        "model"
+      ],
       "description": "MANDATORY. Every OCM module speaks PackML. This is what makes the cell coordinator generatable once instead of per-module.",
       "properties": {
-        "model": { "const": "packml", "description": "ISA-TR88.00.02" },
+        "model": {
+          "const": "packml",
+          "description": "ISA-TR88.00.02"
+        },
         "modes": {
           "type": "array",
-          "items": { "type": "string", "enum": ["production", "maintenance", "manual"] },
-          "default": ["production"]
+          "items": {
+            "type": "string",
+            "enum": [
+              "production",
+              "maintenance",
+              "manual"
+            ]
+          },
+          "default": [
+            "production"
+          ]
         },
         "implements": {
           "type": "array",
           "description": "Which PackML states this module actually implements. Modules may omit Held/Suspended if they cannot be interrupted mid-op.",
           "items": {
             "type": "string",
-            "enum": ["idle", "starting", "execute", "completing", "complete", "resetting",
-                     "holding", "held", "unholding", "suspending", "suspended", "unsuspending",
-                     "aborting", "aborted", "clearing", "stopping", "stopped"]
+            "enum": [
+              "idle",
+              "starting",
+              "execute",
+              "completing",
+              "complete",
+              "resetting",
+              "holding",
+              "held",
+              "unholding",
+              "suspending",
+              "suspended",
+              "unsuspending",
+              "aborting",
+              "aborted",
+              "clearing",
+              "stopping",
+              "stopped"
+            ]
           }
         },
         "abort_safe": {
@@ -322,7 +571,6 @@
         }
       }
     },
-
     "safety": {
       "type": "object",
       "description": "Declares hazards. Does NOT constitute a risk assessment and must never be treated as one.",
@@ -331,22 +579,57 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["pinch", "crush", "puncture", "burn_hot", "burn_cryo", "laser",
-                     "uv", "chemical", "pressure", "electrical", "noise", "rotating"]
+            "enum": [
+              "pinch",
+              "crush",
+              "puncture",
+              "burn_hot",
+              "burn_cryo",
+              "laser",
+              "uv",
+              "chemical",
+              "pressure",
+              "electrical",
+              "noise",
+              "rotating"
+            ]
           }
         },
         "required_performance_level": {
           "type": "string",
-          "enum": ["none", "PLb", "PLc", "PLd", "PLe"],
+          "enum": [
+            "none",
+            "PLb",
+            "PLc",
+            "PLd",
+            "PLe"
+          ],
           "description": "ISO 13849 PL required of the SAFETY circuit that guards this module."
         },
-        "sto_required":    { "type": "boolean", "description": "Module has an STO input that must be wired to the cell safety circuit." },
-        "guarding":        { "type": "string", "enum": ["none", "fixed", "interlocked", "light_curtain", "area_scanner", "speed_and_separation"] },
-        "safe_state":      { "type": "string", "description": "What the module does on loss of safety power. Must be described plainly." },
-        "notes":           { "type": "string" }
+        "sto_required": {
+          "type": "boolean",
+          "description": "Module has an STO input that must be wired to the cell safety circuit."
+        },
+        "guarding": {
+          "type": "string",
+          "enum": [
+            "none",
+            "fixed",
+            "interlocked",
+            "light_curtain",
+            "area_scanner",
+            "speed_and_separation"
+          ]
+        },
+        "safe_state": {
+          "type": "string",
+          "description": "What the module does on loss of safety power. Must be described plainly."
+        },
+        "notes": {
+          "type": "string"
+        }
       }
     },
-
     "maintenance": {
       "type": "object",
       "properties": {
@@ -355,88 +638,206 @@
           "items": {
             "type": "object",
             "properties": {
-              "name":            { "type": "string" },
-              "part_number":     { "type": "string" },
-              "interval_cycles": { "type": "integer" },
-              "interval_hours":  { "type": "number" }
+              "name": {
+                "type": "string"
+              },
+              "part_number": {
+                "type": "string"
+              },
+              "interval_cycles": {
+                "type": "integer"
+              },
+              "interval_hours": {
+                "type": "number"
+              }
             }
           }
         }
       }
     }
   },
-
   "allOf": [
     {
-      "if":   { "properties": { "kind": { "const": "end_effector" } } },
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "end_effector"
+          }
+        }
+      },
       "then": {
-        "required": ["capabilities", "comms"],
+        "required": [
+          "capabilities",
+          "comms"
+        ],
         "properties": {
           "mechanical": {
             "properties": {
-              "frames": { "required": ["tcp"] },
-              "mount":  { "properties": { "interface": { "pattern": "^iso-9409-1-" } } }
+              "frames": {
+                "required": [
+                  "tcp"
+                ]
+              },
+              "mount": {
+                "properties": {
+                  "interface": {
+                    "pattern": "^iso-9409-1-"
+                  }
+                }
+              }
             },
-            "required": ["com_mm"]
+            "required": [
+              "com_mm"
+            ]
           }
         }
       }
     },
     {
-      "if":   { "properties": { "kind": { "const": "process" } } },
-      "then": { "required": ["capabilities", "comms", "process", "safety"] }
-    },
-    {
-      "if":   { "properties": { "kind": { "const": "feeder" } } },
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "process"
+          }
+        }
+      },
       "then": {
-        "required": ["capabilities", "comms"],
-        "description": "A feeder MUST declare a 'pick' frame — where the part presents — and a capability that guarantees part presence."
+        "required": [
+          "capabilities",
+          "comms",
+          "process",
+          "safety"
+        ]
       }
     },
     {
-      "if":   { "properties": { "kind": { "const": "robot" } } },
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "feeder"
+          }
+        }
+      },
       "then": {
-        "required": ["comms"],
+        "required": [
+          "capabilities",
+          "comms"
+        ],
+        "description": "A feeder MUST declare a 'pick' frame \u2014 where the part presents \u2014 and a capability that guarantees part presence."
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "robot"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "comms"
+        ],
         "properties": {
           "mechanical": {
             "properties": {
-              "geometry": { "required": ["urdf_fragment"] }
+              "geometry": {
+                "required": [
+                  "urdf_fragment"
+                ]
+              }
             }
           }
         }
       }
     }
   ],
-
   "$defs": {
     "frame": {
       "type": "object",
-      "required": ["xyz_mm"],
+      "required": [
+        "xyz_mm"
+      ],
       "properties": {
-        "xyz_mm": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
-        "rpy_deg": {
-          "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3,
-          "default": [0, 0, 0],
-          "description": "Fixed-axis roll-pitch-yaw, degrees. Matches URDF convention (which uses radians — the loader converts)."
+        "xyz_mm": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
         },
-        "parent": { "type": "string", "default": "origin" },
-        "note":   { "type": "string" }
+        "rpy_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "default": [
+            0,
+            0,
+            0
+          ],
+          "description": "Fixed-axis roll-pitch-yaw, degrees. Matches URDF convention (which uses radians \u2014 the loader converts)."
+        },
+        "parent": {
+          "type": "string",
+          "default": "origin"
+        },
+        "note": {
+          "type": "string"
+        }
       }
     },
-
     "parameter": {
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "description": "A typed, bounded, unit-carrying value. Bounds are enforced by the generator and respected by the agent.",
       "properties": {
-        "type":    { "type": "string", "enum": ["number", "integer", "boolean", "string", "enum"] },
-        "unit":    { "type": "string", "examples": ["N.m", "mm", "mm/s", "deg", "bar", "ml", "degC"] },
-        "min":     { "type": "number" },
-        "max":     { "type": "number" },
+        "type": {
+          "type": "string",
+          "enum": [
+            "number",
+            "integer",
+            "boolean",
+            "string",
+            "enum"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "examples": [
+            "N.m",
+            "mm",
+            "mm/s",
+            "deg",
+            "bar",
+            "ml",
+            "degC"
+          ]
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
         "default": {},
-        "values":  { "type": "array", "description": "For type=enum." },
-        "required":{ "type": "boolean", "default": true },
-        "summary": { "type": "string", "description": "Plain English. The agent reads this to decide what to pass." }
+        "values": {
+          "type": "array",
+          "description": "For type=enum."
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "summary": {
+          "type": "string",
+          "description": "Plain English. The agent reads this to decide what to pass."
+        }
       }
     }
   }
