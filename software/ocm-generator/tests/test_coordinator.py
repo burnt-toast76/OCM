@@ -29,6 +29,7 @@ pytest.importorskip("tesseract_robotics")
 from ocm_core.cell import Cell  # noqa: E402
 from ocm_generator.coordinator import (  # noqa: E402
     Coordinator,
+    HeartbeatStaleError,
     RobotAborted,
     RobotLink,
     SimulatedPackMLModule,
@@ -116,9 +117,21 @@ class _Loopback:
     SimulatedSignalBus, and tears everything down cleanly afterwards.
     """
 
-    def __init__(self, resolved, script: str, *, drive_screw_result_ok_for=None, op_delay_s: float = 0.01, trace_log_path=None):
+    def __init__(
+        self,
+        resolved,
+        script: str,
+        *,
+        drive_screw_result_ok_for=None,
+        op_delay_s: float = 0.01,
+        trace_log_path=None,
+        heartbeat_timeout_s: float | None = None,
+    ):
         self.bus = SimulatedSignalBus()
-        self.coordinator = Coordinator(resolved, self.bus, poll_interval_s=0.005, trace_log_path=trace_log_path)
+        coordinator_kwargs = {}
+        if heartbeat_timeout_s is not None:
+            coordinator_kwargs["heartbeat_timeout_s"] = heartbeat_timeout_s
+        self.coordinator = Coordinator(resolved, self.bus, poll_interval_s=0.005, trace_log_path=trace_log_path, **coordinator_kwargs)
         robot_link = RobotLink.bind(self.bus, self.coordinator.robot_instance, resolved.instance("robot1").module)
         self.robot = SimulatedRobot(script=script, link=robot_link, poll_interval_s=0.005)
 
@@ -232,3 +245,59 @@ def test_forced_result_ok_false_on_hole_2_triggers_abort(repo_root: Path):
     # It reached hole 2's contact sync (step 4) and stalled there -- it
     # never got anywhere near hole 3 (steps 5, 6).
     assert loop.robot.reached_steps == [1, 2, 3, 4]
+
+
+# ---------------------------------------------------------------------------
+# The robot dies mid-sequence -> HeartbeatStaleError within the timeout window
+# ---------------------------------------------------------------------------
+
+
+def test_robot_dying_mid_sequence_raises_heartbeat_stale_error_within_the_window(repo_root: Path):
+    # spec/08: "hs_heartbeat static for > 2s while a program should be
+    # running = robot program dead or connection lost -> coordinator
+    # faults the cell." A short heartbeat_timeout_s here so the test
+    # doesn't wait around for the real 2s default.
+    heartbeat_timeout_s = 0.15
+    resolved, script = _build_script(repo_root, _BRACKET_HOLES, ["hole_1", "hole_2", "hole_3"])
+    loop = _Loopback(resolved, script, heartbeat_timeout_s=heartbeat_timeout_s)
+
+    async def scenario() -> float:
+        module_task = asyncio.create_task(loop.module.run())
+        robot_task = asyncio.ensure_future(loop.robot.run())
+        coordinator_task = asyncio.ensure_future(loop.coordinator.run())
+        try:
+            # Let the sequence make real progress -- all the way through
+            # hole 1 and into hole 2's standoff sync -- before the robot
+            # dies. hs_heartbeat has been genuinely advancing up to this
+            # point; from here it's frozen forever, mid-sequence, with the
+            # coordinator still waiting on it (screw_present for hole 2,
+            # then its own contact sync).
+            while len(loop.robot.reached_steps) < 3:  # standoff_1, contact_1, standoff_2
+                assert not coordinator_task.done(), "coordinator finished before the robot could be killed"
+                await asyncio.sleep(0.005)
+
+            robot_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await robot_task
+            robot_died_at = time.monotonic()
+
+            with pytest.raises(HeartbeatStaleError):
+                await coordinator_task
+
+            return time.monotonic() - robot_died_at
+        finally:
+            loop.module.stop()
+            module_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await module_task
+
+    elapsed = asyncio.run(asyncio.wait_for(scenario(), timeout=5))
+
+    # Fires close to heartbeat_timeout_s after the robot actually stopped
+    # updating hs_heartbeat -- not immediately (it must genuinely observe
+    # staleness, not just "no heartbeat yet") and not after some unrelated
+    # longer timeout.
+    assert heartbeat_timeout_s * 0.5 <= elapsed <= heartbeat_timeout_s * 4, (
+        f"HeartbeatStaleError fired outside the expected window: {elapsed:.3f}s "
+        f"(heartbeat_timeout_s={heartbeat_timeout_s})"
+    )
