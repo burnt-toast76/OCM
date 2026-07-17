@@ -8,7 +8,7 @@
 # That's a real schema gap, not an oversight; worth revisiting if more
 # vision modules show up wanting the same shape.
 # ─────────────────────────────────────────────────────────────────────
-ocm_version: "1.0"
+ocm_version: "1.1"
 id:       com.lmi.gocator.2350
 revision: "1.0.0"
 name:     "Gocator 2350"
@@ -39,13 +39,14 @@ capabilities:
     motion:
       hold_still: true   # the robot isn't involved; this runs off nest1's fixed camera
     results:
-      x_mm:    { type: number, unit: mm }
-      y_mm:    { type: number, unit: mm }
-      z_mm:    { type: number, unit: mm }
-      rx_deg:  { type: number, unit: deg }
-      ry_deg:  { type: number, unit: deg }
-      rz_deg:  { type: number, unit: deg }
-      ok:      { type: boolean, summary: "false if no part / low confidence match -- plan must not proceed on a stale pose." }
+      part_pose:
+        type: pose6d
+        frame: nest1.part_datum
+        summary: "Measured part pose correction, expressed in the nest's part_datum frame. Consumed by the plan's `binds:` to transform every downstream feature."
+      confidence:
+        type: number
+        unit: "%"
+        summary: "Match confidence. The coordinator should gate on this before releasing downstream steps."
     nominal_duration_s: 0.3
 
 state_machine:

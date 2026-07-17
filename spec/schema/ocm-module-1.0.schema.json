@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://opencellmodule.org/schema/ocm-module-1.0.schema.json",
-  "title": "OCM Module Definition v1.0",
+  "title": "OCM Module Definition v1.1",
   "description": "Declarative self-description of an assembly-cell module. Consumed by motion planners, PLC code generators, and AI agents.",
   "type": "object",
   "required": [
@@ -16,7 +16,11 @@
   "additionalProperties": false,
   "properties": {
     "ocm_version": {
-      "const": "1.0"
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
+      "description": "Spec version this manifest is written against. 1.1 adds: x-<name> custom protocols, pose6d/vec3/struct composite types."
     },
     "id": {
       "type": "string",
@@ -262,16 +266,25 @@
       "properties": {
         "protocol": {
           "type": "string",
-          "enum": [
-            "ethercat",
-            "ethernet-ip",
-            "profinet",
-            "modbus-tcp",
-            "opc-ua",
-            "io-link",
-            "discrete-io",
-            "ur-rtde"
-          ]
+          "anyOf": [
+            {
+              "enum": [
+                "ethercat",
+                "ethernet-ip",
+                "profinet",
+                "modbus-tcp",
+                "opc-ua",
+                "io-link",
+                "discrete-io",
+                "ur-rtde"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "^x-[a-z0-9][a-z0-9-]*$"
+            }
+          ],
+          "description": "Transport. Enumerated values have (or will have) toolchain drivers. x-<name> declares a custom/proprietary protocol: valid for authoring, resolving, scene and plan (which never touch transports); the runtime coordinator refuses to go live unless a driver is registered for it, naming the protocol. Escape hatch per ADR-0012."
         },
         "esi": {
           "type": "string",
@@ -310,7 +323,10 @@
                   "int32",
                   "uint32",
                   "real",
-                  "string"
+                  "string",
+                  "pose6d",
+                  "vec3",
+                  "struct"
                 ]
               },
               "unit": {
@@ -342,8 +358,46 @@
                   "handshake_abort",
                   "handshake_heartbeat"
                 ]
+              },
+              "frame": {
+                "type": "string",
+                "description": "For type=pose6d: the frame this pose is expressed in, as '<instance-relative frame name>' resolved against this module's declared frames (or, in capability results, a frame of a plan-referenced instance, e.g. 'nest1.part_datum'). REQUIRED for pose6d \u2014 a pose without a frame is a bug waiting to happen."
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "enum": [
+                    "bool",
+                    "int16",
+                    "uint16",
+                    "int32",
+                    "uint32",
+                    "real",
+                    "string"
+                  ]
+                },
+                "description": "For type=struct: ordered field name -> scalar type. Wire layout is fields in declaration order."
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "type": {
+                      "const": "pose6d"
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "frame"
+                  ]
+                }
+              }
+            ]
           }
         }
       }
@@ -804,7 +858,10 @@
             "integer",
             "boolean",
             "string",
-            "enum"
+            "enum",
+            "pose6d",
+            "vec3",
+            "struct"
           ]
         },
         "unit": {
@@ -837,8 +894,43 @@
         "summary": {
           "type": "string",
           "description": "Plain English. The agent reads this to decide what to pass."
+        },
+        "frame": {
+          "type": "string",
+          "description": "For type=pose6d results/params: the reference frame. REQUIRED for pose6d."
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": {
+            "enum": [
+              "number",
+              "integer",
+              "boolean",
+              "string"
+            ]
+          },
+          "description": "For type=struct: field name -> type."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "pose6d"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "frame"
+            ]
+          }
+        }
+      ]
     }
   }
 }
