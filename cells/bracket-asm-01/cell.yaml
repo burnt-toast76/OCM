@@ -64,7 +64,7 @@ modules:
   - instance: cam1
     module: com.lmi.gocator.2350@1.0.0
     mount:
-      pose: { xyz_mm: [640, 300, 420], rpy_deg: [180, 0, 0] }
+      pose: { xyz_mm: [640, 300, 600], rpy_deg: [180, 0, 0] }
     address:
       ip: 192.168.1.20
     calibration: cal/cam1_2026-07-01.yaml   # per-CELL, not per-module. Extrinsics live here.
