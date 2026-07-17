@@ -132,3 +132,98 @@ def test_transform_point_matches_compose_with_a_translation_only_pose():
     via_compose = pose.compose(Pose(point)).translation
 
     assert via_transform_point == pytest.approx(via_compose, abs=1e-9)
+
+
+# ---------------------------------------------------------------------------
+# from_z_axis / inverse / axis_angle / rotate_vector -- added for the
+# planner (standoff/contact pose construction, IK targets, URScript's own
+# p[x,y,z,rx,ry,rz] pose convention).
+# ---------------------------------------------------------------------------
+
+
+def test_from_z_axis_points_its_local_z_along_the_given_direction():
+    # A pose whose +Z axis points straight along world -X: rotating the
+    # local +Z unit vector by the pose's own rotation must land on -X.
+    pose = Pose.from_z_axis((1.0, 2.0, 3.0), (-1.0, 0.0, 0.0))
+
+    assert pose.translation == (1.0, 2.0, 3.0)
+    assert pose.rotate_vector((0.0, 0.0, 1.0)) == pytest.approx((-1.0, 0.0, 0.0), abs=1e-9)
+
+
+def test_from_z_axis_normalizes_a_non_unit_direction():
+    a = Pose.from_z_axis((0.0, 0.0, 0.0), (0.0, 0.0, 2.0))
+    b = Pose.from_z_axis((0.0, 0.0, 0.0), (0.0, 0.0, 7.0))
+
+    assert a.quaternion_xyzw() == pytest.approx(b.quaternion_xyzw(), abs=1e-9)
+
+
+def test_from_z_axis_falls_back_to_a_different_reference_when_up_hint_is_parallel():
+    # The default up_hint is +Z; asking for local +Z to point along world +Z
+    # too would leave the look-at basis undefined unless the fallback
+    # reference kicks in. Just needs to not raise and produce a valid
+    # (orthonormal, right-handed) basis.
+    pose = Pose.from_z_axis((0.0, 0.0, 0.0), (0.0, 0.0, 1.0))
+
+    x_axis = pose.rotate_vector((1.0, 0.0, 0.0))
+    y_axis = pose.rotate_vector((0.0, 1.0, 0.0))
+    z_axis = pose.rotate_vector((0.0, 0.0, 1.0))
+    assert z_axis == pytest.approx((0.0, 0.0, 1.0), abs=1e-9)
+    # right-handed and orthonormal: x cross y == z
+    cross = (
+        x_axis[1] * y_axis[2] - x_axis[2] * y_axis[1],
+        x_axis[2] * y_axis[0] - x_axis[0] * y_axis[2],
+        x_axis[0] * y_axis[1] - x_axis[1] * y_axis[0],
+    )
+    assert cross == pytest.approx(z_axis, abs=1e-9)
+
+
+def test_inverse_composed_with_self_is_identity():
+    pose = Pose.from_xyz_rpy((1.0, -2.0, 0.5), (0.3, -0.7, 1.1))
+
+    identity = pose.compose(pose.inverse())
+
+    assert identity.translation == pytest.approx((0.0, 0.0, 0.0), abs=1e-9)
+    assert identity.quaternion_xyzw() == pytest.approx((0.0, 0.0, 0.0, 1.0), abs=1e-9)
+
+
+def test_inverse_undoes_transform_point():
+    pose = Pose.from_xyz_rpy((2.0, 3.0, -1.0), (0.2, 0.4, -0.6))
+    point = (5.0, -1.0, 2.0)
+
+    round_tripped = pose.inverse().transform_point(pose.transform_point(point))
+
+    assert round_tripped == pytest.approx(point, abs=1e-9)
+
+
+def test_axis_angle_round_trips_through_from_axis_angle():
+    axis = (0.0, 1.0, 0.0)
+    angle = math.pi / 3
+    pose = Pose.from_axis_angle(axis, angle)
+
+    rx, ry, rz = pose.axis_angle()
+
+    assert (rx, ry, rz) == pytest.approx((0.0, angle, 0.0), abs=1e-9)
+
+
+def test_axis_angle_of_identity_is_zero():
+    assert Pose.identity().axis_angle() == pytest.approx((0.0, 0.0, 0.0), abs=1e-9)
+
+
+def test_axis_angle_handles_a_180_degree_rotation():
+    # The near-pi branch of _axis_angle_from_matrix -- the usual
+    # off-diagonal-difference formula divides by ~0 right here.
+    pose = Pose.from_axis_angle((0.0, 0.0, 1.0), math.pi)
+
+    rx, ry, rz = pose.axis_angle()
+
+    angle = math.sqrt(rx * rx + ry * ry + rz * rz)
+    assert angle == pytest.approx(math.pi, abs=1e-9)
+    assert (rx / angle, ry / angle, rz / angle) == pytest.approx((0.0, 0.0, 1.0), abs=1e-6)
+
+
+def test_rotate_vector_ignores_translation():
+    pose = Pose.from_xyz_rpy((100.0, -50.0, 3.0), (0.0, 0.0, math.pi / 2))
+
+    rotated = pose.rotate_vector((1.0, 0.0, 0.0))
+
+    assert rotated == pytest.approx((0.0, 1.0, 0.0), abs=1e-9)

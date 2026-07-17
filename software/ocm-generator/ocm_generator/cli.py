@@ -5,14 +5,17 @@
     ocm resolve  <cell.yaml> [--modules DIR]
     ocm scene    <cell.yaml> [--modules DIR] [--dump-urdf FILE.urdf] [--view FILE.html]
                              [--collision [--collision-margin-mm MM]]
+    ocm plan     <cell.yaml> [--modules DIR] --emit-urscript FILE.script
+                             [--collision-margin-mm MM] [--path-samples N]
 
 Each stage's collected-violations error (ManifestValidationError,
 CellResolutionError, SceneBuildError) is printed in full, not just the
 first problem -- same as the underlying libraries. Exit code is 0 on
 success, 1 if that stage reported errors.
 
-`--collision` needs the `tesseract` extra (pip install ocm-generator
-[tesseract]); nothing else here does -- see ocm_generator/scene/collision.py.
+`--collision` and `plan` need the `tesseract` extra (pip install
+ocm-generator[tesseract]); nothing else here does -- see
+ocm_generator/scene/collision.py and ocm_generator/planner/ik.py.
 
 This is a developer/trial tool, not the agent layer (see ROADMAP Step 6 --
 "the agent is a thin tool-calling wrapper over a generator that already
@@ -155,6 +158,52 @@ def cmd_scene_collision(scene, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_plan(args: argparse.Namespace) -> int:
+    from ocm_core import load_cell
+    from ocm_generator.emitters import emit_urscript
+    from ocm_generator.planner import PlanningError, PlanningUnavailable, plan_drive_screw
+    from ocm_generator.scene import SceneBuildError, build_scene
+    from ocm_resolve import CellResolutionError, resolve_cell
+
+    try:
+        cell = load_cell(args.cell)
+    except OSError as e:
+        print(f"FAILED: {args.cell}: {e.strerror or e}", file=sys.stderr)
+        return 1
+
+    try:
+        resolved = resolve_cell(cell, args.modules)
+    except CellResolutionError as e:
+        _print_errors(f"FAILED: {args.cell} did not resolve against {args.modules}", e.errors)
+        return 1
+
+    try:
+        scene = build_scene(resolved, args.modules)
+    except SceneBuildError as e:
+        _print_errors(f"FAILED: {args.cell} scene did not build", e.errors)
+        return 1
+
+    try:
+        plan = plan_drive_screw(
+            resolved,
+            scene,
+            collision_margin_mm=args.collision_margin_mm,
+            path_samples=args.path_samples,
+        )
+    except PlanningUnavailable as e:
+        print(f"FAILED: planning unavailable: {e}", file=sys.stderr)
+        return 1
+    except PlanningError as e:
+        print(f"FAILED: {args.cell}: {e}", file=sys.stderr)
+        return 1
+
+    script = emit_urscript(plan)
+    args.emit_urscript.write_text(script, encoding="utf-8")
+    print(f"OK: {plan.tool_instance} drive_screw @ {plan.hole_id}")
+    print(f"  wrote URScript to {args.emit_urscript}")
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ocm", description="Run and trial the OCM generator pipeline.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -191,6 +240,34 @@ def _build_parser() -> argparse.ArgumentParser:
         "to tolerate looser resting fits; lower it to catch closer near-misses too.",
     )
     p_scene.set_defaults(func=cmd_scene)
+
+    p_plan = subparsers.add_parser(
+        "plan", help="Plan the first drive_screw step's motion and emit URScript (needs the 'tesseract' extra)."
+    )
+    p_plan.add_argument("cell", type=Path, help="Path to a cell.yaml")
+    p_plan.add_argument("--modules", type=Path, default=Path("modules"), help="Module search path (default: ./modules)")
+    p_plan.add_argument(
+        "--emit-urscript",
+        type=Path,
+        required=True,
+        metavar="FILE.script",
+        help="Write the planned standoff/contact/retract/home motion as URScript to this file.",
+    )
+    p_plan.add_argument(
+        "--collision-margin-mm",
+        type=float,
+        default=1.0,
+        metavar="MM",
+        help="Contact distance margin for the home->standoff path check (default: 1.0).",
+    )
+    p_plan.add_argument(
+        "--path-samples",
+        type=int,
+        default=50,
+        metavar="N",
+        help="Number of joint-space states to collision-check along home->standoff (default: 50).",
+    )
+    p_plan.set_defaults(func=cmd_plan)
 
     return parser
 

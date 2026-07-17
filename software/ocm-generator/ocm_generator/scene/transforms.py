@@ -48,6 +48,41 @@ class Pose:
         """
         return cls((0.0, 0.0, 0.0), _rotation_from_axis_angle(axis, angle))
 
+    @classmethod
+    def from_z_axis(cls, origin: Vec3, z_axis: Vec3, up_hint: Vec3 = (0.0, 0.0, 1.0)) -> "Pose":
+        """A pose at `origin` whose local +Z axis points along `z_axis`
+        (need not be unit length). The rotation *about* that axis is
+        otherwise unconstrained by a single direction vector, so it's
+        picked deterministically from `up_hint` (any vector not parallel
+        to `z_axis`) via a standard look-at basis construction -- fine for
+        anything rotationally symmetric about its own Z (a screwdriver bit
+        driving straight in), which is the only thing this is for.
+        """
+        z = _normalize(z_axis)
+        hint = up_hint
+        if abs(_dot(z, _normalize(hint))) > 0.999:
+            hint = (1.0, 0.0, 0.0)  # z_axis (near-)parallel to up_hint -- pick a different reference
+        x = _normalize(_cross(hint, z))
+        y = _cross(z, x)
+        rotation = ((x[0], y[0], z[0]), (x[1], y[1], z[1]), (x[2], y[2], z[2]))
+        return cls(tuple(origin), rotation)
+
+    def inverse(self) -> "Pose":
+        """The rigid transform such that self.compose(self.inverse()) ==
+        Pose.identity() (up to floating point): rotation transposed
+        (rotation matrices are orthonormal), translation -R^T @ t.
+        """
+        rt = tuple(zip(*self.rotation))  # transpose
+        t = self.translation
+        neg_t = (-t[0], -t[1], -t[2])
+        return Pose(_mat3_vec(rt, neg_t), rt)  # type: ignore[arg-type]
+
+    def axis_angle(self) -> Vec3:
+        """This pose's rotation as a rotation vector (axis * angle,
+        radians) -- URScript's `p[x,y,z,rx,ry,rz]` pose convention.
+        """
+        return _axis_angle_from_matrix(self.rotation)
+
     def transform_point(self, point: Vec3) -> Vec3:
         """p_parent = rotation @ point + translation."""
         rotated = _mat3_vec(self.rotation, point)
@@ -56,6 +91,13 @@ class Pose:
             rotated[1] + self.translation[1],
             rotated[2] + self.translation[2],
         )
+
+    def rotate_vector(self, vector: Vec3) -> Vec3:
+        """rotation @ vector -- ignores translation entirely. For a
+        *direction* (a surface normal, an approach_vec), not a point:
+        moving the frame shouldn't move the direction it points in.
+        """
+        return _mat3_vec(self.rotation, vector)
 
     def compose(self, local: "Pose") -> "Pose":
         """`local` is expressed in this pose's own frame; return the
@@ -107,6 +149,52 @@ def _rotation_from_axis_angle(axis: Vec3, angle: float) -> Mat3:
         (t * ux * uy + s * uz, t * uy * uy + c, t * uy * uz - s * ux),
         (t * ux * uz - s * uy, t * uy * uz + s * ux, t * uz * uz + c),
     )
+
+
+def _cross(a: Vec3, b: Vec3) -> Vec3:
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+
+
+def _dot(a: Vec3, b: Vec3) -> float:
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
+def _normalize(v: Vec3) -> Vec3:
+    n = math.sqrt(_dot(v, v))
+    if n == 0.0:
+        raise ValueError("cannot normalize the zero vector")
+    return (v[0] / n, v[1] / n, v[2] / n)
+
+
+def _axis_angle_from_matrix(m: Mat3) -> Vec3:
+    m00, m01, m02 = m[0]
+    m10, m11, m12 = m[1]
+    m20, m21, m22 = m[2]
+    trace = m00 + m11 + m22
+    angle = math.acos(max(-1.0, min(1.0, (trace - 1.0) / 2.0)))
+
+    if angle < 1e-9:
+        return (0.0, 0.0, 0.0)
+
+    if math.pi - angle < 1e-6:
+        # Near a 180-degree rotation: the usual off-diagonal-difference
+        # formula degenerates (divides by ~0). (R + I) / 2 has the axis'
+        # outer product on its diagonal instead.
+        ax = math.sqrt(max(0.0, (m00 + 1.0) / 2.0))
+        ay = math.sqrt(max(0.0, (m11 + 1.0) / 2.0))
+        az = math.sqrt(max(0.0, (m22 + 1.0) / 2.0))
+        if ax >= ay and ax >= az and ax > 1e-9:
+            ay, az = (m01 + m10) / (4 * ax), (m02 + m20) / (4 * ax)
+        elif ay >= az and ay > 1e-9:
+            ax, az = (m01 + m10) / (4 * ay), (m12 + m21) / (4 * ay)
+        elif az > 1e-9:
+            ax, ay = (m02 + m20) / (4 * az), (m12 + m21) / (4 * az)
+        axis = _normalize((ax, ay, az))
+    else:
+        s = 2.0 * math.sin(angle)
+        axis = ((m21 - m12) / s, (m02 - m20) / s, (m10 - m01) / s)
+
+    return (axis[0] * angle, axis[1] * angle, axis[2] * angle)
 
 
 def _mat3_mul(a: Mat3, b: Mat3) -> Mat3:
