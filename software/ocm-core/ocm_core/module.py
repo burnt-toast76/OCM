@@ -139,7 +139,13 @@ class Electrical:
 
 @dataclass(frozen=True)
 class Signal:
-    """One entry in the semantic I/O map. `name` becomes the generated PLC tag."""
+    """One entry in the semantic I/O map. `name` becomes the generated PLC tag.
+
+    v1.1 adds composite types (`pose6d`, `vec3`, `struct` — spec/CHANGELOG.md).
+    `frame` (pose6d's required reference frame) and `fields` (struct's
+    ordered field name -> scalar type map, wire layout in declaration
+    order) carry those declarations; both are None for every scalar type.
+    """
 
     name: str
     direction: str
@@ -148,9 +154,12 @@ class Signal:
     offset: int | None = None
     bit: int | None = None
     role: str | None = None
+    frame: str | None = None
+    fields: dict[str, str] | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Signal":
+        fields = data.get("fields")
         return cls(
             name=data["name"],
             direction=data["direction"],
@@ -159,6 +168,8 @@ class Signal:
             offset=data.get("offset"),
             bit=data.get("bit"),
             role=data.get("role"),
+            frame=data.get("frame"),
+            fields=dict(fields) if fields is not None else None,
         )
 
 

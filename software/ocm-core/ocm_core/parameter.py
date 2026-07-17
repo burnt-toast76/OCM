@@ -14,6 +14,12 @@ class Parameter:
     Bounds (min/max) are hard limits: the generator must reject a plan that
     exceeds them, and the agent must never propose one. ocm-core only carries
     the declaration — enforcing it against an actual plan is validate/'s job.
+
+    v1.1 adds composite types (`pose6d`, `vec3`, `struct` — spec/CHANGELOG.md)
+    alongside the original scalars. `frame` and `fields` carry their own
+    declarations; `min`/`max` remain scalar-only (the schema doesn't apply
+    them to composites, and neither does ocm-resolve — bounds checking a
+    six-float pose against one number is meaningless, not just unimplemented).
     """
 
     type: str
@@ -24,10 +30,19 @@ class Parameter:
     values: tuple[Any, ...] | None = None
     required: bool = True
     summary: str | None = None
+    # For type=pose6d: the reference frame the pose is expressed in
+    # (schema-required for pose6d — "a pose without a frame is a bug
+    # waiting to happen"). None for every other type.
+    frame: str | None = None
+    # For type=struct: ordered field name -> scalar type. Wire layout is
+    # fields in declaration order (dict insertion order, preserved from
+    # the manifest's own YAML key order). None for every other type.
+    fields: dict[str, str] | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Parameter":
         values = data.get("values")
+        fields = data.get("fields")
         return cls(
             type=data["type"],
             unit=data.get("unit"),
@@ -37,6 +52,8 @@ class Parameter:
             values=tuple(values) if values is not None else None,
             required=data.get("required", True),
             summary=data.get("summary"),
+            frame=data.get("frame"),
+            fields=dict(fields) if fields is not None else None,
         )
 
 

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-from ocm_core import load_module
+from ocm_core import Parameter, Signal, load_module
 from ocm_core.module import Module
 
 
@@ -53,3 +53,62 @@ def test_dh200_not_abort_safe(dh200_path):
     assert module.state_machine.abort_safe is False
     assert module.safety.required_performance_level == "PLc"
     assert module.safety.sto_required is False
+
+
+# ---------------------------------------------------------------------------
+# v1.1 composite types (spec/CHANGELOG.md): pose6d/vec3/struct carry `frame`
+# and `fields` on Parameter (capability parameters/results) and Signal
+# (comms.signals) alike -- everything else stays None.
+# ---------------------------------------------------------------------------
+
+
+def test_parameter_from_dict_carries_frame_for_pose6d():
+    param = Parameter.from_dict({"type": "pose6d", "frame": "nest1.part_datum"})
+    assert param.type == "pose6d"
+    assert param.frame == "nest1.part_datum"
+    assert param.fields is None
+
+
+def test_parameter_from_dict_carries_fields_for_struct():
+    param = Parameter.from_dict({"type": "struct", "fields": {"x": "number", "y": "number"}})
+    assert param.type == "struct"
+    assert param.fields == {"x": "number", "y": "number"}
+    assert param.frame is None
+
+
+def test_parameter_from_dict_leaves_frame_and_fields_none_for_scalars():
+    param = Parameter.from_dict({"type": "number", "unit": "mm", "min": 0, "max": 10})
+    assert param.frame is None
+    assert param.fields is None
+
+
+def test_signal_from_dict_carries_frame_for_pose6d():
+    signal = Signal.from_dict(
+        {"name": "part_pose", "direction": "input", "type": "pose6d", "frame": "nest1.part_datum", "role": "process_result"}
+    )
+    assert signal.type == "pose6d"
+    assert signal.frame == "nest1.part_datum"
+    assert signal.fields is None
+
+
+def test_signal_from_dict_carries_fields_for_struct():
+    signal = Signal.from_dict({"name": "blob", "direction": "input", "type": "struct", "fields": {"a": "int16", "b": "bool"}})
+    assert signal.fields == {"a": "int16", "b": "bool"}
+    assert signal.frame is None
+
+
+def test_gocator_manifest_round_trips_through_the_object_model_with_frame_intact(gocator_path):
+    module = load_module(gocator_path)
+
+    assert module.ocm_version == "1.1"
+    assert module.kind == "sensor"
+
+    locate = module.capability("locate_part")
+    part_pose = locate.results["part_pose"]
+    assert part_pose.type == "pose6d"
+    assert part_pose.frame == "nest1.part_datum"
+
+    confidence = locate.results["confidence"]
+    assert confidence.type == "number"
+    assert confidence.unit == "%"
+    assert confidence.frame is None

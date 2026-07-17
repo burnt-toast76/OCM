@@ -58,6 +58,13 @@ def _find_capability(module: Module, op_name: str) -> Capability | None:
     return None
 
 
+# pose6d/vec3/struct (spec/CHANGELOG.md v1.1). Bounds (min/max) are a
+# scalar concept -- a six-float pose or a struct blob has no ordering to
+# check a number against. These are opaque to this function: known-name
+# checking still applies (see _check_op_step), but never a bounds check.
+_COMPOSITE_TYPES = ("pose6d", "vec3", "struct")
+
+
 def _check_param(
     location: str,
     op_name: str,
@@ -66,6 +73,8 @@ def _check_param(
     param: Parameter,
     errors: list[str],
 ) -> None:
+    if param.type in _COMPOSITE_TYPES:
+        return
     if param.type in ("number", "integer"):
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             errors.append(

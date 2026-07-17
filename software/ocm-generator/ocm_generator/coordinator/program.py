@@ -38,6 +38,16 @@ all -- mirroring exactly where `.emitters.urscript` places its "overlaps
 following transit" comment. Its own completion is never watched directly;
 it's observed indirectly, through drive_screw's `screw_present`
 precondition at the following standoff gate.
+
+## Go-live
+
+Before any of the above, `.drivers.check_drivers_registered` walks every
+resolved instance's own declared `comms.protocol` against the
+`DriverRegistry` this coordinator was built with, and refuses (naming
+every protocol/instance pair with no registered driver) if the cell can't
+actually be talked to yet -- a custom `x-<name>` protocol (ADR-0012) is
+perfectly valid to author, resolve, and plan against, but the coordinator
+is the stage that has to actually drive it.
 """
 
 from __future__ import annotations
@@ -54,6 +64,7 @@ from typing import Any
 from ocm_core import Capability, Module
 from ocm_resolve import ResolvedCell
 
+from .drivers import DriverRegistry, check_drivers_registered
 from .errors import CoordinatorError, HeartbeatStaleError
 from .packml import PackMLCommand, PackMLState, preconditions_met, read_signals
 from .robot_link import RobotLink
@@ -128,9 +139,9 @@ def _process_result_signal_names(module: Module) -> set[str]:
 
 class Coordinator:
     """Bound to one resolved cell's fastening sequence. Construct once
-    (validates the handshake binding and the tool module's result-signal
-    contract up front -- fail at startup, not mid-cycle), then `await
-    .run()`.
+    (checks driver coverage for the whole cell, the handshake binding, and
+    the tool module's result-signal contract up front -- fail at startup,
+    not mid-cycle), then `await .run()`.
     """
 
     def __init__(
@@ -140,6 +151,7 @@ class Coordinator:
         poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
         heartbeat_timeout_s: float = DEFAULT_HEARTBEAT_TIMEOUT_S,
         trace_log_path: str | Path | None = None,
+        driver_registry: DriverRegistry | None = None,
     ) -> None:
         from ocm_generator.planner import find_fastening_plan
 
@@ -148,6 +160,9 @@ class Coordinator:
         self.poll_interval_s = poll_interval_s
         self.heartbeat_timeout_s = heartbeat_timeout_s
         self.trace_log_path = trace_log_path
+        self.driver_registry = driver_registry if driver_registry is not None else DriverRegistry.default()
+
+        check_drivers_registered(resolved, self.driver_registry)
 
         self.fasten = find_fastening_plan(resolved.cell)
         self.tool_instance = self.fasten.steps[0].tool_instance

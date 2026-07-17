@@ -10,6 +10,10 @@ simulated peers before any real transport exists:
 
 - `.signals.SignalBus` stubs the EtherCAT/SOEM layer (ADR-0002) a module's
   own signals live behind.
+- `.drivers.DriverRegistry` / `check_drivers_registered` is the go-live
+  preflight: refuses, naming protocol and instance, if any resolved
+  module's `comms.protocol` (including a v1.1 `x-<name>` custom one --
+  ADR-0012) has no registered driver in this build.
 - `.robot_link.RobotLink` binds spec/08's four handshake signals to a
   robot module BY ROLE, from its own manifest -- never a hardcoded
   register number.
@@ -24,7 +28,14 @@ simulated peers before any real transport exists:
   drivers to add later, behind the same two interfaces.
 """
 
-from .errors import CoordinatorError, HandshakeBindingError, HeartbeatStaleError, PreconditionError
+from .drivers import DEFAULT_REGISTERED_PROTOCOLS, DriverRegistry, check_drivers_registered
+from .errors import (
+    CoordinatorError,
+    DriverNotRegisteredError,
+    HandshakeBindingError,
+    HeartbeatStaleError,
+    PreconditionError,
+)
 from .packml import PackMLCommand, PackMLState
 from .program import Coordinator, CoordinatorResult, TraceEntry, write_trace_log
 from .robot_link import RobotLink
@@ -33,9 +44,12 @@ from .simulated_module import SimulatedPackMLModule, default_load_screw_recipe, 
 from .urscript_sim import RobotAborted, RobotEvent, SimulatedRobot
 
 __all__ = [
+    "DEFAULT_REGISTERED_PROTOCOLS",
     "Coordinator",
     "CoordinatorError",
     "CoordinatorResult",
+    "DriverNotRegisteredError",
+    "DriverRegistry",
     "HandshakeBindingError",
     "HeartbeatStaleError",
     "PackMLCommand",
@@ -49,6 +63,7 @@ __all__ = [
     "SimulatedRobot",
     "SimulatedSignalBus",
     "TraceEntry",
+    "check_drivers_registered",
     "default_load_screw_recipe",
     "make_drive_screw_recipe",
     "write_trace_log",

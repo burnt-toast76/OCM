@@ -2,11 +2,18 @@
 # OCM Module Definition — LMI Gocator 2350 3D snapshot sensor
 #
 # STUB. Enough to resolve cell.yaml end-to-end. `locate_part` matches the
-# op the dogfood plan calls. The schema's `results` are scalar-typed
-# (no pose/transform type exists yet -- see $defs/parameter), so a located
-# pose is reported as six named scalars rather than one composite value.
-# That's a real schema gap, not an oversight; worth revisiting if more
-# vision modules show up wanting the same shape.
+# op the dogfood plan calls. v1.1's composite `pose6d` type (spec/
+# CHANGELOG.md) is this schema version's own motivating case for this
+# exact module: `part_pose` is one frame-bearing pose, not six unrelated
+# scalars and a comment.
+#
+# `comms.protocol` is `x-gocator-gsdk` -- LMI's own proprietary SDK, not
+# one of the enumerated transports. Valid for authoring/resolve/scene/plan
+# (ADR-0012's escape hatch: none of those stages touch a transport); the
+# runtime coordinator refuses to go live against this module until an
+# x-gocator-gsdk driver is actually registered (today: none is --
+# ocm_generator.coordinator.drivers.DEFAULT_REGISTERED_PROTOCOLS only
+# covers ur-rtde and ethercat).
 # ─────────────────────────────────────────────────────────────────────
 ocm_version: "1.1"
 id:       com.lmi.gocator.2350
@@ -32,6 +39,14 @@ mechanical:
     collision:     meshes/gocator-2350_convex.stl   # placeholder -- not authored yet
     urdf_fragment: urdf/gocator-2350.urdf.xacro
   mass_kg: 0.9
+
+comms:
+  protocol: x-gocator-gsdk
+  signals:
+    - { name: packml_cmd,   direction: output, type: uint16, role: packml_cmd }
+    - { name: packml_state, direction: input,  type: uint16, role: packml_state }
+    - { name: part_pose,    direction: input,  type: pose6d, frame: nest1.part_datum, role: process_result }
+    - { name: confidence,   direction: input,  type: real,   unit: "%",              role: process_result }
 
 capabilities:
   - name: locate_part

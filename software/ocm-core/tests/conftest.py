@@ -28,5 +28,10 @@ def dh200_path(repo_root: Path) -> Path:
 
 
 @pytest.fixture
+def gocator_path(repo_root: Path) -> Path:
+    return repo_root / "modules" / "com.lmi.gocator.2350" / "module.yaml"
+
+
+@pytest.fixture
 def bracket_cell_path(repo_root: Path) -> Path:
     return repo_root / "cells" / "bracket-asm-01" / "cell.yaml"

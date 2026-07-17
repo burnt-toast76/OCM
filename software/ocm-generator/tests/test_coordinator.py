@@ -28,7 +28,10 @@ pytest.importorskip("tesseract_robotics")
 
 from ocm_core.cell import Cell  # noqa: E402
 from ocm_generator.coordinator import (  # noqa: E402
+    DEFAULT_REGISTERED_PROTOCOLS,
     Coordinator,
+    DriverNotRegisteredError,
+    DriverRegistry,
     HeartbeatStaleError,
     RobotAborted,
     RobotLink,
@@ -301,3 +304,65 @@ def test_robot_dying_mid_sequence_raises_heartbeat_stale_error_within_the_window
         f"HeartbeatStaleError fired outside the expected window: {elapsed:.3f}s "
         f"(heartbeat_timeout_s={heartbeat_timeout_s})"
     )
+
+
+# ---------------------------------------------------------------------------
+# Go-live: a module with no registered driver for its protocol is refused,
+# naming the protocol and the instance (v1.1 custom protocols -- ADR-0012)
+# ---------------------------------------------------------------------------
+
+
+def _cell_dict_with_gocator(features: dict[str, list[float]], for_each: list[str]) -> dict[str, Any]:
+    """The same camera-free coordinator test cell, plus cam1 (the real
+    gocator module) as a plain static instance -- not referenced by the
+    plan at all. resolve_cell doesn't require it to be; the go-live check
+    walks every resolved instance, not just the ones this particular
+    sequence happens to touch.
+    """
+    cell_dict = _coordinator_cell_dict(features, for_each)
+    cell_dict["modules"].append(
+        {
+            "instance": "cam1",
+            "module": "com.lmi.gocator.2350@1.0.0",
+            "mount": {"pose": {"xyz_mm": [640, 300, 420], "rpy_deg": [180, 0, 0]}},
+        }
+    )
+    return cell_dict
+
+
+def test_go_live_refuses_a_module_with_no_registered_driver(repo_root: Path):
+    # cam1 declares comms.protocol: x-gocator-gsdk -- v1.1's custom-
+    # protocol escape hatch (ADR-0012): valid to author, resolve, and plan
+    # against (none of those stages touch a transport), but nothing in
+    # this coordinator build has a driver for it.
+    cell = Cell.from_dict(_cell_dict_with_gocator({"hole_1": [12, 12, 0]}, ["hole_1"]))
+    resolved = resolve_cell(cell, repo_root / "modules")
+    bus = SimulatedSignalBus()
+
+    with pytest.raises(DriverNotRegisteredError) as exc:
+        Coordinator(resolved, bus)
+
+    assert exc.value.missing == (("x-gocator-gsdk", "cam1"),)
+    assert "x-gocator-gsdk" in str(exc.value)
+    assert "cam1" in str(exc.value)
+
+
+def test_go_live_succeeds_once_the_protocol_has_a_registered_driver(repo_root: Path):
+    cell = Cell.from_dict(_cell_dict_with_gocator({"hole_1": [12, 12, 0]}, ["hole_1"]))
+    resolved = resolve_cell(cell, repo_root / "modules")
+    bus = SimulatedSignalBus()
+    registry = DriverRegistry(DEFAULT_REGISTERED_PROTOCOLS | {"x-gocator-gsdk"})
+
+    Coordinator(resolved, bus, driver_registry=registry)  # should not raise
+
+
+def test_go_live_passes_for_a_cell_with_only_already_registered_protocols(repo_root: Path):
+    # The plain camera-free cell every other coordinator test uses: only
+    # ur-rtde (robot1) and ethercat (sd1, nest1) -- both registered by
+    # default. Pins down that the go-live check doesn't false-positive on
+    # an entirely ordinary cell.
+    cell = Cell.from_dict(_coordinator_cell_dict({"hole_1": [12, 12, 0]}, ["hole_1"]))
+    resolved = resolve_cell(cell, repo_root / "modules")
+    bus = SimulatedSignalBus()
+
+    Coordinator(resolved, bus)  # should not raise

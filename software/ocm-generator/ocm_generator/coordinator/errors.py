@@ -31,3 +31,20 @@ class HeartbeatStaleError(CoordinatorError):
     while the program should still be running -- spec/08: "robot program
     dead or connection lost -> coordinator faults the cell."
     """
+
+
+class DriverNotRegisteredError(CoordinatorError):
+    """One or more resolved instances declare a `comms.protocol` this
+    coordinator build has no registered transport driver for -- checked at
+    go-live (`.drivers.check_drivers_registered`), before any motion
+    starts. Per ADR-0012: authoring, resolve, scene, and plan all work
+    with ANY protocol (including `x-<name>` custom ones) since they never
+    touch transports; the coordinator is the one stage that actually has
+    to talk to hardware, so it's the one stage that has to know what it
+    can and can't drive.
+    """
+
+    def __init__(self, missing: list[tuple[str, str]]):
+        self.missing = tuple(missing)
+        detail = "; ".join(f"{instance} (protocol {protocol!r})" for protocol, instance in missing)
+        super().__init__(f"no registered driver for: {detail}")
