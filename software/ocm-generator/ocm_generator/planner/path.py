@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Joint-space linear interpolation from home to a standoff, collision-
-checked at ~50 sampled states with the existing discrete contact checker
-(.scene.collision.check_collisions).
+"""Joint-space linear interpolation between two named configurations,
+collision-checked at ~50 sampled states with the existing discrete contact
+checker (.scene.collision.check_collisions).
 
 Deliberately a straight line in joint space, not a planned/optimized path
 -- OMPL/TrajOpt are out of scope for this v0. A straight line that collides
@@ -11,6 +11,12 @@ individually collision-free and the straight line between them still
 punch through something a real path planner would route around -- that is
 exactly the case this exists to catch, and refusing it is correct v0
 behavior, not a defect in this checker.
+
+`.plan` calls this once per segment of the full fastening sequence -- not
+just home->standoff, but standoff->contact, contact->retract, and every
+inter-hole retract->standoff transit too (see .plan's own module
+docstring for why even the short contact/retract moves are checked here,
+despite being emitted as `movel`s the controller solves its own path for).
 """
 
 from __future__ import annotations
@@ -26,17 +32,19 @@ from .ik import UR_JOINT_ORDER
 DEFAULT_PATH_SAMPLES = 50
 
 
-def check_joint_path(
+def check_joint_segment(
     scene: Scene,
     robot_instance: str,
+    label: str,
     start_joints: tuple[float, ...],
     end_joints: tuple[float, ...],
     samples: int = DEFAULT_PATH_SAMPLES,
     collision_margin_mm: float = DEFAULT_MARGIN_MM,
 ) -> None:
-    """Raises PathCollisionError, naming the colliding instance pair and
-    the fraction along the path (0=start, 1=end), at the first sampled
-    state (walking from `start_joints` towards `end_joints`) that collides.
+    """Raises PathCollisionError, naming `label` (e.g. "retract_1 ->
+    standoff_2"), the colliding instance pair, and the fraction along the
+    path (0=start, 1=end), at the first sampled state (walking from
+    `start_joints` towards `end_joints`) that collides.
     """
     joint_names = [f"{robot_instance}__{joint}" for joint in UR_JOINT_ORDER]
 
@@ -53,4 +61,4 @@ def check_joint_path(
         result = check_collisions(sample_scene, contact_distance_mm=collision_margin_mm)
         if result.violations:
             v = result.violations[0]
-            raise PathCollisionError(v.instance_a, v.instance_b, v.link_a, v.link_b, t)
+            raise PathCollisionError(label, v.instance_a, v.instance_b, v.link_a, v.link_b, t)

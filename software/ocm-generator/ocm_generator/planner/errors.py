@@ -19,7 +19,8 @@ class NoDriveScrewStepError(PlanningError):
 
 
 class PoseUnreachableError(PlanningError):
-    """The UR analytic IK solver found no solution for a named pose."""
+    """The UR analytic IK solver found no solution for a named pose (e.g.
+    "standoff_2")."""
 
     def __init__(self, pose_name: str, detail: str = ""):
         self.pose_name = pose_name
@@ -30,18 +31,19 @@ class PoseUnreachableError(PlanningError):
 
 
 class PathCollisionError(PlanningError):
-    """The home->standoff joint-space path collides at some sampled state,
-    even though the individual endpoints may each be collision-free.
+    """A segment's straight-line joint-space path collides at some sampled
+    state, even though the individual endpoints may each be collision-free.
     """
 
-    def __init__(self, instance_a: str, instance_b: str, link_a: str, link_b: str, fraction: float):
+    def __init__(self, segment: str, instance_a: str, instance_b: str, link_a: str, link_b: str, fraction: float):
+        self.segment = segment
         self.instance_a = instance_a
         self.instance_b = instance_b
         self.link_a = link_a
         self.link_b = link_b
         self.fraction = fraction
         super().__init__(
-            f"home->standoff joint-space path collides at t={fraction:.3f}: "
+            f"segment {segment!r} collides at t={fraction:.3f}: "
             f"{instance_a} <-> {instance_b} ({link_a} / {link_b})"
         )
 

@@ -82,10 +82,20 @@ fire, and does (see `tests/test_collision.py`).
 ## planner/ (`ocm_generator.planner`) + emitters/ (`ocm_generator.emitters`)
 
 `ocm plan --emit-urscript` (needs the `tesseract` extra, like `--collision`
-above): plans the motion for the first `drive_screw` step in a cell's
-`plan` -- the first for_each item, walking `sequence`/`on_fail` nesting but
-never descending into an `on_fail` branch itself, since that's recovery,
-not the forward path this builds motion for -- and emits it as URScript.
+above): plans the motion for the *entire* fastening `for_each` in a cell's
+`plan` -- every item, in listed order (no path/visit-order optimization --
+v0 is honest about that), walking `sequence`/`on_fail` nesting but never
+descending into an `on_fail` branch itself, since that's PLC-side
+recovery, not the forward path this builds motion for -- and emits it as
+one continuous URScript program:
+
+```
+home -> standoff_1 -> contact_1 -> retract_1
+      -> standoff_2 -> contact_2 -> retract_2 -> ... -> retract_N -> home
+```
+
+Transits between holes go directly `retract_i -> standoff_{i+1}`; the
+robot only returns home once, at the very end.
 
 **Where the part is.** `locate_part`'s actual vision result isn't
 modeled -- like `.scene.kinematics`, this isn't a live simulator. The
@@ -96,42 +106,75 @@ note) gives the nominal part pose directly, which is exactly what the
 vision system exists to verify, not something this bypasses.
 
 **Standoff/contact/retract poses** (`ocm_generator/planner/poses.py`) come
-from the targeted `cell.part.features.*` entry (`xyz_mm`/`normal`, in the
-fixture's `part_datum` frame) and the capability's own `motion` block
+from each item's `cell.part.features.*` entry (`xyz_mm`/`normal`, in the
+fixture's `part_datum` frame, `${item}` substituted into `at` per
+for_each item) and the capability's own `motion` block
 (`approach_vec`/`approach_mm`/`approach_speed_mm_s`/`retract_vec`/
 `retract_mm`) -- computed directly in the tool's FLANGE frame (not its TCP)
 since IK needs the flange pose and sd50's `tcp` frame is a purely
 translational offset from it.
 
-**Reachability** (`ocm_generator/planner/ik.py`): each pose is solved with
-`tesseract_kinematics`' real analytic UR inverse kinematics
-(`URInvKinFactory`, `model: UR5e`) against the composed scene's own URDF.
-An unreachable pose is refused by name (`PoseUnreachableError`, naming
-"standoff" or "contact") -- not retried, not routed around.
+**Reachability and IK branch consistency** (`ocm_generator/planner/ik.py`):
+every pose in the chain -- not just each hole's standoff, but its contact
+and retract too, even though those are emitted as `movel`s the controller
+solves its own IK for online -- is solved with `tesseract_kinematics`'
+real analytic UR inverse kinematics (`URInvKinFactory`, `model: UR5e`)
+against the composed scene's own URDF, and selected as the solution
+closest (by joint-space distance) to the IMMEDIATELY PRECEDING
+configuration in the sequence -- never re-seeded from `home`. The UR
+solver returns up to 8 valid solutions ("branches") for almost any
+reachable pose; chaining without regard for what came before can pick
+solutions that are each individually valid but require an enormous,
+physically absurd swing to get from one to the next (a "branch flip"). An
+unreachable pose is refused by name (`PoseUnreachableError`, e.g.
+`"standoff_2"`) -- not retried, not routed around. See
+`tests/test_planner.py`'s own branch-consistency test, which pins this
+down by asserting no consecutive pair across a real 3-hole sequence swings
+any single joint by more than ~120 degrees (a real branch flip shows up as
+~180+).
 
-**The home->standoff path** (`ocm_generator/planner/path.py`): a straight
-line in JOINT SPACE (not Cartesian) from the robot's committed home
-`joint_state` to the IK-solved standoff, sampled at `--path-samples`
-(default 50) states and collision-checked at each one with the same
-`check_collisions` `--collision` uses. A straight line that collides is
-refused (`PathCollisionError`, naming the colliding instance pair and how
-far along the path it happened), even when both endpoints are
-individually clear -- see `tests/test_planner.py`'s test against the real,
-committed `bracket-asm-01` cell, where the straight-line path to every one
-of its three holes swings the wrist through `cam1` (the vision camera
-mounted over the workspace) despite home and the standoff itself each
-being clean on their own. **This is deliberately not path-planned or
+**Every segment's path** (`ocm_generator/planner/path.py`): a straight
+line in JOINT SPACE (not Cartesian) between each consecutive pair in the
+chain above -- not just `home -> standoff_1`, but `standoff_i ->
+contact_i`, `contact_i -> retract_i`, and every inter-hole
+`retract_i -> standoff_{i+1}` transit too (short, but not skipped) --
+sampled at `--path-samples` (default 50) states per segment and
+collision-checked at each one with the same `check_collisions`
+`--collision` uses. A straight line that collides is refused
+(`PathCollisionError`, naming the SEGMENT, e.g. `"retract_1 ->
+standoff_2"`, the colliding instance pair, and how far along it happened),
+even when both endpoints are individually clear -- see
+`tests/test_planner.py`'s test against the real, committed
+`bracket-asm-01` cell's own three holes (camera aside; see below) and its
+own synthetic obstacle fixture. **This is deliberately not path-planned or
 optimized (no OMPL, no TrajOpt) -- refusing a colliding straight line is
 correct v0 behavior**, matching this package's own thesis that "the most
-valuable output of this tool is 'no.'" Only the standoff->contact `movel`
-(a few mm along the capability's own approach vector) and the retract
-`movel` are not re-verified -- that channel is what `approach_vec` was
-declared to keep clear, and it's short.
+valuable output of this tool is 'no.'"
 
-**URScript emission** (`ocm_generator/emitters/urscript.py`): `movej`
-standoff -> `movel` contact (at the capability's own `approach_speed_mm_s`,
-converted to m/s) -> a `# TODO PLC handshake: <op>` placeholder -> `movel`
-retract -> `movej` home. Positions in metres, rotations as axis-angle
+*(Aside, found empirically while building this: the real, committed
+`bracket-asm-01` cell's own `home -> standoff_1` swings the wrist through
+`cam1`, the vision camera mounted directly over the workspace, for all
+three of its holes -- despite home and each standoff being clean on their
+own. `tests/test_planner.py` uses a camera-free variant of that same cell
+so its tests are about what they're actually testing, not about
+re-proving the camera finding on every run.)*
+
+**`load_screw` overlap.** `load_screw` has no `motion` block -- sd50's own
+manifest note: "the generator is free to overlap this with the robot's
+move to the next hole." Its PLC-handshake placeholder (`# PLC handshake:
+load_screw (overlaps following transit)`) is emitted immediately before
+the transit `movej` that carries the robot to that hole's standoff -- for
+hole 1, that's `home -> standoff_1`.
+
+**`on_fail`** (e.g. `eject_screw`, `reject_part`) is PLC coordinator logic
+(ADR-0004: PackML sequences modules, and abort/recovery routing is the
+coordinator's job) -- noted as a comment, never emitted as robot motion.
+
+**URScript emission** (`ocm_generator/emitters/urscript.py`): per hole,
+`movej` standoff -> `movel` contact (at the capability's own
+`approach_speed_mm_s`, converted to m/s) -> a `# TODO PLC handshake: <op>
+@ <hole>` placeholder -> `movel` retract; one trailing `movej` home at the
+very end, not one per hole. Positions in metres, rotations as axis-angle
 radians (URScript's own `p[x,y,z,rx,ry,rz]` convention), real UR joint
 names (named in a trailing comment; UR's own joint order otherwise, not
 this package's namespaced ones). No leading `movej(home)` -- the script
@@ -141,6 +184,19 @@ every `movel` targets the FLANGE, the same frame IK solved reachability
 against; the bit lands correctly as a direct consequence of the flange
 being placed correctly, since sd50 is bolted on at a fixed, known,
 purely-translational offset.
+
+**Cycle-time estimate** (`ocm_generator/planner/cycle_time.py` +
+`ocm_generator/emitters/cycle_time.py`, printed by the CLI after planning
+succeeds): a plain-text table, one row per motion segment and per
+stationary op, in the order they actually happen. Motion rows are labeled
+`ESTIMATE` -- `max(|joint delta|) / a stated default joint speed`
+(1.0 rad/s; there's no jerk-limited trajectory generation yet, see
+ADR-0007's Ruckig note), never to be mistaken for a real trajectory
+generator's number. Op rows (`load_screw`/`drive_screw`) use each
+capability's own declared `nominal_duration_s`, unmodified. The table
+totals both a naive serial time (everything back to back) and the
+overlapped time (each `load_screw` running concurrently with the transit
+into its hole), and reports the difference as the overlap savings.
 
 ## CLI
 
@@ -163,10 +219,11 @@ python -m ocm_generator plan  cells/bracket-asm-01/cell.yaml --modules modules -
 
 Four subcommands, one per stage: `validate` (a module manifest against the
 schema), `resolve` (a cell against a module search path), `scene` (resolve +
-compose the scene), `plan` (plan the first `drive_screw` step's motion and
-emit URScript -- see the planner/emitters section above). Each prints every
-collected violation (or, for `plan`, its one refusal) on failure, matching
-the libraries underneath -- see `ocm_generator/cli.py`.
+compose the scene), `plan` (plan the full fastening `for_each` sequence's
+motion, emit URScript, and print a cycle-time estimate -- see the
+planner/emitters section above). Each prints every collected violation (or,
+for `plan`, its one refusal) on failure, matching the libraries underneath
+-- see `ocm_generator/cli.py`.
 
 `scene` takes three optional actions, any combination at once:
 

@@ -49,8 +49,8 @@ from .errors import NoDriveScrewStepError, PlanningError
 
 @dataclass(frozen=True)
 class DriveScrewStep:
-    """The first forward (non on_fail) drive_screw step in a plan, with its
-    enclosing for_each item already substituted into `at`.
+    """One for_each item's drive_screw step, with that item substituted
+    into `at`.
     """
 
     tool_instance: str  # e.g. "sd1"
@@ -69,17 +69,44 @@ class ToolPoses:
     approach_speed_m_s: float
 
 
+@dataclass(frozen=True)
+class FastenPlan:
+    """The plan's fastening for_each block, expanded to one DriveScrewStep
+    per item, in listed order -- v0 doesn't reorder or optimize visiting
+    order, "no path optimization -- v0 is honest."
+    """
+
+    steps: tuple[DriveScrewStep, ...]
+    load_screw_module: str | None  # the module a load_screw op targets, if the sequence has one before drive_screw
+    on_fail_summary: str | None  # e.g. "eject_screw, reject_part" -- PLC-side, not emitted as URScript
+
+
 def _substitute_item(value: Any, item: str | None) -> Any:
     if isinstance(value, str) and item is not None:
         return value.replace("${item}", item)
     return value
 
 
-def _walk_forward(plan: list[Any], item: str | None) -> DriveScrewStep | None:
-    """Depth-first search of `plan`'s forward path: `for_each` (its first
-    item only -- "the first drive_screw step") and `sequence`, but never
-    `on_fail`, since that's recovery, not the forward path this plans
-    motion for.
+def _describe_on_fail(on_fail: Any) -> str | None:
+    if not isinstance(on_fail, list) or not on_fail:
+        return None
+    parts = []
+    for entry in on_fail:
+        if not isinstance(entry, dict):
+            continue
+        if "op" in entry:
+            parts.append(str(entry["op"]))
+        elif "action" in entry:
+            parts.append(str(entry["action"]))
+    return ", ".join(parts) if parts else None
+
+
+def _find_fasten_block(plan: list[Any]) -> tuple[list[Any], list[Any]] | None:
+    """Depth-first search of `plan`'s forward path (`sequence`, never
+    `on_fail` -- that's recovery, not the forward path this plans motion
+    for) for the first `for_each` block whose `sequence` contains a
+    drive_screw op. Returns (for_each items, sequence), unresolved --
+    `${item}` substitution happens once per item, not here.
     """
     for entry in plan:
         if not isinstance(entry, dict):
@@ -88,38 +115,63 @@ def _walk_forward(plan: list[Any], item: str | None) -> DriveScrewStep | None:
         for_each = entry.get("for_each")
         sequence = entry.get("sequence")
         if isinstance(for_each, list) and isinstance(sequence, list):
-            if not for_each:
-                continue
-            found = _walk_forward(sequence, str(for_each[0]))
-            if found is not None:
-                return found
+            if any(isinstance(s, dict) and s.get("op") == "drive_screw" for s in sequence):
+                return for_each, sequence
             continue
 
-        if entry.get("op") == "drive_screw" and "module" in entry:
-            at_path = _substitute_item(entry.get("at", ""), item)
-            return DriveScrewStep(
-                tool_instance=entry["module"],
-                hole_id=item or "",
-                at_path=at_path,
-                params=dict(entry.get("params", {})),
-            )
-
         if isinstance(sequence, list):
-            found = _walk_forward(sequence, item)
+            found = _find_fasten_block(sequence)
             if found is not None:
                 return found
 
     return None
 
 
-def find_first_drive_screw_step(cell: Cell) -> DriveScrewStep:
-    """Raises NoDriveScrewStepError if the plan has no forward drive_screw
-    step (an on_fail recovery step doesn't count).
+def _resolve_sequence_for_item(sequence: list[Any], item: str) -> tuple[DriveScrewStep, str | None, str | None]:
+    """(this item's DriveScrewStep, the load_screw op's module if one
+    directly precedes drive_screw in the sequence, drive_screw's own
+    on_fail summary).
     """
-    step = _walk_forward(cell.plan, None)
-    if step is None:
+    load_screw_module: str | None = None
+    for entry in sequence:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("op") == "load_screw" and "module" in entry:
+            load_screw_module = entry["module"]
+            continue
+        if entry.get("op") == "drive_screw" and "module" in entry:
+            at_path = _substitute_item(entry.get("at", ""), item)
+            step = DriveScrewStep(
+                tool_instance=entry["module"],
+                hole_id=item,
+                at_path=at_path,
+                params=dict(entry.get("params", {})),
+            )
+            return step, load_screw_module, _describe_on_fail(entry.get("on_fail"))
+
+    raise PlanningError("fasten sequence lost its drive_screw op")  # pragma: no cover -- _find_fasten_block already checked
+
+
+def find_fastening_plan(cell: Cell) -> FastenPlan:
+    """Raises NoDriveScrewStepError if the plan has no forward fastening
+    for_each (an on_fail recovery step doesn't count).
+    """
+    found = _find_fasten_block(cell.plan)
+    if found is None:
         raise NoDriveScrewStepError(f"cell {cell.id!r}'s plan has no (non on_fail) drive_screw step")
-    return step
+
+    for_each_items, sequence = found
+    if not for_each_items:
+        raise NoDriveScrewStepError(f"cell {cell.id!r}'s fasten step has an empty for_each list")
+
+    steps: list[DriveScrewStep] = []
+    load_screw_module: str | None = None
+    on_fail_summary: str | None = None
+    for item in for_each_items:
+        step, load_screw_module, on_fail_summary = _resolve_sequence_for_item(sequence, str(item))
+        steps.append(step)
+
+    return FastenPlan(steps=tuple(steps), load_screw_module=load_screw_module, on_fail_summary=on_fail_summary)
 
 
 def _find_clamp_fixture(plan: list[Any]) -> str | None:

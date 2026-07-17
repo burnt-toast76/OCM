@@ -160,8 +160,8 @@ def cmd_scene_collision(scene, args: argparse.Namespace) -> int:
 
 def cmd_plan(args: argparse.Namespace) -> int:
     from ocm_core import load_cell
-    from ocm_generator.emitters import emit_urscript
-    from ocm_generator.planner import PlanningError, PlanningUnavailable, plan_drive_screw
+    from ocm_generator.emitters import emit_urscript, render_cycle_time_table
+    from ocm_generator.planner import PlanningError, PlanningUnavailable, plan_fastening_sequence
     from ocm_generator.scene import SceneBuildError, build_scene
     from ocm_resolve import CellResolutionError, resolve_cell
 
@@ -184,7 +184,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
         return 1
 
     try:
-        plan = plan_drive_screw(
+        plan = plan_fastening_sequence(
             resolved,
             scene,
             collision_margin_mm=args.collision_margin_mm,
@@ -199,8 +199,11 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
     script = emit_urscript(plan)
     args.emit_urscript.write_text(script, encoding="utf-8")
-    print(f"OK: {plan.tool_instance} drive_screw @ {plan.hole_id}")
+    print(f"OK: {plan.tool_instance} fastening sequence ({len(plan.holes)} hole(s)): "
+          f"{', '.join(h.hole_id for h in plan.holes)}")
     print(f"  wrote URScript to {args.emit_urscript}")
+    print()
+    print(render_cycle_time_table(plan))
     return 0
 
 
@@ -242,7 +245,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_scene.set_defaults(func=cmd_scene)
 
     p_plan = subparsers.add_parser(
-        "plan", help="Plan the first drive_screw step's motion and emit URScript (needs the 'tesseract' extra)."
+        "plan", help="Plan the plan's fastening for_each sequence and emit URScript (needs the 'tesseract' extra)."
     )
     p_plan.add_argument("cell", type=Path, help="Path to a cell.yaml")
     p_plan.add_argument("--modules", type=Path, default=Path("modules"), help="Module search path (default: ./modules)")
