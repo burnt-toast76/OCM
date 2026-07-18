@@ -76,6 +76,20 @@ modules:
   module: com.acme.gripper.vg25@1.0.0
   mount:
     'on': robot1.flange
+- instance: disp1
+  module: com.nordson-kline.dispense.dp8@1.0.0
+  mount:
+    pose:
+      xyz_mm:
+      - 980
+      - 500
+      - 0
+      rpy_deg:
+      - 0
+      - 0
+      - 0
+  address:
+    ethercat_position: 7
 controller:
   runtime: beremiz
   target: revpi-connect-5

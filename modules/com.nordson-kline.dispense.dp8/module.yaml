@@ -1,0 +1,211 @@
+ocm_version: '1.1'
+id: com.nordson-kline.dispense.dp8
+revision: 1.0.0
+name: Nordson-Kline DP-8 Precision Dot Dispenser
+vendor: Nordson-Kline
+license: CERN-OHL-S-2.0
+kind: process
+description: Fixed-mount benchtop jetting dispenser for UV-cure adhesive dots, 0.3-2.5
+  uL. Heated reservoir (35-45 C). Bolts to the machine table -- the part is presented
+  to it; it is NOT robot-carried. Reports per-shot actual volume and a needle-pressure
+  fault flag.
+mechanical:
+  mount:
+    interface: ocm-base-grid-50
+    footprint_mm:
+    - 120.0
+    - 160.0
+    keepout_mm: 50
+  frames:
+    origin:
+      xyz_mm:
+      - 0.0
+      - 0.0
+      - 0.0
+      note: Bolt-down datum on the deck. Everything below is relative to this.
+    tcp:
+      xyz_mm:
+      - 0.0
+      - 0.0
+      - 210.0
+      rpy_deg:
+      - 0.0
+      - 0.0
+      - 0.0
+      note: Needle/jet exit. +Z points up out of the needle; the robot presents the
+        part here. Needle tip runs ~45 C.
+  mass_kg: 4.2
+  com_mm:
+  - 0.0
+  - 0.0
+  - 105.0
+  geometry:
+    urdf_fragment: urdf/generated_box.urdf.xacro
+    collision: urdf/generated_box.urdf.xacro
+electrical:
+  supplies:
+  - rail: 24VDC
+    current_nominal_a: 1.0
+    current_peak_a: 3.5
+  pneumatic:
+    pressure_bar: 5.0
+    port: G1/8
+comms:
+  protocol: ethercat
+  signals:
+  - name: packml_cmd
+    direction: output
+    type: uint16
+    role: packml_cmd
+  - name: packml_state
+    direction: input
+    type: uint16
+    role: packml_state
+  - name: fault_code
+    direction: input
+    type: uint16
+    role: fault_code
+  - name: heartbeat
+    direction: input
+    type: bool
+    role: heartbeat
+  - name: temp_setpoint
+    direction: output
+    type: real
+    unit: degC
+    role: process_param
+  - name: shot_volume_ul
+    direction: output
+    type: real
+    unit: uL
+    role: process_param
+  - name: jet_trigger
+    direction: output
+    type: bool
+  - name: temp_actual
+    direction: input
+    type: real
+    unit: degC
+  - name: temp_ready
+    direction: input
+    type: bool
+  - name: volume_actual
+    direction: input
+    type: real
+    unit: uL
+    role: process_result
+  - name: pressure_fault
+    direction: input
+    type: bool
+  - name: reservoir_low
+    direction: input
+    type: bool
+process:
+  recipe_parameters:
+    material_id:
+      type: string
+      summary: UV-cure adhesive part number. Drives viscosity model and cure assumptions.
+    temp_setpoint_c:
+      type: number
+      unit: degC
+      min: 35.0
+      max: 45.0
+      summary: Heated-reservoir setpoint. Datasheet operating range 35-45 C.
+  warmup_s: 240
+  purge_required: true
+  idle_timeout_s: 480
+capabilities:
+- name: purge
+  summary: Expel a purge shot to clear a needle that skinned over during idle. Restores
+    a clean tip.
+  parameters:
+    volume_ul:
+      type: number
+      unit: uL
+      min: 0.5
+      max: 20.0
+      default: 5.0
+      summary: Purge shot volume, into the purge cup.
+  motion:
+    frame: tcp
+    hold_still: true
+  preconditions:
+  - temp_ready == true
+  postconditions:
+  - pressure_fault == false
+  nominal_duration_s: 2.0
+  consumes:
+  - adhesive
+- name: dispense_dot
+  summary: Jet a single UV-cure adhesive dot. Robot presents the part and holds stationary.
+  parameters:
+    volume_ul:
+      type: number
+      unit: uL
+      min: 0.3
+      max: 2.5
+      summary: Dot volume. Hard datasheet limits -- the generator rejects anything
+        outside 0.3-2.5 uL.
+  motion:
+    frame: tcp
+    approach_vec:
+    - 0
+    - 0
+    - 1
+    approach_mm: 10.0
+    approach_speed_mm_s: 30.0
+    retract_vec:
+    - 0
+    - 0
+    - -1
+    retract_mm: 15.0
+    clearance_mm: 3.0
+    hold_still: true
+  preconditions:
+  - temp_ready == true
+  - reservoir_low == false
+  - pressure_fault == false
+  postconditions:
+  - volume_actual > 0
+  results:
+    volume_dispensed:
+      type: number
+      unit: uL
+      summary: Actual jetted volume, per shot.
+    pressure_fault:
+      type: boolean
+      summary: Needle-pressure fault on this shot.
+  nominal_duration_s: 0.3
+  consumes:
+  - adhesive
+state_machine:
+  model: packml
+  modes:
+  - production
+  - maintenance
+  implements:
+  - idle
+  - starting
+  - execute
+  - completing
+  - complete
+  - resetting
+  - aborting
+  - aborted
+  - clearing
+  - stopping
+  - stopped
+  abort_safe: false
+safety:
+  hazards:
+  - burn_hot
+  - chemical
+  - pressure
+  required_performance_level: PLc
+  sto_required: false
+  guarding: interlocked
+  safe_state: Jetting valve closes, heater de-energizes, air supply vents to atmosphere.
+    Needle tip stays warm (~45 C) for a short time after power removal.
+  notes: 'Jetting produces a fine aerosol: vendor REQUIRES local extraction and interlocked
+    access -- the guard must not permit access on de-energize alone. UV-cure adhesive
+    MSDS governs the chemical hazard and is NOT captured here.'
