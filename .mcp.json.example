@@ -1,0 +1,11 @@
+{
+  "//": "Copy to .mcp.json and replace <REPO> with your absolute repo path.",
+  "//windows": "command: <REPO>\\.venv\\Scripts\\python.exe   (double backslashes in JSON)",
+  "//linux-mac": "command: <REPO>/.venv/bin/python",
+  "mcpServers": {
+    "ocm": {
+      "command": "<REPO>/.venv/bin/python",
+      "args": ["-m", "ocm_api.mcp_server", "<REPO>"]
+    }
+  }
+}

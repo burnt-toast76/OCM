@@ -1,0 +1,171 @@
+# ─────────────────────────────────────────────────────────────────────
+# OCM Module Definition — Acme VG-25 venturi vacuum gripper
+#
+# A pick-and-place end effector. Unlike the screwdriver, its "safe state"
+# is the interesting fact: a venturi gripper does NOT hold on air loss —
+# vacuum decays and the part drops. That single line (safety.safe_state)
+# changes how the cell coordinator sequences e-stop recovery, and it is
+# the opposite of the sd50, which deliberately HOLDS vacuum on trip.
+#
+# `comms.protocol` is `x-acme-asl` — Acme's proprietary serial over M12,
+# not one of the enumerated transports. Valid for authoring/resolve/scene/
+# plan (ADR-0012's escape hatch: none of those stages touch a transport);
+# the runtime coordinator refuses to go live against this module until an
+# x-acme-asl driver is registered (today: none is —
+# ocm_generator.coordinator.drivers.DEFAULT_REGISTERED_PROTOCOLS only
+# covers ur-rtde and ethercat). Same shape as com.lmi.gocator.2350.
+# ─────────────────────────────────────────────────────────────────────
+ocm_version: "1.1"
+id:       com.acme.gripper.vg25
+revision: "1.0.0"
+name:     "Acme VG-25 Vacuum Gripper"
+vendor:   "Acme"
+license:  CERN-OHL-S-2.0
+kind:     end_effector
+description: >
+  Integrated venturi vacuum gripper with a PNP part-present switch and a
+  blow-off assist. Pick force is set by supply-pressure regulation over the
+  Acme ASL serial link. No moving jaws — it grips a flat, sealable face.
+
+mechanical:
+  mount:
+    interface: iso-9409-1-a50      # robot tool flange, 50 mm bolt circle
+    footprint_mm: [45, 45]
+
+  frames:
+    origin:
+      xyz_mm: [0, 0, 0]
+      note:   "Robot tool flange face. Everything below is relative to this."
+    tcp:
+      xyz_mm:  [0, 0, 80.0]        # datasheet height 80 mm, flange face to cup contact
+      rpy_deg: [0, 0, 0]
+      note:    "Suction-cup sealing face. +Z points away from flange, i.e. INTO the part."
+
+  geometry:
+    visual:        meshes/vg25.glb              # renders directly in the R3F viewer
+    collision:     meshes/vg25_convex.stl       # convex hull — Bullet is ~10x faster on this
+    urdf_fragment: urdf/vg25.urdf.xacro         # ← drops straight into the Tesseract scene
+
+  mass_kg: 0.65
+  com_mm:  [0, 0, 33]                           # robot payload, not decoration; body is light and centered
+
+electrical:
+  supplies:
+    - rail: 24VDC
+      current_nominal_a: 0.8                    # venturi ejector solenoid + ASL electronics
+  pneumatic:
+    pressure_bar: 6.0                           # datasheet supply range 5–7 bar; nominal 6
+    port: G1/8
+  connectors:
+    - ref: X1
+      type: M12-A-5P
+      carries: power+fieldbus                   # 24 VDC + Acme ASL serial on one M12
+
+comms:
+  protocol: x-acme-asl                          # proprietary serial — ADR-0012 escape hatch (see header)
+
+  # These names become the PLC tag names in generated code.
+  signals:
+    - { name: packml_cmd,    direction: output, type: uint16, role: packml_cmd }
+    - { name: packml_state,  direction: input,  type: uint16, role: packml_state }
+    - { name: fault_code,    direction: input,  type: uint16, role: fault_code }
+    - { name: heartbeat,     direction: input,  type: bool,   role: heartbeat }
+
+    - { name: target_force,  direction: output, type: real,   unit: "N", role: process_param }   # commanded pick force; ASL drives the internal regulator
+    - { name: blow_off,      direction: output, type: bool }   # datasheet "digital input: blow-off trigger"
+
+    - { name: part_present,  direction: input,  type: bool,   role: process_result }   # datasheet "digital output: part-present" — PNP vacuum switch
+
+capabilities:
+
+  - name: grip
+    summary: "Draw vacuum and confirm the part is on the cup via the vacuum switch."
+    parameters:
+      force_n:
+        type: number
+        unit: "N"
+        min: 10.0
+        max: 120.0
+        summary: "Pick force, realized via supply-pressure/vacuum regulation. Hard limits from the datasheet — the generator rejects anything outside."
+
+    motion:
+      frame:        tcp
+      approach_vec: [0, 0, 1]          # drive down onto the part along +Z
+      approach_mm:  20.0               # standoff where the approach move begins
+      approach_speed_mm_s: 40.0
+      retract_vec:  [0, 0, -1]
+      retract_mm:   30.0
+      clearance_mm: 3.0
+      hold_still:   true               # ← robot must be STATIONARY while sealing. Planner enforces this.
+
+    preconditions:
+      - part_present == false
+    postconditions:
+      - part_present == true
+
+    results:
+      gripped: { type: boolean }
+
+    nominal_duration_s: 0.5
+
+  - name: release
+    summary: "Vent the cup to atmosphere and set the part down."
+    motion:
+      frame:        tcp
+      approach_vec: [0, 0, 1]          # descend to the place surface
+      approach_mm:  15.0
+      approach_speed_mm_s: 40.0
+      retract_vec:  [0, 0, -1]
+      retract_mm:   30.0
+      clearance_mm: 3.0
+      hold_still:   true
+    preconditions:
+      - part_present == true
+    postconditions:
+      - part_present == false
+    nominal_duration_s: 0.3
+
+  - name: blow_off
+    summary: "Positive air pulse to shed a part that clings to the cup after venting. Recovery op."
+    postconditions:
+      - part_present == false
+    nominal_duration_s: 0.4
+
+state_machine:
+  model: packml
+  implements:
+    - idle
+    - starting
+    - execute
+    - completing
+    - complete
+    - resetting
+    - aborting
+    - aborted
+    - clearing
+    - stopping
+    - stopped
+  # NOT abort-safe. A venturi gripper is not fail-hold: on abort the vacuum
+  # decays and a held part drops. The cell coordinator must know this so it
+  # never sequences an e-stop recovery that assumes the part is still on the
+  # cup — the opposite of the sd50, which HOLDS vacuum on trip.
+  abort_safe: false
+
+safety:
+  hazards: [pressure, noise]           # compressed air / venturi; venturi ejectors are loud (~80 dB)
+  required_performance_level: PLc
+  sto_required: false                  # pneumatic — no servo drive to gate with STO
+  guarding: interlocked
+  safe_state: >
+    On loss of air or control power the venturi stops and vacuum decays; a
+    held part is released and will drop. This gripper is NOT fail-hold — the
+    cell coordinator must not rely on grip retention through a power/air loss.
+
+maintenance:
+  wear_items:
+    - name: "Suction cup"
+      part_number: VG25-CUP
+      interval_cycles: 100000
+    - name: "Ejector filter"
+      part_number: VG25-FLT
+      interval_hours: 500
