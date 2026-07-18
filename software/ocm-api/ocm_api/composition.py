@@ -15,7 +15,7 @@ from typing import Any, Callable
 
 from ocm_core import ModuleRef
 from ocm_core.cell import Cell
-from ocm_generator.scene import SceneBuildError, build_scene
+from ocm_generator.scene import SceneBuildError, base_footprint_mm, build_scene
 
 from .envelope import Codes, Envelope, Refusal, single_refusal
 from .resolution import resolve_with_refusals
@@ -43,6 +43,23 @@ def create_cell(ws: Workspace, cell_id: str, base_module: str) -> Envelope:
     }
     write_yaml(ws.cell_path(cell_id), doc)
     return Envelope.succeed({"cell_id": cell_id, "id": doc["id"], "path": str(ws.cell_path(cell_id))})
+
+
+def _workspace_bounds_mm(scene: Any) -> dict[str, Any] | None:
+    """The base module's own X/Y footprint, in mm -- exactly what a
+    WORKSPACE_OVERHANG refusal's `allowed.footprint` already names, but
+    surfaced on every composition call (not just a failing one) so an
+    agent's mental model of "how much room do I have" comes from data,
+    not from tripping the tolerance once and reading the refusal message.
+    That tolerance is real geometry (the base module's own guard walls,
+    which sit outside its nominal footprint_mm), not a magic number this
+    package invented -- see ocm_generator.scene.containment.
+    """
+    bounds = base_footprint_mm(scene.urdf_xml, scene.joint_state, scene.base.link_names)
+    if bounds is None:
+        return None
+    lo, hi = bounds
+    return {"x_mm": [round(lo[0] * 1000, 1), round(hi[0] * 1000, 1)], "y_mm": [round(lo[1] * 1000, 1), round(hi[1] * 1000, 1)]}
 
 
 def _mutate_and_resolve(ws: Workspace, cell_id: str, mutate: Callable[[dict[str, Any]], Refusal | None]) -> Envelope:
@@ -75,6 +92,7 @@ def _mutate_and_resolve(ws: Workspace, cell_id: str, mutate: Callable[[dict[str,
             "cell_id": cell_id,
             "instances": sorted(scene.instances),
             "base": scene.base.root_link,
+            "workspace_bounds": _workspace_bounds_mm(scene),
         }
     )
 

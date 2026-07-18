@@ -115,7 +115,9 @@ def test_acceptance_demo(api: OcmApi, workspace_root: Path):
     trap_refusal = trapped_envelope.refusals[0]
     assert trap_refusal.code == Codes.SCHEMA_INVALID
     assert "frame" in trap_refusal.message
-    assert trap_refusal.hint
+    # A pose6d-specific hint, not generic "fix the field" boilerplate --
+    # it points the agent at the verb that actually answers "what frame?".
+    assert "list_frames" in trap_refusal.hint
 
     # Agent corrects and resubmits.
     corrected_envelope = api.update_module("com.example.pickhead.pk100", manifest=_pk100_manifest(with_frame=True))

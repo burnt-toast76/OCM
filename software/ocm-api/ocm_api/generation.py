@@ -130,7 +130,13 @@ def plan_cell(ws: Workspace, cell_id: str, collision_margin_mm: float = 1.0, pat
 
     report = estimate_cycle_time(plan)
     cycle_table = [
-        {"label": row.label, "duration_s": row.duration_s, "source": row.source, "held_at_segment": row.held_at_segment}
+        {
+            "label": row.label,
+            "duration_s": row.duration_s,
+            "source": row.source,
+            "overlapped_with": row.overlapped_with,
+            "held_at_segment": row.held_at_segment,
+        }
         for row in report.rows
     ]
     return Envelope.succeed(

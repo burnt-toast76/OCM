@@ -86,6 +86,23 @@ exactly once, in the packages that already implement them.
   internal `id:` field (`com.accelsolutions.cell.bracket-asm-01`) -- deliberately different
   from modules, where directory name and manifest id match. Cells are filesystem-addressable
   scratch documents in a way published modules aren't.
+- **No verb raises.** Every `OcmApi` method is wrapped (`api._never_raise`) so an exception a
+  verb didn't anticipate (a malformed RFC-6902 patch reaching `jsonpatch`/`jsonpointer` in a
+  shape nothing here foresaw, say) still comes back as an `INVALID_ARGUMENT` envelope, never a
+  raw exception -- design principle #1 applies to inputs this library's authors didn't think
+  of too, not just the ones it has a named refusal code for.
+- **`validate_module` checks every declared file, not just `urdf_fragment`/`comms.esi`.**
+  `mechanical.geometry.collision` is schema-*required* for every module (unlike the other two,
+  which are optional), so it's checked too -- a claimed collision mesh path is exactly as much
+  a claim as a claimed URDF fragment. This is why `create_module_draft`'s own scaffold (an
+  honest `meshes/TODO_convex.stl` placeholder) doesn't pass `validate_module` until
+  `generate_geometry_stub` has actually run.
+- **Composition verbs return the workspace bounds on every successful call**
+  (`data.workspace_bounds`, `{"x_mm": [...], "y_mm": [...]}`) -- the base module's real X/Y
+  footprint (deck *and* guard walls, per `ocm_generator.scene.containment`) is usually larger
+  than its nominal `footprint_mm`, and that margin was previously only discoverable by
+  tripping a `WORKSPACE_OVERHANG` refusal once. An agent building a mental model of "how much
+  room do I have" should get that from data, not from a near-miss.
 
 ## Running it
 
@@ -108,6 +125,14 @@ Drop `[tesseract]` to skip Tesseract entirely -- everything works except `check_
 and `plan_cell`'s (and `emit`'s motion-planning path's) happy path, which refuse with
 `UNAVAILABLE` instead of raising. `[serve]` is only needed to actually run `ocm-api-http`
 (FastAPI's `TestClient`, used by the test suite, needs `httpx` but not a real ASGI server).
+
+**Debian/Ubuntu:** the `mcp` dependency pulls in `PyJWT`, and on these distros a system
+`python3-jwt` apt package is often already installed without proper `dist-info` metadata --
+`pip install` then fails trying to uninstall it before reinstalling. Work around it with:
+
+```
+pip install --ignore-installed PyJWT -e ../ocm-core -e ../ocm-resolve -e "../ocm-generator[tesseract]" -e ".[serve,tesseract,test]"
+```
 
 Every MCP tool's description embeds the envelope contract and one worked example inline
 (`mcp_server._doc`) -- spec/09: "the agent should succeed without reading this spec." Long

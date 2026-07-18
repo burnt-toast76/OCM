@@ -58,6 +58,24 @@ def _union_aabb(
     return (lo[0], lo[1], lo[2]), (hi[0], hi[1], hi[2])  # type: ignore[index]
 
 
+def base_footprint_mm(
+    urdf_xml: str,
+    joint_state: JointState,
+    base_link_names: frozenset[str],
+    world_link: str = "world",
+) -> tuple[Vec3, Vec3] | None:
+    """The base module's own world AABB, in metres -- the same footprint
+    `check_workspace_containment` measures every other instance against.
+    Exposed on its own (not just as a violation-message fragment) so a
+    caller can show an agent the workspace bounds proactively, before it
+    ever tries a placement that overhangs them. None if the base has no
+    collision geometry at all.
+    """
+    root = ET.fromstring(urdf_xml)
+    world_poses = compute_world_poses(root, joint_state, world_link)
+    return _union_aabb(base_link_names, root, world_poses)
+
+
 def check_workspace_containment(
     cell_id: str,
     urdf_xml: str,

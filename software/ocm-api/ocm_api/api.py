@@ -12,12 +12,37 @@ nothing else to hold.
 
 from __future__ import annotations
 
+import functools
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, TypeVar
 
 from . import authoring, composition, discovery, generation
-from .envelope import Envelope
+from .envelope import Codes, Envelope, single_refusal
 from .workspace import Workspace
+
+_F = TypeVar("_F", bound=Callable[..., Envelope])
+
+
+def _never_raise(fn: _F) -> _F:
+    """spec/09 design principle #1: "Refusals are results, not errors" --
+    no verb may let bad input escape as a raw exception (a caller across
+    an MCP/HTTP transport can't catch a Python exception anyway). Every
+    verb already turns the failure modes it KNOWS about into refusals;
+    this is the facade-boundary backstop for the ones it doesn't -- a
+    malformed argument reaching some third-party parser (jsonpatch,
+    jsonschema, ...) in a shape nothing here anticipated. Genuine
+    programming bugs still show up in `message` (via `str(e)`), just as an
+    INVALID_ARGUMENT refusal instead of a crash.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Envelope:
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:  # noqa: BLE001 -- deliberately broad, see docstring
+            return single_refusal(Codes.INVALID_ARGUMENT, path="$", message=f"{type(e).__name__}: {e}")
+
+    return wrapper  # type: ignore[return-value]
 
 
 class OcmApi:
@@ -26,75 +51,97 @@ class OcmApi:
 
     # -- Discovery ---------------------------------------------------
 
+    @_never_raise
     def describe_schema(self, section: str | None = None) -> Envelope:
         return discovery.describe_schema(self.workspace, section)
 
+    @_never_raise
     def get_example(self, kind: str) -> Envelope:
         return discovery.get_example(self.workspace, kind)
 
+    @_never_raise
     def list_modules(self) -> Envelope:
         return discovery.list_modules(self.workspace)
 
+    @_never_raise
     def describe_module(self, id: str) -> Envelope:
         return discovery.describe_module(self.workspace, id)
 
+    @_never_raise
     def list_cells(self) -> Envelope:
         return discovery.list_cells(self.workspace)
 
+    @_never_raise
     def describe_cell(self, id: str) -> Envelope:
         return discovery.describe_cell(self.workspace, id)
 
+    @_never_raise
     def list_frames(self, cell_id: str) -> Envelope:
         return discovery.list_frames(self.workspace, cell_id)
 
     # -- Module authoring ---------------------------------------------------
 
+    @_never_raise
     def create_module_draft(self, id: str, kind: str) -> Envelope:
         return authoring.create_module_draft(self.workspace, id, kind)
 
+    @_never_raise
     def update_module(self, id: str, manifest: dict[str, Any] | None = None, patch: list[dict[str, Any]] | None = None) -> Envelope:
         return authoring.update_module(self.workspace, id, manifest=manifest, patch=patch)
 
+    @_never_raise
     def generate_geometry_stub(self, id: str, footprint_mm: tuple[float, float], height_mm: float, kind: str | None = None) -> Envelope:
         return authoring.generate_geometry_stub(self.workspace, id, footprint_mm, height_mm, kind=kind)
 
+    @_never_raise
     def validate_module(self, id: str) -> Envelope:
         return authoring.validate_module(self.workspace, id)
 
+    @_never_raise
     def publish_module(self, id: str, revision: str) -> Envelope:
         return authoring.publish_module(self.workspace, id, revision)
 
     # -- Cell composition ---------------------------------------------------
 
+    @_never_raise
     def create_cell(self, id: str, base_module: str) -> Envelope:
         return composition.create_cell(self.workspace, id, base_module)
 
+    @_never_raise
     def place_instance(self, cell: str, instance: str, module: str, mount: dict[str, Any]) -> Envelope:
         return composition.place_instance(self.workspace, cell, instance, module, mount)
 
+    @_never_raise
     def move_instance(self, cell: str, instance: str, mount: dict[str, Any]) -> Envelope:
         return composition.move_instance(self.workspace, cell, instance, mount)
 
+    @_never_raise
     def remove_instance(self, cell: str, instance: str) -> Envelope:
         return composition.remove_instance(self.workspace, cell, instance)
 
+    @_never_raise
     def set_plan(self, cell: str, plan: list[Any], part: dict[str, Any] | None = None) -> Envelope:
         return composition.set_plan(self.workspace, cell, plan, part=part)
 
+    @_never_raise
     def set_joint_state(self, cell: str, instance: str, joints: dict[str, float]) -> Envelope:
         return composition.set_joint_state(self.workspace, cell, instance, joints)
 
     # -- Checking & generation ---------------------------------------------------
 
+    @_never_raise
     def build_scene(self, cell: str) -> Envelope:
         return generation.build_scene_verb(self.workspace, cell)
 
+    @_never_raise
     def check_collision(self, cell: str, collision_margin_mm: float = 1.0) -> Envelope:
         return generation.check_collision(self.workspace, cell, collision_margin_mm=collision_margin_mm)
 
+    @_never_raise
     def plan_cell(self, cell: str, collision_margin_mm: float = 1.0, path_samples: int = 50) -> Envelope:
         return generation.plan_cell(self.workspace, cell, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
 
+    @_never_raise
     def emit(
         self,
         cell: str,

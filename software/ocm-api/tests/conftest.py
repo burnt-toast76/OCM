@@ -46,13 +46,18 @@ def api(workspace_root: Path) -> OcmApi:
     return OcmApi(workspace_root)
 
 
-# A schema-valid, already-published module manifest with no comms.esi and
-# no urdf_fragment reference, so validate_module's cross-file checks never
-# fire on it -- useful whenever a test wants "a module that's simply, fully
-# valid" without tripping over sd50's own placeholder ESI path (a real,
-# pre-existing gap: this pre-alpha repo's sd50 manifest references an ESI
-# file that was never actually authored -- see modules/.../sd50/module.yaml).
-CLEAN_MODULE_ID = "com.accelsolutions.fixture.pneumatic-nest"
+# A schema-valid, already-published module manifest whose declared files
+# ALL genuinely exist on disk -- the one module in this pre-alpha repo
+# whose geometry isn't a placeholder (see modules/com.universal-robots.ur5e's
+# own NOTICE.md: "a real vendored-and-flattened UR5e"). Every other real
+# module's mechanical.geometry.collision is schema-REQUIRED but declared as
+# an honest "placeholder -- not authored yet" (frame1200, pneumatic-nest,
+# sf20, gocator) or simply unauthored without the comment (dh200, sd50) --
+# a real, pre-existing pre-alpha gap (CLAUDE.md: "no hardware built"), not
+# something to work around by weakening validate_module's own cross-file
+# checks. Useful whenever a test wants "a module that's simply, fully
+# valid" with no cross-file gaps at all.
+CLEAN_MODULE_ID = "com.universal-robots.ur5e"
 
 
 def write_obstacle_module(workspace_root: Path) -> None:

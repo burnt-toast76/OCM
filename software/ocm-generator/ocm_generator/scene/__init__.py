@@ -9,7 +9,7 @@ check_collisions() does.
 
 from .build import Scene, SceneInstance, build_scene
 from .collision import Contact, CollisionCheckResult, check_collisions
-from .containment import check_workspace_containment
+from .containment import base_footprint_mm, check_workspace_containment
 from .errors import CollisionCheckError, CollisionCheckUnavailable, FragmentError, SceneBuildError
 from .kinematics import GeometryPrimitive, compute_world_poses, list_collision_primitives, world_aabb
 from .transforms import Pose
@@ -26,6 +26,7 @@ __all__ = [
     "Scene",
     "SceneBuildError",
     "SceneInstance",
+    "base_footprint_mm",
     "build_scene",
     "check_collisions",
     "check_workspace_containment",

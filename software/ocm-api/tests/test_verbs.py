@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from ocm_api import OcmApi
+from ocm_api import Codes, OcmApi
 
 from .conftest import CLEAN_MODULE_ID
 
@@ -92,8 +92,13 @@ def test_create_module_draft_end_effector(api: OcmApi):
     assert e.data["draft"] is True
     assert e.data["revision"] == "0.1.0"
 
+    # Schema-valid out of the box, but not yet FULLY valid: the scaffold's
+    # collision mesh is an honest TODO placeholder that doesn't exist on
+    # disk yet (ADR-0011: agents never hand-write URDF -- generate_geometry_stub
+    # is the next step; see test_generate_geometry_stub below).
     validated = api.validate_module("com.example.pickhead.pk100")
-    assert validated.ok, validated.refusals  # the scaffold is genuinely schema-valid out of the box
+    assert not validated.ok
+    assert any(r.code == Codes.NOT_FOUND and r.path == "mechanical.geometry.collision" for r in validated.refusals)
 
 
 def test_update_module_writes_and_validates(api: OcmApi):
@@ -159,6 +164,10 @@ def test_place_move_remove_instance(api: OcmApi):
     )
     assert e.ok, e.refusals
     assert "robot1" in e.data["instances"]
+    # frame1200's real footprint (deck + guard walls) extends beyond its
+    # nominal 1200x900 footprint_mm -- an agent should be able to read that
+    # tolerance from data, not discover it by tripping an overhang refusal.
+    assert e.data["workspace_bounds"] == {"x_mm": [-50.0, 1250.0], "y_mm": [-50.0, 950.0]}
 
     e = api.move_instance("assembly-a", "robot1", {"pose": {"xyz_mm": [450, 300, 0], "rpy_deg": [0, 0, 0]}})
     assert e.ok, e.refusals
@@ -221,6 +230,14 @@ def test_plan_cell_and_emit(api: OcmApi, workspace_root: Path, tmp_path: Path):
     assert e.data["holes"] == ["hole_1", "hole_2", "hole_3"]
     assert e.data["naive_serial_total_s"] > 0
     assert len(e.data["cycle_table"]) > 0
+    # Every row's full structure is populated -- the GUI/agent both need
+    # duration/source AND which segment an overlapped load_screw hides
+    # inside or a dwell is held at, not just a label.
+    overlapped_rows = [row for row in e.data["cycle_table"] if row["source"] == "overlapped"]
+    assert overlapped_rows
+    for row in overlapped_rows:
+        assert row["overlapped_with"]
+        assert row["held_at_segment"]
 
     script_path = tmp_path / "out.script"
     view_path = tmp_path / "view.html"

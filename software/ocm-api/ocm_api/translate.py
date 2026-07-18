@@ -44,13 +44,45 @@ def _schema_path_to_json_path(schema_path: str) -> str:
     return "".join(out)
 
 
+_RE_MISSING_FRAME = re.compile(r"^'frame' is a required property$")
+_RE_PATTERN_MISMATCH = re.compile(r"^'(?P<value>[^']*)' does not match '(?P<pattern>[^']*)'$")
+_SNAKE_CASE_PATTERN = "^[a-z][a-z0-9_]*$"
+
+
+def _snake_case_suggestion(value: str) -> str:
+    out = re.sub(r"[^a-z0-9_]", "_", value.lower())
+    out = re.sub(r"_+", "_", out).strip("_")
+    if not out or not out[0].isalpha():
+        out = f"x_{out}" if out else "x"
+    return out
+
+
+def _hint_for_schema_violation(message: str) -> str:
+    """Code-specific hints -- generic "fix the field" advice doesn't teach
+    anything the agent couldn't already see in `path`/`message`. Where the
+    violation matches a known shape, spend the hint on what to do next.
+    """
+    if _RE_MISSING_FRAME.match(message):
+        return (
+            "pose6d needs `frame`: the named coordinate frame this pose is expressed in. "
+            "Call list_frames(cell_id=...) to see every frame a placed instance can reference "
+            "(e.g. 'tcp', 'robot1.flange', 'nest1.part_datum')."
+        )
+    if m := _RE_PATTERN_MISMATCH.match(message):
+        if m["pattern"] == _SNAKE_CASE_PATTERN:
+            return f"Use snake_case (lowercase letters, digits, underscores, starting with a letter), e.g. {_snake_case_suggestion(m['value'])!r}."
+        return f"{m['value']!r} must match the pattern {m['pattern']!r}."
+    return "Fix the field named in `path` and resubmit -- validation gates publishing, not saving."
+
+
 def schema_violation_to_refusal(violation: str) -> Refusal:
     schema_path, _, message = violation.partition(": ")
+    message = message or violation
     return Refusal(
         code=Codes.SCHEMA_INVALID,
         path=_schema_path_to_json_path(schema_path),
-        message=message or violation,
-        hint="Fix the field named in `path` and resubmit -- validation gates publishing, not saving.",
+        message=message,
+        hint=_hint_for_schema_violation(message),
     )
 
 

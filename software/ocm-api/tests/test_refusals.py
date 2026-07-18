@@ -80,6 +80,19 @@ def test_schema_invalid(api: OcmApi):
     assert api.describe_module("com.example.pickhead.bad1").refusals  # still invalid, but readable back
 
 
+def test_schema_invalid_name_pattern_hint_suggests_snake_case(api: OcmApi):
+    api.create_module_draft("com.example.pickhead.bad2", "end_effector")
+    manifest = api.describe_module("com.example.pickhead.bad2").data["manifest"]
+    manifest["comms"]["signals"] = [{"name": "IN_3", "direction": "input", "type": "bool"}]
+
+    e = api.update_module("com.example.pickhead.bad2", manifest=manifest)
+    assert not e.ok
+    violation = next(r for r in e.refusals if "IN_3" in r.message)
+    assert violation.code == Codes.SCHEMA_INVALID
+    assert "snake_case" in violation.hint
+    assert "in_3" in violation.hint
+
+
 def test_not_found_describe_module(api: OcmApi):
     e = api.describe_module("com.example.does-not-exist")
     _assert_envelope_shape(e, Codes.NOT_FOUND)

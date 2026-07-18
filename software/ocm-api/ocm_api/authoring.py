@@ -15,6 +15,7 @@ import re
 from typing import Any
 
 import jsonpatch
+import jsonpointer
 
 from ocm_core import load_schema
 from ocm_core.loader import validate_module_dict
@@ -136,7 +137,13 @@ def update_module(ws: Workspace, module_id: str, manifest: dict[str, Any] | None
         current = read_yaml(ws.module_path(module_id)) or {}
         try:
             doc = jsonpatch.apply_patch(current, patch)
-        except jsonpatch.JsonPatchException as e:
+        except (jsonpatch.JsonPatchException, jsonpointer.JsonPointerException, TypeError, KeyError, IndexError) as e:
+            # jsonpatch's own exception hierarchy doesn't cover every way a
+            # malformed/positional patch document can fail to apply --
+            # jsonpointer.JsonPointerException (a bad pointer segment) and
+            # bare TypeError/KeyError/IndexError (patching into the wrong
+            # document shape) all come from the same untrusted input and
+            # must land as a refusal, not an exception escaping the API.
             return single_refusal(Codes.INVALID_ARGUMENT, path="$", message=f"invalid RFC-6902 patch: {e}")
     else:
         doc = dict(manifest)  # type: ignore[arg-type]
@@ -198,8 +205,12 @@ def generate_geometry_stub(ws: Workspace, module_id: str, footprint_mm: tuple[fl
 
 def validate_module(ws: Workspace, module_id: str) -> Envelope:
     """Full validation including cross-file checks schema validation alone
-    can't do -- does `geometry.urdf_fragment` exist, does `comms.esi`
-    exist, if declared.
+    can't do -- does `geometry.collision` exist, does `geometry.urdf_fragment`
+    exist, does `comms.esi` exist, if declared. `collision` is schema-REQUIRED
+    for every module (not optional like the other two), so this fires on
+    every draft that hasn't run generate_geometry_stub yet -- by design:
+    the field is a claimed file path just like the other two, and a claim
+    nothing backs is exactly what this check exists to catch.
     """
     if not ws.module_exists(module_id):
         return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
@@ -210,7 +221,19 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
     refusals = [schema_violation_to_refusal(e) for e in errors]
 
     module_dir = ws.module_dir(module_id)
-    urdf_fragment = doc.get("mechanical", {}).get("geometry", {}).get("urdf_fragment")
+    geometry = doc.get("mechanical", {}).get("geometry", {})
+
+    collision = geometry.get("collision")
+    if collision and not (module_dir / collision).is_file():
+        refusals.append(
+            Refusal(
+                code=Codes.NOT_FOUND,
+                path="mechanical.geometry.collision",
+                message=f"{collision!r} does not exist under {module_dir}",
+                hint="generate_geometry_stub(...) first, or point at a real collision mesh file.",
+            )
+        )
+    urdf_fragment = geometry.get("urdf_fragment")
     if urdf_fragment and not (module_dir / urdf_fragment).is_file():
         refusals.append(
             Refusal(
