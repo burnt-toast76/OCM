@@ -1,0 +1,39 @@
+[project]
+name = "ocm-api"
+version = "0.1.0"
+description = "The one programmatic surface (ADR-0012, spec/09-ocm-api.md): a library layer over ocm-core/ocm-resolve/ocm-generator, an MCP server, and a FastAPI HTTP wrapper -- three thin clients of the same refusal engine."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0-or-later" }
+dependencies = [
+    "PyYAML>=6.0",
+    "jsonschema>=4.18",
+    "jsonpatch>=1.33",
+    "mcp>=1.2.0",
+    "fastapi>=0.110",
+]
+
+[project.optional-dependencies]
+# The HTTP wrapper needs a real ASGI server to actually serve traffic;
+# FastAPI's TestClient (used by the test suite) only needs `httpx`, not
+# uvicorn itself -- see test dependency below.
+serve = ["uvicorn[standard]>=0.29"]
+# ocm-core/ocm-resolve/ocm-generator are sibling packages in this
+# monorepo, not published to an index -- install all editable from the
+# same venv:
+# `pip install -e ../ocm-core -e ../ocm-resolve -e ../ocm-generator -e ".[test,tesseract]"`
+# `plan_cell`/`check_collision`'s happy path needs ocm-generator's own
+# `tesseract` extra; everything else in this package works without it.
+tesseract = ["ocm-generator[tesseract]"]
+test = ["pytest>=8.0", "httpx>=0.27"]
+
+[project.scripts]
+ocm-api-mcp = "ocm_api.mcp_server:main"
+ocm-api-http = "ocm_api.http_app:main"
+
+[tool.setuptools.packages.find]
+include = ["ocm_api*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
