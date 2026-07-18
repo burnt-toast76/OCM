@@ -27,3 +27,5 @@ Next: freeze the bolt grid (ADR-0011, still open), then build the generator (ROA
   `hardware/` makes its license ambiguous. See LICENSING.md.
 - Module manifests must validate against `spec/schema/ocm-module-1.0.schema.json`.
 - Claims in `reference/` are **measured**, not from datasheets. Keep it that way.
+
+Module authoring goes through the ocm MCP tools (create_module_draft → update_module → generate_geometry_stub → validate_module → publish_module) — never by writing module files directly. Storage location is derived from the module id; geometry is generated, never declared as paths to files that don't exist.

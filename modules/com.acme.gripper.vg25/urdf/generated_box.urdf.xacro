@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<robot name="frag">
+  <link name="origin">
+    <collision>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <geometry><box size="0.045 0.045 0.08"/></geometry>
+    </collision>
+  </link>
+</robot>

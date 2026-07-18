@@ -5,6 +5,11 @@ just calls the matching `OcmApi` method and returns `envelope.to_dict()`
 -- no reshaping, so this transport's JSON payload is exactly the library
 call's own envelope (see tests/test_envelope_consistency.py).
 
+Module authoring flows through these tools exclusively:
+create_module_draft -> update_module -> generate_geometry_stub -> validate_module -> publish_module.
+Creating module files directly with file-editing tools bypasses validation and produces
+broken modules (phantom geometry paths, unpublished revisions).
+
 Each tool's description embeds the envelope contract (spec/09 design
 principle #1) and one worked example -- "the agent should succeed
 without reading this spec." Long outputs (schema subtrees, manifests) are
@@ -115,7 +120,10 @@ def build_server(repo_root: str) -> FastMCP:
     # -- Module authoring ---------------------------------------------------
 
     @mcp.tool(description=_doc(
-        "Scaffold modules/<id>/module.yaml with a minimal, already schema-valid manifest for `kind`, "
+        "THE entry point for creating any new module -- NEVER create module directories or "
+        "write module.yaml by hand with file tools; every module starts here. Scaffolds "
+        "modules/<id>/module.yaml (storage location is derived from the id -- never ask "
+        "where to put it) with a minimal, already schema-valid manifest for `kind`, "
         "filled with honest TODO placeholders. revision is always 0.1.0 (a draft) -- excluded from cell "
         "resolution until publish_module. ADR-0011: agents never hand-write URDF; use generate_geometry_stub next.",
         '  call: create_module_draft(id="com.example.pickhead.pk100", kind="end_effector")\n'
