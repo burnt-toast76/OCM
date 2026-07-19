@@ -29,3 +29,16 @@ Next: freeze the bolt grid (ADR-0011, still open), then build the generator (ROA
 - Claims in `reference/` are **measured**, not from datasheets. Keep it that way.
 
 Module authoring goes through the ocm MCP tools (create_module_draft → update_module → generate_geometry_stub → validate_module → publish_module) — never by writing module files directly. Storage location is derived from the module id; geometry is generated, never declared as paths to files that don't exist.
+
+## Authoring from datasheets (ADR-0014)
+
+A datasheet describes a COMPONENT. Author it as one (components/ registry), by
+TRANSCRIPTION ONLY: a value appears only if the source states it. Unit conversion and
+restatement are fine ("~4 min" -> 240 s). Choosing within a stated range is design --
+record the range, do not pick. Anything unanswered is OMITTED, never estimated, never
+copied from other definitions. Leave the draft incomplete and report the validation
+refusals as the list of what the human must supply.
+
+MODULES are assemblies and design work: TCP placement, capabilities, PackML, safety.
+Do not author or modify modules from a datasheet alone; propose, and let the human
+decide. Never publish an incomplete definition.

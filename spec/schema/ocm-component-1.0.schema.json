@@ -1,0 +1,280 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencellmodule.org/schema/ocm-component-1.0.schema.json",
+  "title": "OCM Component Definition v1.0 (draft)",
+  "type": "object",
+  "required": [
+    "ocm_version",
+    "id",
+    "revision",
+    "kind",
+    "vendor",
+    "source"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "ocm_version": {
+      "const": "1.1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9_-]+)+$"
+    },
+    "revision": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "vendor": {
+      "type": "string"
+    },
+    "part_number": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "kind",
+        "ref"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "datasheet",
+            "manual",
+            "catalog",
+            "measured"
+          ]
+        },
+        "ref": {
+          "type": "string",
+          "description": "URL, filename, or citation. Provenance is mandatory: every component names where its facts came from."
+        },
+        "date": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "kind": {
+      "anyOf": [
+        {
+          "enum": [
+            "vacuum_ejector",
+            "io_link_master",
+            "valve_island",
+            "sensor",
+            "camera",
+            "actuator",
+            "drive",
+            "gripper_body",
+            "dispenser",
+            "feeder_body",
+            "bracket",
+            "other"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^x-[a-z0-9][a-z0-9-]*$"
+        }
+      ]
+    },
+    "electrical": {
+      "type": "object",
+      "properties": {
+        "supplies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rail"
+            ],
+            "properties": {
+              "rail": {
+                "enum": [
+                  "24VDC",
+                  "48VDC",
+                  "120VAC",
+                  "240VAC",
+                  "400VAC-3P"
+                ]
+              },
+              "current_nominal_a": {
+                "type": "number"
+              },
+              "current_peak_a": {
+                "type": "number"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "connectors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "ref": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "carries": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "pneumatic": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pressure_bar_min": {
+          "type": "number"
+        },
+        "pressure_bar_max": {
+          "type": "number"
+        },
+        "flow_nl_min": {
+          "type": "number"
+        },
+        "port": {
+          "type": "string"
+        }
+      },
+      "description": "Ranges as stated. A single operating point is a MODULE decision (ADR-0014)."
+    },
+    "comms": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "anyOf": [
+            {
+              "enum": [
+                "ethercat",
+                "ethernet-ip",
+                "profinet",
+                "modbus-tcp",
+                "opc-ua",
+                "io-link",
+                "discrete-io",
+                "ur-rtde"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "^x-[a-z0-9][a-z0-9-]*$"
+            }
+          ]
+        },
+        "device_description": {
+          "type": "string",
+          "description": "Citation for the ESI/IODD/EDS (e.g. 'ESI available from vendor'). NEVER a path to a file that does not exist."
+        },
+        "signals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "direction_device",
+              "type"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "direction_device": {
+                "enum": [
+                  "input",
+                  "output"
+                ],
+                "description": "From the DEVICE's perspective, as the datasheet states it. Coordinator-perspective mapping happens at the module boundary."
+              },
+              "type": {
+                "enum": [
+                  "bool",
+                  "int16",
+                  "uint16",
+                  "int32",
+                  "uint32",
+                  "real",
+                  "string",
+                  "pose6d",
+                  "vec3",
+                  "struct"
+                ]
+              },
+              "unit": {
+                "type": "string"
+              },
+              "electrical": {
+                "type": "string",
+                "description": "e.g. 'PNP', 'NPN', '0-10V' as stated"
+              },
+              "note": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "envelope_mm": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "mass_kg": {
+          "type": "number"
+        },
+        "mesh": {
+          "type": "string",
+          "description": "Only if the file exists in this component's directory."
+        }
+      }
+    },
+    "hazards": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "pinch",
+          "crush",
+          "puncture",
+          "burn_hot",
+          "burn_cryo",
+          "laser",
+          "uv",
+          "chemical",
+          "pressure",
+          "electrical",
+          "noise",
+          "rotating",
+          "aerosol"
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Cautions and requirements carried from the source, near-verbatim."
+    }
+  }
+}
