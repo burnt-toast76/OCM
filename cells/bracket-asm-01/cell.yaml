@@ -25,7 +25,7 @@ modules:
       - 0
   address:
     ip: 192.168.1.10
-  tool: grip1
+  tool: sd1
   joint_state:
     shoulder_lift_joint: -1.5707963267948966
     elbow_joint: 1.5707963267948966
@@ -72,10 +72,6 @@ modules:
   address:
     ip: 192.168.1.20
   calibration: cal/cam1_2026-07-01.yaml
-- instance: grip1
-  module: com.acme.gripper.vg25@1.0.0
-  mount:
-    'on': robot1.flange
 - instance: disp1
   module: com.nordson-kline.dispense.dp8@1.0.0
   mount:
@@ -90,6 +86,10 @@ modules:
       - 0
   address:
     ethercat_position: 7
+- instance: sd1
+  module: com.accelsolutions.screwdriver.sd50@1.2.0
+  mount:
+    on: robot1.flange
 controller:
   runtime: beremiz
   target: revpi-connect-5
@@ -99,7 +99,7 @@ safety:
   circuit: safety/bracket-cell-01.pdf
   relay: Pilz PNOZ s4
   performance_level: PLd
-  verified_by: "(human signature required \u2014 the tool will not sign this)"
+  verified_by: "(human signature required — the tool will not sign this)"
 part:
   id: BRK-4471
   cad: cad/BRK-4471.step
@@ -131,4 +131,26 @@ part:
       - 0
       - 0
       - 1
-plan: []
+plan:
+- step: clamp
+  module: nest1
+  op: clamp
+  params:
+    force_n: 120
+- step: fasten
+  for_each:
+  - hole_1
+  - hole_2
+  - hole_3
+  sequence:
+  - module: sd1
+    op: load_screw
+  - module: sd1
+    op: drive_screw
+    at: part.features.${item}
+    params:
+      torque_nm: 2.4
+      depth_mm: 8.0
+- step: release
+  module: nest1
+  op: unclamp

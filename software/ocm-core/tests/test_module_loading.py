@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from ocm_core import Parameter, Signal, load_module
-from ocm_core.module import Module
+from ocm_core.module import ComponentRef, Module, ModuleComponent
 
 
 def test_loads_sd50_end_effector(sd50_path):
@@ -112,3 +112,56 @@ def test_gocator_manifest_round_trips_through_the_object_model_with_frame_intact
     assert confidence.type == "number"
     assert confidence.unit == "%"
     assert confidence.frame is None
+
+
+# ---------------------------------------------------------------------------
+# ADR-0014 additive fields: a module's own `components:` list and a
+# signal's `source` provenance into one of those components.
+# ---------------------------------------------------------------------------
+
+
+def test_module_with_no_components_list_stays_empty_tuple_not_none():
+    module = Module.from_dict(
+        {
+            "ocm_version": "1.1",
+            "id": "com.example.pickhead.pk100",
+            "revision": "0.1.0",
+            "kind": "end_effector",
+            "license": "CERN-OHL-S-2.0",
+            "mechanical": {
+                "mount": {"interface": "custom"},
+                "frames": {"origin": {"xyz_mm": [0, 0, 0]}},
+                "geometry": {"collision": "x.stl"},
+                "mass_kg": 1.0,
+            },
+            "state_machine": {"model": "packml"},
+        }
+    )
+    assert module.components == ()
+
+
+def test_module_components_list_and_signal_source_are_parsed():
+    module = Module.from_dict(
+        {
+            "ocm_version": "1.1",
+            "id": "com.example.pickhead.pk100",
+            "revision": "0.1.0",
+            "kind": "end_effector",
+            "license": "CERN-OHL-S-2.0",
+            "mechanical": {
+                "mount": {"interface": "custom"},
+                "frames": {"origin": {"xyz_mm": [0, 0, 0]}},
+                "geometry": {"collision": "x.stl"},
+                "mass_kg": 1.0,
+            },
+            "state_machine": {"model": "packml"},
+            "components": [{"refdes": "VG1", "ref": "com.smc.ejector.zk2-agh@1.0.0"}],
+            "comms": {
+                "protocol": "discrete-io",
+                "signals": [{"name": "part_present", "direction": "input", "type": "bool", "source": "VG1.vacuum_switch"}],
+            },
+        }
+    )
+    assert module.components == (ModuleComponent(refdes="VG1", ref=ComponentRef(id="com.smc.ejector.zk2-agh", revision="1.0.0")),)
+    assert str(module.components[0].ref) == "com.smc.ejector.zk2-agh@1.0.0"
+    assert module.comms.signals[0].source == "VG1.vacuum_switch"

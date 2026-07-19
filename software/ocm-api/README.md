@@ -7,12 +7,18 @@ API"). spec/09-ocm-api.md's tool surface, implemented exactly, and nowhere else:
 ocm_api/
   envelope.py     the ONE response shape -- Envelope/Refusal/Codes, .to_dict()
   translate.py    ocm-core/ocm-resolve/ocm-generator error strings -> structured Refusals
-  workspace.py    Workspace(repo_root) -- module/cell paths, draft-revision convention
-  resolution.py   resolve_cell() + the one NEW rule: a draft module can't resolve into a cell
-  discovery.py    describe_schema, get_example, list/describe module & cell, list_frames
+  workspace.py    Workspace(repo_root) -- module/cell/component paths, draft-revision
+                  convention, and the comment-preserving YAML write path
+  resolution.py   resolve_cell() + the NEW rules ocm-resolve has no opinion on: a draft
+                  module/component can't resolve into a cell
+  discovery.py    describe_schema, get_example, list/describe module & cell, list_frames,
+                  and describe_module's ADR-0014 BOM/power/air aggregates
   authoring.py    create_module_draft, update_module, generate_geometry_stub,
                   validate_module, publish_module -- and the verified_by hard refusal
-  composition.py  create_cell, place/move/remove_instance, set_plan, set_joint_state
+  components.py   create_component_draft, update_component, validate_component,
+                  publish_component, list_components, describe_component (ADR-0014)
+  composition.py  create_cell, place/move/remove_instance, set_plan, set_joint_state --
+                  TOOL_SLOT_OCCUPIED and orphaned-plan-step/stale-tool: warnings live here
   generation.py   build_scene, check_collision, plan_cell, emit
   api.py          OcmApi -- the facade every client calls through
   mcp_server.py   stdio MCP server, tools mapping 1:1 to OcmApi's verbs
@@ -103,6 +109,56 @@ exactly once, in the packages that already implement them.
   than its nominal `footprint_mm`, and that margin was previously only discoverable by
   tripping a `WORKSPACE_OVERHANG` refusal once. An agent building a mental model of "how much
   room do I have" should get that from data, not from a near-miss.
+- **`place_instance`/`move_instance` never evict or swap.** A `mount.on` naming an attachment
+  another instance already occupies is refused (`TOOL_SLOT_OCCUPIED`, hint naming the
+  incumbent) rather than silently displacing it -- a GUI drag and an agent's tool swap both go
+  through `remove_instance` first if that's genuinely what's meant.
+- **A mutation that orphans a plan step, or leaves another instance's `tool:` field pointing at
+  a removed instance, says so in `warnings[]` -- on the same call, whether or not that call is
+  also refused for a harder reason.** `remove_instance` is the one verb that can create both:
+  a plan step naming the removed instance also trips `resolve_cell`'s own hard
+  `UNKNOWN_MODULE` check (so the warning usually rides alongside a refusal, adding a
+  human-readable "here's the blast radius" summary a bare per-step error list doesn't), while a
+  stale `tool:` reference (e.g. `robot1: {tool: grip1}`, spec/02's "which end effector is
+  mounted" convention) is never cross-checked by `resolve_cell` at all -- without this, removing
+  the instance it names would succeed completely silently.
+- **Components (ADR-0014) mirror the module lifecycle exactly, with one governing
+  difference: transcription, not design.** `create_component_draft` -> `update_component` ->
+  `validate_component` -> `publish_component`, same always-write/validate-gates-publish
+  discipline -- but `create_component_draft` does NOT pre-fill a schema-valid skeleton the way
+  `create_module_draft` does. A module's mount/frames/geometry are DESIGN placeholders an agent
+  legitimately starts sketching; a component's `vendor`/`source` are DATASHEET FACTS that
+  either are known right now or aren't, so a fresh draft is genuinely minimal
+  (`ocm_version`/`id`/`revision`/`kind` only) and `validate_component` on it fails with exactly
+  the completion list spec/10 describes ("vendor is a required property", "source is a required
+  property"). A component with real gaps (no stated mass, no stated current draw) validates
+  fine -- ADR-0014: omission isn't invalidity -- and simply stays unpublished until a human
+  says otherwise. Two new schema-additive (v1.1) module fields make the assembly relationship
+  real: an optional `components:` list (`{refdes, ref}`) and an optional `source:`
+  provenance field on a `comms.signals` entry (`'REFDES.signal_name'`); `ocm-resolve` checks
+  both at cell-resolution time (unknown component id/revision, duplicate refdes, a `source`
+  naming a signal the referenced component doesn't declare -- codes `UNKNOWN_COMPONENT`,
+  `DUPLICATE_REFDES`, `INVALID_SOURCE`). `describe_module` derives a purchasable BOM, a power
+  budget per electrical rail, and total air consumption straight from a module's own
+  `components:` list -- summing only what every contributing component actually states;  a
+  rail/gas with even one silent component is omitted from the totals entirely (never a partial
+  sum passed off as complete), with a warning naming the incomplete component.
+
+## Comment-preserving writes
+
+Every write in this repo used to round-trip through `yaml.safe_dump`, which silently destroyed
+every comment in the file -- and this repo's YAML comments carry real design intent (ADR
+references, `# placeholder -- not authored yet`, unit/provisional-value caveats). `write_yaml`
+(in `workspace.py`) now loads the EXISTING file with `ruamel.yaml`'s round-trip mode (a
+comment-carrying `CommentedMap`/`CommentedSeq` tree), diffs the old file's plain value against
+the new data as an RFC-6902 patch (`jsonpatch.make_patch`, the same library `update_module`'s
+own explicit `patch=` verb already uses), and applies that patch to the round-trip tree in
+place -- so untouched keys, and their comments, never move. A brand new file is written fresh
+(nothing to preserve). One honest limitation: round-trip mode preserves comments, key order,
+blank-line grouping, and quoting, but not manual inter-column alignment whitespace
+(`id:       foo`) a couple of this repo's earliest, hand-typed files use for visual alignment --
+that padding isn't meaningful YAML syntax any round-trip library models as preservable state.
+See `tests/test_yaml_comments.py`.
 
 ## Running it
 
@@ -146,12 +202,28 @@ inlined.
 pytest
 ```
 
-- `test_verbs.py` -- every verb's happy path (all 22: 7 discovery, 5 authoring, 5
-  composition, 4 generation, plus `create_cell`).
+- `test_verbs.py` -- every module/cell verb's happy path (22: 7 discovery, 5 authoring, 6
+  composition, 4 generation) -- component verbs get their own full-lifecycle coverage in
+  `test_components.py` instead of a separate happy-path pass.
 - `test_refusals.py` -- the envelope shape for every refusal code in `envelope.Codes`,
   including `HUMAN_SIGNATURE_REQUIRED` (confirms the signature is actually absent from the
   written file, not just flagged) and `DRAFT_MODULE_REFERENCED` (a draft module blocks
   resolution; publishing it makes the same cell resolve).
+- `test_components.py` -- the full component lifecycle; a fresh draft's refusal list reads as
+  spec/10's own completion list; a deliberately gap-filled (no mass, no current) transcription
+  validates cleanly and simply stays unpublished; a module referencing two published
+  components resolves into a cell AND aggregates a correct BOM/power budget/air consumption;
+  every ADR-0014 refusal path (`UNKNOWN_COMPONENT`, `DUPLICATE_REFDES`, `INVALID_SOURCE`, a
+  draft component blocking resolution).
+- `test_guardrails.py` -- `place_instance`/`move_instance` onto an occupied `mount.on` refuse
+  with `TOOL_SLOT_OCCUPIED` (and never evict the incumbent -- confirmed by reading the file back
+  off disk); `remove_instance` orphaning plan steps warns on the same call that causes it
+  (alongside the resulting `UNKNOWN_MODULE` refusal, since the plan genuinely can't resolve any
+  more); `remove_instance` leaving a stale `robot1.tool:` reference warns even when the call
+  otherwise succeeds (`ok: true`) since `resolve_cell` never cross-checks that field itself.
+- `test_yaml_comments.py` -- a targeted patch to a real, heavily-commented module (frame1200)
+  preserves every comment and top-level key order; a targeted patch to a freshly-annotated file
+  produces a minimal diff (only the changed field's line differs).
 - `test_transports.py` -- the library call, an in-process MCP `call_tool`, and a FastAPI
   `TestClient` call produce canonically-identical JSON (`json.dumps(..., sort_keys=True)`
   equality -- transport-level formatting may differ, content must not) for the same verb +

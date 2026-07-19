@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 license = { text = "AGPL-3.0-or-later" }
 dependencies = [
     "PyYAML>=6.0",
+    "ruamel.yaml>=0.18",
     "jsonschema>=4.18",
     "jsonpatch>=1.33",
     "mcp>=1.2.0",

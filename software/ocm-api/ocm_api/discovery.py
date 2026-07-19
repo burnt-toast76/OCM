@@ -89,6 +89,75 @@ def list_modules(ws: Workspace) -> Envelope:
     return Envelope.succeed(rows)
 
 
+def _component_aggregates(ws: Workspace, module_data: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """ADR-0014: BOM, power budget, air consumption -- all DERIVED from a
+    module's own `components:` list, never re-authored. Zero-assumption
+    propagates into aggregation: a rail's/gas's total is only ever the sum
+    of values every contributing component actually states; if even one
+    doesn't state it, that aggregate is OMITTED entirely (never a partial
+    sum passed off as a total) and a warning names the incomplete
+    component -- the same "report the gap, don't guess" discipline
+    authoring.py's own zero-assumption components already follow.
+    Returns ({} , []) for a module with no components: list at all (ADR-0014:
+    "a module with no components list stays valid" -- nothing to derive).
+    """
+    components_list = module_data.get("components") or []
+    if not components_list:
+        return {}, []
+
+    bom: list[dict[str, Any]] = []
+    power_by_rail: dict[str, list[float | None]] = {}
+    power_gap_notes: dict[str, list[str]] = {}
+    air_values: list[float] = []
+    air_gap_notes: list[str] = []
+    warnings: list[str] = []
+
+    for mc in components_list:
+        refdes = mc.get("refdes")
+        ref = mc.get("ref", "")
+        component_id, _, _revision = ref.partition("@")
+        if not ws.component_exists(component_id):
+            warnings.append(f"component {refdes} ({ref}) not found -- its BOM/power/air contribution is omitted")
+            bom.append({"refdes": refdes, "id": component_id, "vendor": None, "part_number": None})
+            continue
+
+        cdata = read_yaml(ws.component_path(component_id)) or {}
+        component_label = f"{refdes} ({cdata.get('id', component_id)})"
+        bom.append({"refdes": refdes, "id": cdata.get("id", component_id), "vendor": cdata.get("vendor"), "part_number": cdata.get("part_number")})
+
+        for supply in (cdata.get("electrical") or {}).get("supplies", []):
+            rail = supply.get("rail")
+            if rail is None:
+                continue
+            current = supply.get("current_nominal_a")
+            power_by_rail.setdefault(rail, []).append(current)
+            if current is None:
+                power_gap_notes.setdefault(rail, []).append(f"{component_label} doesn't state current_nominal_a")
+
+        pneumatic = cdata.get("pneumatic")
+        if pneumatic:
+            flow = pneumatic.get("flow_nl_min")
+            if flow is None:
+                air_gap_notes.append(f"{component_label} doesn't state flow_nl_min")
+            else:
+                air_values.append(flow)
+
+    aggregates: dict[str, Any] = {"bom": bom}
+
+    power_budget = {rail: {"current_nominal_a": sum(currents)} for rail, currents in power_by_rail.items() if rail not in power_gap_notes}
+    if power_budget:
+        aggregates["power_budget"] = power_budget
+    for rail, notes in power_gap_notes.items():
+        warnings.append(f"power budget for {rail} is incomplete: " + "; ".join(notes))
+
+    if air_gap_notes:
+        warnings.append("air consumption is incomplete: " + "; ".join(air_gap_notes))
+    elif air_values:
+        aggregates["air_consumption_nl_min"] = sum(air_values)
+
+    return aggregates, warnings
+
+
 def describe_module(ws: Workspace, module_id: str) -> Envelope:
     if not ws.module_exists(module_id):
         return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
@@ -101,7 +170,11 @@ def describe_module(ws: Workspace, module_id: str) -> Envelope:
 
     if errors:
         return Envelope.refuse([schema_violation_to_refusal(e) for e in errors])
-    return Envelope.succeed(payload)
+
+    aggregates, warnings = _component_aggregates(ws, data)
+    if aggregates:
+        payload["aggregates"] = aggregates
+    return Envelope.succeed(payload, warnings=warnings)
 
 
 def list_cells(ws: Workspace) -> Envelope:

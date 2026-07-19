@@ -377,6 +377,11 @@
                   ]
                 },
                 "description": "For type=struct: ordered field name -> scalar type. Wire layout is fields in declaration order."
+              },
+              "source": {
+                "type": "string",
+                "description": "ADR-0014: provenance into a components/ entry's own signal list, as 'REFDES.signal_name' (the refdes must appear in this module's own components: list). Optional -- a signal with no components: list, or one that isn't backed by a purchased part, has none.",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]*\\.[a-z][a-z0-9_]*$"
               }
             },
             "allOf": [
@@ -705,6 +710,30 @@
                 "type": "number"
               }
             }
+          }
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "description": "ADR-0014: this module as an ASSEMBLY of purchasable components (spec/10). Optional -- a module with no components list stays valid (some purchased devices genuinely are whole modules). Derivable from this list: the purchasable BOM, power budget, air consumption.",
+      "items": {
+        "type": "object",
+        "required": [
+          "refdes",
+          "ref"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "refdes": {
+            "type": "string",
+            "description": "Reference designator, e.g. 'VG1', 'IO1' -- this module's own name for this component instance.",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+          },
+          "ref": {
+            "type": "string",
+            "description": "id@revision of a components/ entry. The referenced component must be published (revision >= 1.0.0), same as a module ref.",
+            "pattern": "^[a-z0-9]+(\\.[a-z0-9_-]+)+@\\d+\\.\\d+\\.\\d+$"
           }
         }
       }

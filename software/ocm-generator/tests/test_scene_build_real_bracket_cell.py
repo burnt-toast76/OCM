@@ -37,7 +37,7 @@ def test_real_bracket_cell_scene_builds_end_to_end(repo_root: Path):
     scene = build_scene(resolved, repo_root / "modules")
 
     assert isinstance(scene, Scene)
-    assert set(scene.instances) == {"robot1", "sd1", "feed1", "nest1", "cam1"}
+    assert set(scene.instances) == {"robot1", "sd1", "feed1", "nest1", "cam1", "disp1"}
 
 
 def test_real_bracket_cell_sd1_is_kinematically_parented_to_the_real_ur5e_flange(repo_root: Path):
@@ -96,9 +96,9 @@ def test_real_bracket_cell_without_the_folded_joint_state_pokes_through_the_wall
     # test added instead, and load the result the normal way.
     original = (repo_root / "cells" / "bracket-asm-01" / "cell.yaml").read_text(encoding="utf-8")
     joint_state_block = (
-        "\n    joint_state:"
-        "\n      shoulder_lift_joint: -1.5707963267948966   # -90 deg"
-        "\n      elbow_joint: 1.5707963267948966            #  90 deg"
+        "\n  joint_state:"
+        "\n    shoulder_lift_joint: -1.5707963267948966"
+        "\n    elbow_joint: 1.5707963267948966"
     )
     assert joint_state_block in original, "cell.yaml's joint_state block text has changed; update this test"
     modified_path = tmp_path / "cell_no_joint_state.yaml"

@@ -145,6 +145,10 @@ class Signal:
     `frame` (pose6d's required reference frame) and `fields` (struct's
     ordered field name -> scalar type map, wire layout in declaration
     order) carry those declarations; both are None for every scalar type.
+
+    ADR-0014 additive field: `source` is this signal's provenance into a
+    referenced component's own signal list ('REFDES.signal_name') -- None
+    for a signal with no such backing part.
     """
 
     name: str
@@ -156,6 +160,7 @@ class Signal:
     role: str | None = None
     frame: str | None = None
     fields: dict[str, str] | None = None
+    source: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Signal":
@@ -170,6 +175,7 @@ class Signal:
             role=data.get("role"),
             frame=data.get("frame"),
             fields=dict(fields) if fields is not None else None,
+            source=data.get("source"),
         )
 
 
@@ -363,6 +369,47 @@ class Maintenance:
 
 
 @dataclass(frozen=True)
+class ComponentRef:
+    """A reference to a components/ entry from a module's own `components:`
+    list: 'id@x.y.z' -- one layer up from ocm_core.cell.ModuleRef (ADR-0014:
+    modules reference components the same way cells reference modules).
+    Not imported from .cell to avoid a circular import (cell.py already
+    depends on this module for ID_PATTERN/REVISION_PATTERN).
+    """
+
+    id: str
+    revision: str
+
+    @classmethod
+    def parse(cls, ref: str) -> "ComponentRef":
+        if "@" not in ref:
+            raise ValueError(f"component ref {ref!r} is missing '@revision'")
+        component_id, _, revision = ref.partition("@")
+        if not ID_PATTERN.match(component_id):
+            raise ValueError(f"component ref {ref!r} has an invalid id {component_id!r}")
+        if not REVISION_PATTERN.match(revision):
+            raise ValueError(f"component ref {ref!r} has an invalid revision {revision!r}")
+        return cls(id=component_id, revision=revision)
+
+    def __str__(self) -> str:
+        return f"{self.id}@{self.revision}"
+
+
+@dataclass(frozen=True)
+class ModuleComponent:
+    """One entry in a module's `components:` list -- a purchased part this
+    module is assembled from, by its own reference designator (ADR-0014).
+    """
+
+    refdes: str
+    ref: ComponentRef
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ModuleComponent":
+        return cls(refdes=data["refdes"], ref=ComponentRef.parse(data["ref"]))
+
+
+@dataclass(frozen=True)
 class Module:
     """A validated OCM module manifest. Construct via ocm_core.load_module, not directly."""
 
@@ -383,6 +430,7 @@ class Module:
     process: Process | None = None
     safety: Safety | None = None
     maintenance: Maintenance | None = None
+    components: tuple[ModuleComponent, ...] = ()
 
     @property
     def is_abort_safe(self) -> bool:
@@ -419,4 +467,5 @@ class Module:
             state_machine=StateMachine.from_dict(data["state_machine"]),
             safety=Safety.from_dict(safety) if safety else None,
             maintenance=Maintenance.from_dict(maintenance) if maintenance else None,
+            components=tuple(ModuleComponent.from_dict(c) for c in data.get("components", [])),
         )

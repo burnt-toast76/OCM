@@ -16,7 +16,7 @@ import functools
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
-from . import authoring, composition, discovery, generation
+from . import authoring, components, composition, discovery, generation
 from .envelope import Codes, Envelope, single_refusal
 from .workspace import Workspace
 
@@ -100,6 +100,32 @@ class OcmApi:
     @_never_raise
     def publish_module(self, id: str, revision: str) -> Envelope:
         return authoring.publish_module(self.workspace, id, revision)
+
+    # -- Component authoring (ADR-0014) ---------------------------------------------------
+
+    @_never_raise
+    def create_component_draft(self, id: str, kind: str) -> Envelope:
+        return components.create_component_draft(self.workspace, id, kind)
+
+    @_never_raise
+    def update_component(self, id: str, manifest: dict[str, Any] | None = None, patch: list[dict[str, Any]] | None = None) -> Envelope:
+        return components.update_component(self.workspace, id, manifest=manifest, patch=patch)
+
+    @_never_raise
+    def validate_component(self, id: str) -> Envelope:
+        return components.validate_component(self.workspace, id)
+
+    @_never_raise
+    def publish_component(self, id: str, revision: str) -> Envelope:
+        return components.publish_component(self.workspace, id, revision)
+
+    @_never_raise
+    def list_components(self) -> Envelope:
+        return components.list_components(self.workspace)
+
+    @_never_raise
+    def describe_component(self, id: str) -> Envelope:
+        return components.describe_component(self.workspace, id)
 
     # -- Cell composition ---------------------------------------------------
 

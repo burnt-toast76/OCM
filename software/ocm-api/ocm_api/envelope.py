@@ -47,6 +47,10 @@ class Codes:
     COLLISION_DETECTED = "COLLISION_DETECTED"
     UNAVAILABLE = "UNAVAILABLE"  # a needed optional extra (e.g. tesseract) isn't installed
     INVALID_ARGUMENT = "INVALID_ARGUMENT"
+    UNKNOWN_COMPONENT = "UNKNOWN_COMPONENT"  # ADR-0014: a components: entry's ref doesn't resolve
+    DUPLICATE_REFDES = "DUPLICATE_REFDES"  # ADR-0014: two components: entries share a refdes
+    INVALID_SOURCE = "INVALID_SOURCE"  # ADR-0014: a signal's source: provenance doesn't check out
+    TOOL_SLOT_OCCUPIED = "TOOL_SLOT_OCCUPIED"  # place_instance onto a mount.on flange that's already carrying an instance
 
 
 @dataclass(frozen=True)

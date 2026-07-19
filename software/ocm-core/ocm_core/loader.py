@@ -12,12 +12,16 @@ import yaml
 from jsonschema import Draft202012Validator
 
 from .cell import Cell, validate_cell_dict
+from .component import Component
 from .errors import CellLoadError, ManifestValidationError
 from .module import Module
 
 # software/ocm-core/ocm_core/loader.py -> repo root
 DEFAULT_SCHEMA_PATH = (
     Path(__file__).resolve().parents[3] / "spec" / "schema" / "ocm-module-1.0.schema.json"
+)
+DEFAULT_COMPONENT_SCHEMA_PATH = (
+    Path(__file__).resolve().parents[3] / "spec" / "schema" / "ocm-component-1.0.schema.json"
 )
 
 
@@ -74,6 +78,25 @@ def load_module(path: Path | str, schema_path: Path | str = DEFAULT_SCHEMA_PATH)
     if errors:
         raise ManifestValidationError(path, errors)
     return Module.from_dict(data)
+
+
+def load_component(path: Path | str, schema_path: Path | str = DEFAULT_COMPONENT_SCHEMA_PATH) -> Component:
+    """Load a component definition YAML file, validate it against the OCM
+    component schema, and return a typed Component.
+
+    `validate_module_dict` is schema-agnostic (a plain Draft202012Validator
+    wrapper) -- reused as-is rather than duplicated under a new name.
+
+    Raises ManifestValidationError (carrying every violation, not just the
+    first) if the definition doesn't conform.
+    """
+    path = Path(path)
+    data = _read_yaml(path)
+    schema = load_schema(schema_path)
+    errors = validate_module_dict(data, schema)
+    if errors:
+        raise ManifestValidationError(path, errors)
+    return Component.from_dict(data)
 
 
 def load_cell(path: Path | str) -> Cell:

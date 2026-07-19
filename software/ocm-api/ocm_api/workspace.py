@@ -3,22 +3,55 @@
 state; git is the review layer. Every mutation lands in the working tree."
 No hidden server state beyond this path (spec/09's determinism rule).
 
-`read_yaml`/`write_yaml` reuse ocm_core's own YAML loader (`_read_yaml`,
-its private-but-stable YAML-1.2-boolean-resolution `SafeLoader` subclass)
+`read_yaml` reuses ocm_core's own YAML loader (`_read_yaml`, its
+private-but-stable YAML-1.2-boolean-resolution `SafeLoader` subclass)
 rather than re-implementing it -- a second, subtly different YAML reader
 in this package would be exactly the kind of logic duplication spec/09
 and this task both rule out. `on: robot1.flange` must keep parsing as a
-string key, not `True`, every place this repo reads YAML.
+string key, not `True`, every place this repo reads YAML. Loading for
+validation goes through this one unchanged path everywhere.
+
+`write_yaml` is comment-preserving. This repo's YAML comments carry real
+design intent (ADR references, "placeholder -- not authored yet",
+provisional-value caveats) -- a plain yaml.safe_dump round-trip silently
+destroyed every one of them on the first agent-driven write, which makes
+the resulting diff unreviewable. Ruamel's round-trip mode (`typ="rt"`)
+loads the EXISTING file into a comment-carrying `CommentedMap`/
+`CommentedSeq` tree; the new data is applied to that tree as an RFC-6902
+patch (diffed against the old file's plain value via the same `jsonpatch`
+already used for `update_module`'s explicit patch verb) rather than as a
+full replacement, so untouched keys -- and their comments -- never move.
+Ruamel's `CommentedMap`/`CommentedSeq` satisfy `MutableMapping`/
+`MutableSequence`, so `jsonpatch.apply_patch` mutates them exactly the way
+it mutates a plain dict/list; nothing here re-implements patch application.
+A brand new file (nothing to preserve) is written fresh.
+
+One honest limitation: round-trip mode preserves comments, key order,
+blank-line grouping, flow-vs-block style, and quoting -- but NOT manual
+inter-column alignment whitespace (`id:       foo`) some of this repo's
+earliest, hand-typed files use for visual alignment. That padding isn't
+meaningful YAML syntax any round-trip library models as preservable state;
+re-serializing such a file re-flows it to single-space `key: value` even
+on an untouched line. Files written by this package's own dumps (and
+these tests' own fixtures) never used that style, so it doesn't recur.
 """
 
 from __future__ import annotations
 
+import io
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
-from ocm_core.loader import DEFAULT_SCHEMA_PATH, _read_yaml  # noqa: F401 -- see module docstring
+import jsonpatch
+from ocm_core.loader import DEFAULT_COMPONENT_SCHEMA_PATH, DEFAULT_SCHEMA_PATH, _read_yaml  # noqa: F401 -- see module docstring
+from ruamel.yaml import YAML
+from ruamel.yaml.comments import CommentedMap
+
+_yaml_rt = YAML(typ="rt")
+_yaml_rt.preserve_quotes = True
+_yaml_rt.width = 100_000  # never line-wrap -- wrapping would show up as diff noise unrelated to the actual change
+_yaml_rt.indent(mapping=2, sequence=2, offset=0)  # this repo's own convention: block sequences flush with their parent key
 
 
 def read_yaml(path: Path) -> Any:
@@ -27,7 +60,24 @@ def read_yaml(path: Path) -> Any:
 
 def write_yaml(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
+
+    doc: Any = data
+    if path.is_file():
+        with path.open("r", encoding="utf-8") as f:
+            existing = _yaml_rt.load(f)
+        if isinstance(existing, (CommentedMap, dict, list)):
+            old_plain = _read_yaml(path) or {}
+            ops = jsonpatch.make_patch(old_plain, data).patch
+            if ops:
+                jsonpatch.apply_patch(existing, ops, in_place=True)
+            doc = existing
+        # else: existing content isn't a mapping/sequence (a malformed or
+        # non-standard file) -- nothing structured to preserve, fall
+        # through to writing `data` fresh.
+
+    buf = io.StringIO()
+    _yaml_rt.dump(doc, buf)
+    path.write_text(buf.getvalue(), encoding="utf-8")
 
 
 def is_draft_revision(revision: str) -> bool:
@@ -52,9 +102,18 @@ class Workspace:
         return self.root / "cells"
 
     @property
+    def components_dir(self) -> Path:
+        return self.root / "components"
+
+    @property
     def schema_path(self) -> Path:
         candidate = self.root / "spec" / "schema" / "ocm-module-1.0.schema.json"
         return candidate if candidate.is_file() else Path(DEFAULT_SCHEMA_PATH)
+
+    @property
+    def component_schema_path(self) -> Path:
+        candidate = self.root / "spec" / "schema" / "ocm-component-1.0.schema.json"
+        return candidate if candidate.is_file() else Path(DEFAULT_COMPONENT_SCHEMA_PATH)
 
     @property
     def changelog_path(self) -> Path:
@@ -72,11 +131,20 @@ class Workspace:
     def cell_path(self, cell_id: str) -> Path:
         return self.cell_dir(cell_id) / "cell.yaml"
 
+    def component_dir(self, component_id: str) -> Path:
+        return self.components_dir / component_id
+
+    def component_path(self, component_id: str) -> Path:
+        return self.component_dir(component_id) / "component.yaml"
+
     def module_exists(self, module_id: str) -> bool:
         return self.module_path(module_id).is_file()
 
     def cell_exists(self, cell_id: str) -> bool:
         return self.cell_path(cell_id).is_file()
+
+    def component_exists(self, component_id: str) -> bool:
+        return self.component_path(component_id).is_file()
 
     def list_module_ids(self) -> list[str]:
         if not self.modules_dir.is_dir():
@@ -87,3 +155,8 @@ class Workspace:
         if not self.cells_dir.is_dir():
             return []
         return sorted(p.parent.name for p in self.cells_dir.glob("*/cell.yaml"))
+
+    def list_component_ids(self) -> list[str]:
+        if not self.components_dir.is_dir():
+            return []
+        return sorted(p.parent.name for p in self.components_dir.glob("*/component.yaml"))

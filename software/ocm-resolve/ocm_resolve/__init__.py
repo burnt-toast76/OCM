@@ -9,7 +9,7 @@ Tesseract here -- that's ocm-generator, once a cell resolves cleanly.
 
 from .errors import CellResolutionError, OcmResolveError
 from .resolve import ResolvedCell, ResolvedModuleInstance, resolve_cell
-from .search import SearchPath, find_module
+from .search import SearchPath, find_component, find_module
 
 __all__ = [
     "CellResolutionError",
@@ -17,6 +17,7 @@ __all__ = [
     "ResolvedCell",
     "ResolvedModuleInstance",
     "SearchPath",
+    "find_component",
     "find_module",
     "resolve_cell",
 ]

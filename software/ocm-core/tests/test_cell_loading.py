@@ -14,7 +14,7 @@ def test_loads_bracket_cell(bracket_cell_path):
     assert cell.id == "com.accelsolutions.cell.bracket-asm-01"
     assert cell.base.module.id == "com.accelsolutions.base.frame1200"
     assert cell.base.module.revision == "2.0.0"
-    assert {m.instance for m in cell.modules} == {"robot1", "sd1", "feed1", "nest1", "cam1"}
+    assert {m.instance for m in cell.modules} == {"robot1", "sd1", "feed1", "nest1", "cam1", "disp1"}
 
 
 def test_module_instance_mount_and_address(bracket_cell_path):
@@ -26,9 +26,26 @@ def test_module_instance_mount_and_address(bracket_cell_path):
 
     sd1 = cell.module("sd1")
     assert sd1.mount.on == "robot1.flange"
-    assert sd1.address.ethercat_position == 4
-    assert sd1.consumables["screw"].part == "M3x8 SHCS"
-    assert sd1.consumables["screw"].source == "feed1"
+
+    feed1 = cell.module("feed1")
+    assert feed1.address.ethercat_position == 5
+
+
+def test_module_instance_consumables_are_parsed(tmp_path, bracket_cell_path):
+    # sd1 doesn't declare `consumables` in the real, checked-in cell
+    # either -- inject one into a copy so this structural parse path
+    # stays covered, same pattern test_duplicate_instance_name_is_rejected
+    # already uses below.
+    data = yaml.safe_load(bracket_cell_path.read_text(encoding="utf-8"))
+    feed1 = next(m for m in data["modules"] if m["instance"] == "feed1")
+    feed1["consumables"] = {"screw": {"part": "M3x8 SHCS", "source": "feed1"}}
+    path = tmp_path / "cell_with_consumables.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    cell = load_cell(path)
+    feed1_loaded = cell.module("feed1")
+    assert feed1_loaded.consumables["screw"].part == "M3x8 SHCS"
+    assert feed1_loaded.consumables["screw"].source == "feed1"
 
 
 def test_module_instance_joint_state_defaults_to_empty(bracket_cell_path):
@@ -70,13 +87,27 @@ def test_controller_and_safety(bracket_cell_path):
     assert cell.safety.relay == "Pilz PNOZ s4"
 
 
-def test_part_and_plan_are_passed_through_untyped(bracket_cell_path):
+def test_part_and_plan_are_passed_through_untyped(tmp_path, bracket_cell_path):
     # part/plan are the planner's DSL; ocm-core loads them as raw data
     # rather than interpreting them (ocm-generator's job, not this one).
-    cell = load_cell(bracket_cell_path)
+    # The real cell's own `plan:` is currently empty (its fastening plan
+    # hasn't been redesigned since robot1's end effector was swapped from
+    # a screwdriver to a gripper) -- inject a representative plan into a
+    # copy so the passthrough itself stays covered.
+    data = yaml.safe_load(bracket_cell_path.read_text(encoding="utf-8"))
+    assert data["part"]["id"] == "BRK-4471"
+    data["plan"] = [
+        {"step": "clamp", "module": "nest1", "op": "clamp"},
+        {"step": "fasten", "for_each": ["hole_1", "hole_2", "hole_3"], "sequence": []},
+        {"step": "release", "module": "nest1", "op": "unclamp"},
+    ]
+    path = tmp_path / "cell_with_plan.yaml"
+    path.write_text(yaml.safe_dump(data), encoding="utf-8")
+
+    cell = load_cell(path)
     assert cell.part["id"] == "BRK-4471"
     assert cell.plan[0]["step"] == "clamp"
-    assert cell.plan[2]["for_each"] == ["hole_1", "hole_2", "hole_3"]
+    assert cell.plan[1]["for_each"] == ["hole_1", "hole_2", "hole_3"]
 
 
 def test_module_ref_referenced_by_a_cell_can_load_the_real_manifest(bracket_cell_path, repo_root):

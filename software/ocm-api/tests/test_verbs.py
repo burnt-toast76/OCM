@@ -70,7 +70,7 @@ def test_describe_cell(api: OcmApi):
     e = api.describe_cell("bracket-asm-01")
     assert e.ok
     names = {row["instance"] for row in e.data["instances"]}
-    assert names == {"robot1", "sd1", "feed1", "nest1", "cam1"}
+    assert names == {"robot1", "sd1", "feed1", "nest1", "cam1", "disp1"}
 
 
 def test_list_frames(api: OcmApi):
@@ -205,7 +205,7 @@ def test_build_scene(api: OcmApi):
     assert e.ok
     assert e.data["n_links"] > 0
     assert e.data["n_joints"] > 0
-    assert set(e.data["instances"]) == {"robot1", "sd1", "feed1", "nest1", "cam1"}
+    assert set(e.data["instances"]) == {"robot1", "sd1", "feed1", "nest1", "cam1", "disp1"}
 
 
 def test_check_collision(api: OcmApi):

@@ -19,7 +19,7 @@ def test_real_bracket_cell_resolves_end_to_end(repo_root: Path):
     resolved = resolve_cell(cell, repo_root / "modules")
 
     assert resolved.base.id == "com.accelsolutions.base.frame1200"
-    assert set(resolved.instances) == {"robot1", "sd1", "feed1", "nest1", "cam1"}
+    assert set(resolved.instances) == {"robot1", "sd1", "feed1", "nest1", "cam1", "disp1"}
 
 
 def test_real_bracket_cell_sd1_is_mounted_on_robot1_flange(repo_root: Path):

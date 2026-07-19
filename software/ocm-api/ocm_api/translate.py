@@ -114,6 +114,26 @@ _RE_PARAM_NOT_ENUM = re.compile(
     r"^(?P<loc>[\w.\[\]]+): op '(?P<op>[^']+)' param '(?P<param>[^']+)' = (?P<val>.+) is not one of (?P<known>\[.*\])$"
 )
 
+# ADR-0014: a module's own components: list / signal source: provenance,
+# checked by ocm_resolve.resolve_cell the same way it checks module refs
+# and mount chains -- see resolve.py's own _check_module_components.
+_RE_DUPLICATE_REFDES = re.compile(r"^module (?P<loc>\S+) \((?P<module_id>\S+)\): duplicate component refdes '(?P<refdes>[^']+)'$")
+_RE_NO_COMPONENTS_SEARCH_PATH = re.compile(
+    r"^module (?P<loc>\S+) \((?P<module_id>\S+)\): declares component (?P<refdes>\S+) \((?P<ref>\S+)\) but no components search path was given$"
+)
+_RE_COMPONENT_REF_PROBLEM = re.compile(r"^module (?P<loc>\S+) \((?P<module_id>\S+)\): component (?P<refdes>\S+): (?P<detail>.*)$", re.S)
+_RE_MALFORMED_SOURCE = re.compile(
+    r"^module (?P<loc>\S+) \((?P<module_id>\S+)\): signal '(?P<signal>[^']+)' has a malformed source '(?P<source>[^']*)' \(expected 'REFDES\.signal_name'\)$"
+)
+_RE_UNKNOWN_REFDES_SOURCE = re.compile(
+    r"^module (?P<loc>\S+) \((?P<module_id>\S+)\): signal '(?P<signal>[^']+)' source='(?P<source>[^']+)' "
+    r"references unknown refdes '(?P<refdes>[^']+)' \(declared components: (?P<known>\[.*\])\)$"
+)
+_RE_UNKNOWN_SIGNAL_SOURCE = re.compile(
+    r"^module (?P<loc>\S+) \((?P<module_id>\S+)\): signal '(?P<signal>[^']+)' source='(?P<source>[^']+)' "
+    r"references unknown signal '(?P<devsig>[^']+)' on component (?P<component_id>\S+) \(known signals: (?P<known>\[.*\])\)$"
+)
+
 
 def _parse_pylist(text: str) -> list[str]:
     # `known ops: ['a', 'b']`-style Python repr of a list of strings --
@@ -178,6 +198,53 @@ def resolve_error_to_refusal(error: str) -> Refusal:
         return Refusal(code=Codes.SCHEMA_INVALID, path="module", message=error)
     if m := _RE_NOT_FOUND.match(error):
         return Refusal(code=Codes.UNKNOWN_MODULE, path="module", message=error, hint="Check the id@revision, or publish_module it first.")
+
+    # ADR-0014: components: list / signal source: provenance.
+    if m := _RE_DUPLICATE_REFDES.match(error):
+        return Refusal(
+            code=Codes.DUPLICATE_REFDES,
+            path=f"modules['{m['loc']}'].components",
+            message=error,
+            hint=f"Each entry in {m['module_id']}'s components: list needs its own refdes -- rename one of the two {m['refdes']!r}s.",
+        )
+    if m := _RE_NO_COMPONENTS_SEARCH_PATH.match(error):
+        return Refusal(
+            code=Codes.UNKNOWN_COMPONENT,
+            path=f"modules['{m['loc']}'].components['{m['refdes']}']",
+            message=error,
+            hint="This workspace has no components/ directory to resolve component refs against.",
+        )
+    if m := _RE_COMPONENT_REF_PROBLEM.match(error):
+        return Refusal(
+            code=Codes.UNKNOWN_COMPONENT,
+            path=f"modules['{m['loc']}'].components['{m['refdes']}']",
+            message=error,
+            hint=f"Check the component id@revision, or publish_component({m['refdes']!r}'s id, <semver>) first.",
+        )
+    if m := _RE_MALFORMED_SOURCE.match(error):
+        return Refusal(
+            code=Codes.INVALID_SOURCE,
+            path=f"modules['{m['loc']}'].comms.signals['{m['signal']}'].source",
+            message=error,
+            hint="source must be 'REFDES.signal_name', e.g. 'VG1.vacuum_switch'.",
+        )
+    if m := _RE_UNKNOWN_REFDES_SOURCE.match(error):
+        return Refusal(
+            code=Codes.INVALID_SOURCE,
+            path=f"modules['{m['loc']}'].comms.signals['{m['signal']}'].source",
+            message=error,
+            allowed={"refdes": _parse_pylist(m["known"])},
+            hint=f"Use one of {m['module_id']}'s declared component refdes.",
+        )
+    if m := _RE_UNKNOWN_SIGNAL_SOURCE.match(error):
+        return Refusal(
+            code=Codes.INVALID_SOURCE,
+            path=f"modules['{m['loc']}'].comms.signals['{m['signal']}'].source",
+            message=error,
+            allowed={"values": _parse_pylist(m["known"])},
+            hint=f"Use one of {m['component_id']}'s own declared comms.signals names.",
+        )
+
     return Refusal(code=Codes.CELL_INVALID, path="$", message=error)
 
 

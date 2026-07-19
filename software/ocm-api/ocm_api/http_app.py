@@ -88,6 +88,36 @@ def build_app(repo_root: str) -> FastAPI:
     def publish_module(id: str = Body(...), revision: str = Body(...)) -> dict[str, Any]:
         return envelope_response(api.publish_module(id, revision))
 
+    # -- Component authoring (ADR-0014) ---------------------------------------------------
+
+    @app.post("/create_component_draft")
+    def create_component_draft(id: str = Body(...), kind: str = Body(...)) -> dict[str, Any]:
+        return envelope_response(api.create_component_draft(id, kind))
+
+    @app.post("/update_component")
+    def update_component(
+        id: str = Body(...),
+        manifest: dict[str, Any] | None = Body(default=None),
+        patch: list[dict[str, Any]] | None = Body(default=None),
+    ) -> dict[str, Any]:
+        return envelope_response(api.update_component(id, manifest=manifest, patch=patch))
+
+    @app.post("/validate_component")
+    def validate_component(id: str = Body(..., embed=True)) -> dict[str, Any]:
+        return envelope_response(api.validate_component(id))
+
+    @app.post("/publish_component")
+    def publish_component(id: str = Body(...), revision: str = Body(...)) -> dict[str, Any]:
+        return envelope_response(api.publish_component(id, revision))
+
+    @app.get("/list_components")
+    def list_components() -> dict[str, Any]:
+        return envelope_response(api.list_components())
+
+    @app.get("/describe_component")
+    def describe_component(id: str = Query(...)) -> dict[str, Any]:
+        return envelope_response(api.describe_component(id))
+
     # -- Cell composition ---------------------------------------------------
 
     @app.post("/create_cell")

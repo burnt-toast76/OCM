@@ -20,7 +20,7 @@ from ocm_core import Capability, Cell, Module, ModuleInstance, Parameter
 
 from .errors import CellResolutionError
 from .plan_walk import iter_op_steps
-from .search import SearchPath, find_module
+from .search import SearchPath, find_component, find_module
 
 
 @dataclass(frozen=True)
@@ -180,18 +180,91 @@ def _resolve_mounts(
     return resolved
 
 
-def resolve_cell(cell: Cell, search_path: SearchPath) -> ResolvedCell:
+def _check_module_components(
+    location: str,
+    module: Module,
+    components_search_path: SearchPath | None,
+    errors: list[str],
+) -> None:
+    """ADR-0014: a module's own `components:` list, and its signals'
+    `source` provenance into that list, are cross-file references exactly
+    like a cell's module refs and mount chain -- checked here, once, the
+    same way. Unknown component ids/revisions, duplicate refdes, and a
+    `source` naming a signal the referenced component doesn't declare are
+    all refused; a module with no `components:` list is untouched (ADR-0014:
+    "a module with no components list stays valid").
+    """
+    if not module.components:
+        return
+
+    resolved_by_refdes: dict[str, Component] = {}
+    seen_refdes: set[str] = set()
+    for mc in module.components:
+        if mc.refdes in seen_refdes:
+            errors.append(f"module {location} ({module.id}): duplicate component refdes {mc.refdes!r}")
+            continue
+        seen_refdes.add(mc.refdes)
+
+        if components_search_path is None:
+            errors.append(
+                f"module {location} ({module.id}): declares component {mc.refdes} ({mc.ref}) "
+                "but no components search path was given"
+            )
+            continue
+
+        component, component_errors = find_component(mc.ref, components_search_path)
+        if component_errors:
+            errors.extend(f"module {location} ({module.id}): component {mc.refdes}: {e}" for e in component_errors)
+        if component is not None:
+            resolved_by_refdes[mc.refdes] = component
+
+    if module.comms is None:
+        return
+
+    for signal in module.comms.signals:
+        if signal.source is None:
+            continue
+        refdes, sep, device_signal_name = signal.source.partition(".")
+        if not sep or not refdes or not device_signal_name:
+            errors.append(
+                f"module {location} ({module.id}): signal {signal.name!r} has a malformed source "
+                f"{signal.source!r} (expected 'REFDES.signal_name')"
+            )
+            continue
+        if refdes not in seen_refdes:
+            errors.append(
+                f"module {location} ({module.id}): signal {signal.name!r} source={signal.source!r} "
+                f"references unknown refdes {refdes!r} (declared components: {sorted(seen_refdes)})"
+            )
+            continue
+        component = resolved_by_refdes.get(refdes)
+        if component is None:
+            continue  # the component itself already failed to resolve above -- don't pile on
+        if component.comms is None or component.comms.signal(device_signal_name) is None:
+            known = sorted(s.name for s in component.comms.signals) if component.comms else []
+            errors.append(
+                f"module {location} ({module.id}): signal {signal.name!r} source={signal.source!r} "
+                f"references unknown signal {device_signal_name!r} on component {component.id} "
+                f"(known signals: {known})"
+            )
+
+
+def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: SearchPath | None = None) -> ResolvedCell:
     """Load every module a cell references, and cross-check its plan and
     mount chain against those manifests.
 
     Raises CellResolutionError (carrying every violation found) if any
     referenced module can't be found, any plan step names an unknown op or
-    an out-of-bounds/undeclared param, or any mount.on chain is dangling.
+    an out-of-bounds/undeclared param, any mount.on chain is dangling, or
+    (ADR-0014) any module's own `components:` list/signal `source`
+    provenance doesn't check out against `components_search_path`.
     """
     errors: list[str] = []
 
     base_module, base_errors = find_module(cell.base.module, search_path)
     errors.extend(base_errors)
+    if base_module is not None:
+        _check_module_components("base", base_module, components_search_path, errors)
 
     loaded: dict[str, ResolvedModuleInstance] = {}
     for mi in cell.modules:
@@ -199,6 +272,7 @@ def resolve_cell(cell: Cell, search_path: SearchPath) -> ResolvedCell:
         errors.extend(mod_errors)
         if module is not None:
             loaded[mi.instance] = ResolvedModuleInstance(instance=mi, module=module)
+            _check_module_components(mi.instance, module, components_search_path, errors)
 
     resolved = _resolve_mounts(loaded, errors)
 

@@ -18,6 +18,11 @@ def schema_path(repo_root: Path) -> Path:
 
 
 @pytest.fixture
+def component_schema_path(repo_root: Path) -> Path:
+    return repo_root / "spec" / "schema" / "ocm-component-1.0.schema.json"
+
+
+@pytest.fixture
 def sd50_path(repo_root: Path) -> Path:
     return repo_root / "modules" / "com.accelsolutions.screwdriver.sd50" / "module.yaml"
 

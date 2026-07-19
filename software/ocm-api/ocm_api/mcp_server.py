@@ -5,10 +5,18 @@ just calls the matching `OcmApi` method and returns `envelope.to_dict()`
 -- no reshaping, so this transport's JSON payload is exactly the library
 call's own envelope (see tests/test_envelope_consistency.py).
 
-Module authoring flows through these tools exclusively:
-create_module_draft -> update_module -> generate_geometry_stub -> validate_module -> publish_module.
-Creating module files directly with file-editing tools bypasses validation and produces
-broken modules (phantom geometry paths, unpublished revisions).
+The authoring workflow (ADR-0014) is two layers, in order:
+  datasheet -> COMPONENT (transcription: create_component_draft -> update_component ->
+    validate_component -> publish_component) -> a MODULE, designed by a human or an agent
+    with human approval, references published components (create_module_draft -> update_module
+    -> generate_geometry_stub -> validate_module -> publish_module).
+A datasheet describes a purchasable PART -- transcribe it as a component, zero assumption:
+a value appears only if the source states it, everything else is omitted, and the resulting
+validation refusals ARE the completion list a human works through. A datasheet is NEVER
+enough to author a MODULE directly: a module asks design questions (TCP placement,
+capabilities, PackML, safety) a datasheet doesn't answer. Creating module or component files
+directly with file-editing tools bypasses validation and produces broken definitions (phantom
+geometry paths, unpublished revisions, fabricated design values).
 
 Each tool's description embeds the envelope contract (spec/09 design
 principle #1) and one worked example -- "the agent should succeed
@@ -49,9 +57,12 @@ def build_server(repo_root: str) -> FastMCP:
     mcp = FastMCP(
         name="ocm-api",
         instructions=(
-            "OCM's authoring/composition/planning surface (spec/09-ocm-api.md). "
-            "Start with describe_schema and get_example before authoring a "
-            "module from a datasheet -- never guess field names. " + _ENVELOPE_CONTRACT
+            "OCM's authoring/composition/planning surface (spec/09-ocm-api.md, ADR-0014). "
+            "Workflow: datasheet -> component (create_component_draft/update_component, "
+            "transcription only, zero assumption) -> module (create_module_draft/update_module, "
+            "design -- references published components via a components: list, human-approved). "
+            "NEVER author a module directly from a datasheet; NEVER guess field names -- start "
+            "with describe_schema and get_example. " + _ENVELOPE_CONTRACT
         ),
     )
 
@@ -84,9 +95,16 @@ def build_server(repo_root: str) -> FastMCP:
         return api.list_modules().to_dict()
 
     @mcp.tool(description=_doc(
-        "The full parsed manifest for one module id, including capability signatures.",
-        '  call: describe_module(id="com.accelsolutions.screwdriver.sd50")\n'
-        '  response: {"ok": true, "data": {"id": "...", "revision": "1.2.0", "draft": false, "manifest": {...}}}',
+        "The full parsed manifest for one module id, including capability signatures. If the "
+        "module has a components: list (ADR-0014), also returns DERIVED aggregates -- the "
+        "purchasable BOM, power budget per rail, air consumption -- summed only from what its "
+        "referenced components actually state; a rail/gas with any contributing component silent "
+        "on the relevant number is omitted from the totals entirely (never a partial sum passed "
+        "off as complete), with a warning naming which component has the gap.",
+        '  call: describe_module(id="com.example.pickhead.pk100")\n'
+        '  response: {"ok": true, "data": {"id": "...", "revision": "1.0.0", "draft": false, "manifest": {...}, '
+        '"aggregates": {"bom": [{"refdes": "VG1", "id": "com.smc.ejector.zk2-agh", "vendor": "SMC", "part_number": "ZK2-AGH"}], '
+        '"power_budget": {"24VDC": {"current_nominal_a": 0.4}}, "air_consumption_nl_min": 12.0}}, "warnings": []}',
     ))
     def describe_module(id: str) -> dict[str, Any]:
         return api.describe_module(id).to_dict()
@@ -121,8 +139,11 @@ def build_server(repo_root: str) -> FastMCP:
 
     @mcp.tool(description=_doc(
         "THE entry point for creating any new module -- NEVER create module directories or "
-        "write module.yaml by hand with file tools; every module starts here. Scaffolds "
-        "modules/<id>/module.yaml (storage location is derived from the id -- never ask "
+        "write module.yaml by hand with file tools; every module starts here. NEVER author a "
+        "module directly from a datasheet -- a datasheet describes a purchasable COMPONENT "
+        "(create_component_draft), and a module ASSEMBLES published components plus design "
+        "judgment (TCP, capabilities, PackML, safety) a datasheet never answers (ADR-0014). "
+        "Scaffolds modules/<id>/module.yaml (storage location is derived from the id -- never ask "
         "where to put it) with a minimal, already schema-valid manifest for `kind`, "
         "filled with honest TODO placeholders. revision is always 0.1.0 (a draft) -- excluded from cell "
         "resolution until publish_module. ADR-0011: agents never hand-write URDF; use generate_geometry_stub next.",
@@ -172,6 +193,75 @@ def build_server(repo_root: str) -> FastMCP:
     def publish_module(id: str, revision: str) -> dict[str, Any]:
         return api.publish_module(id, revision).to_dict()
 
+    # -- Component authoring (ADR-0014) ---------------------------------------------------
+
+    @mcp.tool(description=_doc(
+        "A datasheet becomes a COMPONENT -- THE entry point for transcribing any datasheet, "
+        "manual, or catalog page. NEVER author a module from a datasheet. Scaffolds "
+        "components/<id>/component.yaml with ONLY ocm_version/id/revision/kind -- unlike "
+        "create_module_draft, no TODO placeholders for vendor/source: those are facts you either "
+        "have from the document in front of you or don't, and inventing one would be exactly the "
+        "fabrication ADR-0014 exists to stop. revision is always 0.1.0 (a draft) -- excluded from "
+        "module components: references until publish_component.",
+        '  call: create_component_draft(id="com.smc.ejector.zk2-agh", kind="vacuum_ejector")\n'
+        '  response: {"ok": true, "data": {"id": "com.smc.ejector.zk2-agh", "revision": "0.1.0", "draft": true}}',
+    ))
+    def create_component_draft(id: str, kind: str) -> dict[str, Any]:
+        return api.create_component_draft(id, kind).to_dict()
+
+    @mcp.tool(description=_doc(
+        "Write a component definition -- a full replacement document (`manifest`) or an RFC-6902 "
+        "patch (`patch`), exactly one of the two. ALWAYS WRITES, even if invalid (ok=false then, "
+        "with every schema violation as a refusal) -- validation gates publish_component, not this "
+        "call. ZERO ASSUMPTION (ADR-0014): a value goes in only if the source document states it -- "
+        "restate/convert units freely ('~4 min' -> 240 s), but a stated RANGE stays a range "
+        "(pressure_bar_min/max), never narrowed to one number, and anything the datasheet doesn't "
+        "answer is OMITTED, never estimated, never copied from another component. Leave the draft "
+        "incomplete and report the refusals as the human's completion list -- do not guess to make "
+        "validation pass.",
+        '  call: update_component(id="com.smc.ejector.zk2-agh", manifest={"ocm_version": "1.1", "vendor": "SMC", "source": {"kind": "datasheet", "ref": "ZK2-AGH catalog page, 2024 ed."}, ...})\n'
+        '  response: {"ok": false, "data": null, "refusals": [{"code": "SCHEMA_INVALID", "path": "source", "message": "\'ref\' is a required property", "hint": "..."}]}',
+    ))
+    def update_component(id: str, manifest: dict[str, Any] | None = None, patch: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        return api.update_component(id, manifest=manifest, patch=patch).to_dict()
+
+    @mcp.tool(description=_doc(
+        "Full validation: schema PLUS the one cross-file check schema validation alone can't do "
+        "(does geometry.mesh exist on disk, if declared). A schema-required field left out by an "
+        "honest transcription (vendor, source) shows up here as a refusal -- that refusal list IS "
+        "the handoff to a human, not a bug to work around.",
+        '  call: validate_component(id="com.smc.ejector.zk2-agh")\n'
+        '  response: {"ok": true, "data": {"id": "com.smc.ejector.zk2-agh", "valid": true}}',
+    ))
+    def validate_component(id: str) -> dict[str, Any]:
+        return api.validate_component(id).to_dict()
+
+    @mcp.tool(description=_doc(
+        "Validate, then set revision (must be >= 1.0.0 -- a real SemVer, not another 0.x draft) -- "
+        "the component becomes referenceable from a module's components: list only after this "
+        "succeeds.",
+        '  call: publish_component(id="com.smc.ejector.zk2-agh", revision="1.0.0")\n'
+        '  response: {"ok": true, "data": {"id": "com.smc.ejector.zk2-agh", "revision": "1.0.0", "published": true}}',
+    ))
+    def publish_component(id: str, revision: str) -> dict[str, Any]:
+        return api.publish_component(id, revision).to_dict()
+
+    @mcp.tool(description=_doc(
+        "Every component in the registry: id, revision, kind, vendor, and whether it's still a draft (revision 0.x).",
+        "  call: list_components()\n"
+        '  response: {"ok": true, "data": [{"id": "com.smc.ejector.zk2-agh", "revision": "1.0.0", "kind": "vacuum_ejector", "vendor": "SMC", "draft": false}, ...]}',
+    ))
+    def list_components() -> dict[str, Any]:
+        return api.list_components().to_dict()
+
+    @mcp.tool(description=_doc(
+        "The full parsed component definition for one id.",
+        '  call: describe_component(id="com.smc.ejector.zk2-agh")\n'
+        '  response: {"ok": true, "data": {"id": "...", "revision": "1.0.0", "draft": false, "component": {...}}}',
+    ))
+    def describe_component(id: str) -> dict[str, Any]:
+        return api.describe_component(id).to_dict()
+
     # -- Cell composition ---------------------------------------------------
 
     @mcp.tool(description=_doc(
@@ -185,8 +275,10 @@ def build_server(repo_root: str) -> FastMCP:
     @mcp.tool(description=_doc(
         "Add a module instance to a cell (mount is {\"pose\": {\"xyz_mm\":[...], \"rpy_deg\":[...]}} or "
         "{\"on\": \"other_instance.attachment_link\"}). ALWAYS writes, then re-resolves and rebuilds the "
-        "scene -- live refusals: unknown module, revision mismatch, dangling mount.on, or workspace "
-        "overhang (with the exact mm + direction, e.g. \"+X by 2.2 mm\").",
+        "scene -- live refusals: unknown module, revision mismatch, dangling mount.on, workspace "
+        "overhang (with the exact mm + direction, e.g. \"+X by 2.2 mm\"), or TOOL_SLOT_OCCUPIED if "
+        "mount.on names an attachment another instance already occupies -- this NEVER evicts or swaps "
+        "the incumbent; remove_instance it first if that's what you mean.",
         '  call: place_instance(cell="bracket-asm-01", instance="pk1", module="com.example.pickhead.pk100@1.0.0", mount={"pose": {"xyz_mm": [2000, 300, 0], "rpy_deg": [0,0,0]}})\n'
         '  response: {"ok": false, "refusals": [{"code": "WORKSPACE_OVERHANG", "path": "modules.pk1.mount", "message": "...+X by 800.0 mm", "hint": "Move pk1 inside the base footprint (...)."}]}',
     ))
@@ -194,7 +286,8 @@ def build_server(repo_root: str) -> FastMCP:
         return api.place_instance(cell, instance, module, mount).to_dict()
 
     @mcp.tool(description=_doc(
-        "Reposition an already-placed instance's mount. Same live-refusal behavior as place_instance.",
+        "Reposition an already-placed instance's mount. Same live-refusal behavior as place_instance, "
+        "including TOOL_SLOT_OCCUPIED if the new mount.on is already taken by a DIFFERENT instance.",
         '  call: move_instance(cell="bracket-asm-01", instance="pk1", mount={"pose": {"xyz_mm": [600, 300, 0], "rpy_deg": [0,0,0]}})\n'
         '  response: {"ok": true, "data": {"cell_id": "bracket-asm-01", "instances": ["cam1","feed1","nest1","pk1","robot1","sd1"]}}',
     ))
@@ -202,9 +295,13 @@ def build_server(repo_root: str) -> FastMCP:
         return api.move_instance(cell, instance, mount).to_dict()
 
     @mcp.tool(description=_doc(
-        "Remove a placed instance from a cell.",
+        "Remove a placed instance from a cell. If any plan step still names it, or another instance's "
+        "`tool:` field still points at it, the removal still goes through (ok may be true or false, "
+        "depending on whether the plan reference alone is now enough to break resolution) but "
+        "`warnings[]` names the impact on THIS SAME call -- e.g. \"removing sd1 orphans 3 plan steps "
+        "(drive_screw ×3); the plan will no longer resolve.\"",
         '  call: remove_instance(cell="bracket-asm-01", instance="pk1")\n'
-        '  response: {"ok": true, "data": {"cell_id": "bracket-asm-01", "instances": ["cam1","feed1","nest1","robot1","sd1"]}}',
+        '  response: {"ok": true, "data": {"cell_id": "bracket-asm-01", "instances": ["cam1","feed1","nest1","robot1","sd1"]}, "warnings": []}',
     ))
     def remove_instance(cell: str, instance: str) -> dict[str, Any]:
         return api.remove_instance(cell, instance).to_dict()
