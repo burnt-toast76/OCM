@@ -14,11 +14,21 @@
 // confirmed pose) and shows the red ghost + toast instead.
 //
 // OrbitControls listens on the canvas element directly, outside R3F's own
-// synthetic event system -- e.stopPropagation() here does NOT stop it from
-// also orbiting the camera during what's meant to be an instance drag.
-// onDragActiveChange explicitly disables it for the duration.
+// synthetic event system -- e.stopPropagation() here does NOT reach it at
+// all, so it happily orbits/pans at the same time as a drag unless
+// something disables it explicitly. Two layers do that: SceneCanvas
+// drives OrbitControls' `enabled` prop off the store's `dragging` flag
+// (reactive, but waits on a React render), and -- because that's not
+// synchronous enough to beat the very first native pointermove of a fast
+// drag -- handlePointerDown here ALSO reaches into the live controls
+// instance (via useThree's `controls`, populated by OrbitControls'
+// `makeDefault`) and flips `.enabled` directly, before React re-renders
+// at all. Every exit from a drag (pointer-up, pointer-cancel, or losing
+// pointer capture -- e.g. an OS-level gesture reasserting it elsewhere --
+// must re-enable both, or orbit stays dead for the rest of the session.
 
 import { useCallback, useRef, useState } from "react";
+import { useThree } from "@react-three/fiber";
 import type { ThreeEvent } from "@react-three/fiber";
 import type { RawCellModule, ScenePrimitive } from "../api/types";
 import type { Highlight } from "./PrimitiveMesh";
@@ -34,8 +44,6 @@ export interface DraggableInstanceProps {
   highlight: Highlight;
   mountEntry: RawCellModule | undefined;
   onSelect: (instance: string) => void;
-  /** Disables/re-enables OrbitControls for the duration of a real drag. */
-  onDragActiveChange: (active: boolean) => void;
   /** Set true for the moment right after a real drag release, so the
    * browser's trailing "click" (fired at whatever mesh is now under the
    * cursor -- possibly a DIFFERENT instance the dragged one uncovered,
@@ -46,18 +54,10 @@ export interface DraggableInstanceProps {
 
 const DRAG_THRESHOLD_M = 0.01; // 10mm of pointer movement before a press counts as a drag, not a click
 
-export function DraggableInstance({
-  instance,
-  primitives,
-  color,
-  highlight,
-  mountEntry,
-  onSelect,
-  onDragActiveChange,
-  suppressNextClickRef,
-}: DraggableInstanceProps) {
+export function DraggableInstance({ instance, primitives, color, highlight, mountEntry, onSelect, suppressNextClickRef }: DraggableInstanceProps) {
   const moveExistingInstance = useComposerStore((s) => s.moveExistingInstance);
   const clearGhost = useComposerStore((s) => s.clearGhost);
+  const controls = useThree((s) => s.controls) as { enabled: boolean } | null;
   const [offsetM, setOffsetM] = useState<[number, number]>([0, 0]);
   const dragRef = useRef<DragStart | null>(null);
   const draggedRef = useRef(false);
@@ -68,22 +68,30 @@ export function DraggableInstance({
   const endDrag = useCallback(() => {
     dragRef.current = null;
     draggedRef.current = false;
-    onDragActiveChange(false);
-  }, [onDragActiveChange]);
+    if (controls) controls.enabled = true;
+    useComposerStore.getState().setDragging(false);
+  }, [controls]);
 
   const handlePointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       draggedRef.current = false;
       if (!draggable || !pose) return;
       e.stopPropagation();
+      // Synchronous, before React re-renders -- see the module docstring.
+      if (controls) controls.enabled = false;
+      useComposerStore.getState().setDragging(true);
       (e.target as Element).setPointerCapture?.(e.pointerId);
       const point = intersectGroundPlane(e.ray, pose.xyz_mm[2]);
-      if (!point) return; // camera angle grazes the horizon right at this pixel -- bail, no drag starts
+      if (!point) {
+        // Camera angle grazes the horizon right at this pixel -- bail, no
+        // drag starts. Undo the disable immediately; nothing else will.
+        endDrag();
+        return;
+      }
       dragRef.current = { worldX: point.x, worldY: point.y, xMm: pose.xyz_mm[0], yMm: pose.xyz_mm[1], zMm: pose.xyz_mm[2] };
-      onDragActiveChange(true);
       clearGhost(); // a fresh drag attempt supersedes any stale refusal ghost from a previous one
     },
-    [draggable, pose, onDragActiveChange, clearGhost],
+    [draggable, pose, controls, clearGhost, endDrag],
   );
 
   const handlePointerMove = useCallback(
@@ -123,10 +131,8 @@ export function DraggableInstance({
       } else {
         onSelect(instance);
       }
-      onDragActiveChange(false);
       const resolved = resolveDragXY(e.ray, drag, !e.shiftKey);
-      dragRef.current = null;
-      draggedRef.current = false;
+      endDrag();
       if (!resolved || !wasRealDrag) {
         // No real drag, or the release event itself missed the plane --
         // nothing to commit either way.
@@ -144,13 +150,17 @@ export function DraggableInstance({
         setOffsetM([0, 0]);
       });
     },
-    [instance, pose, moveExistingInstance, onSelect, onDragActiveChange, suppressNextClickRef],
+    [instance, pose, moveExistingInstance, onSelect, endDrag, suppressNextClickRef],
   );
 
-  const handlePointerCancel = useCallback(() => {
+  // Both required: onPointerCancel covers an OS-level gesture cancel;
+  // onLostPointerCapture covers capture being reassigned/released out
+  // from under the drag by other means (e.g. another element stealing
+  // it). Either one, left unhandled, leaves controls.enabled=false (and
+  // the store's dragging=true) stuck forever -- orbit dead for the rest
+  // of the session.
+  const handleInterruptedDrag = useCallback(() => {
     if (!dragRef.current) return;
-    // Pointer capture was lost mid-drag (e.g. an OS-level gesture cancel).
-    // Abort without committing -- no move_instance call, just revert.
     endDrag();
     setOffsetM([0, 0]);
   }, [endDrag]);
@@ -172,7 +182,8 @@ export function DraggableInstance({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerCancel}
+      onPointerCancel={handleInterruptedDrag}
+      onLostPointerCapture={handleInterruptedDrag}
     >
       {primitives.map((p, i) => (
         // A link may carry several collision primitives (e.g. frame1200's

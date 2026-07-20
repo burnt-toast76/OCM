@@ -50,6 +50,11 @@ interface ComposerState {
   pendingConfirm: PendingConfirm | null;
   loading: boolean;
   error: string | null;
+  /** True for the duration of an instance drag. Drives OrbitControls'
+   * `enabled` prop declaratively (SceneCanvas) -- belt-and-suspenders
+   * alongside DraggableInstance's own synchronous `controls.enabled =
+   * false` at pointer-down, which doesn't wait on a React re-render. */
+  dragging: boolean;
 
   loadCell: (cellId: string) => Promise<void>;
   refreshScene: () => Promise<void>;
@@ -64,6 +69,7 @@ interface ComposerState {
   dismissToast: (id: string) => void;
   clearGhost: () => void;
   cancelConfirm: () => void;
+  setDragging: (v: boolean) => void;
 }
 
 function pushToastFor(set: (fn: (s: ComposerState) => Partial<ComposerState>) => void, refusals: Refusal[]) {
@@ -101,6 +107,7 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
   pendingConfirm: null,
   loading: false,
   error: null,
+  dragging: false,
 
   loadCell: async (cellId: string) => {
     set(() => ({ loading: true, error: null, cellId, selectedInstance: null, inspector: null, hiddenInstances: new Set(), refusals: [], ghost: null }));
@@ -268,4 +275,5 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
   dismissToast: (id: string) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
   clearGhost: () => set(() => ({ ghost: null, toolSlotIncumbent: null })),
   cancelConfirm: () => set(() => ({ pendingConfirm: null })),
+  setDragging: (v: boolean) => set(() => ({ dragging: v })),
 }));

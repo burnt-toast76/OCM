@@ -56,19 +56,7 @@ export function SceneCanvas() {
   const threeRef = useRef<ThreeHandle | null>(null);
   const suppressNextClickRef = useRef(false);
   const controlsRef = useRef<ComponentRef<typeof OrbitControls>>(null);
-
-  // Instance drags must own the pointer exclusively. drei's OrbitControls
-  // attaches its own native listeners directly on the canvas element,
-  // entirely outside R3F's synthetic event system -- a DraggableInstance's
-  // e.stopPropagation() can't reach it. Toggling `enabled` here is the
-  // only thing that actually stops the camera from orbiting/panning at
-  // the same time as a drag (which is what made drags feel "jumpy": the
-  // ray a drag resolves against is computed from the CURRENT camera each
-  // event, so a camera that's also moving invalidates the drag's own
-  // start reference frame).
-  const setControlsEnabled = useCallback((enabled: boolean) => {
-    if (controlsRef.current) controlsRef.current.enabled = enabled;
-  }, []);
+  const dragging = useComposerStore((s) => s.dragging);
 
   const worldToScreen = useCallback((xM: number, yM: number, zM: number) => {
     const three = threeRef.current;
@@ -98,6 +86,16 @@ export function SceneCanvas() {
       getInstancePoseMm: (instance: string) => {
         const mount = useComposerStore.getState().rawCellModules.find((m) => m.instance === instance)?.mount;
         return mount?.pose ? mount.pose.xyz_mm : null;
+      },
+      // The regression check for "OrbitControls must stay disabled for the
+      // whole drag": if a drag leaks camera input, these angles move even
+      // though nothing asked the camera to. getAzimuthalAngle/
+      // getPolarAngle are three.js's own OrbitControls methods -- read
+      // directly off the live instance, not re-derived.
+      getOrbitAngles: () => {
+        const c = controlsRef.current;
+        if (!c) return null;
+        return { azimuthal: c.getAzimuthalAngle(), polar: c.getPolarAngle() };
       },
     });
   }, [worldToScreen]);
@@ -194,7 +192,6 @@ export function SceneCanvas() {
                   highlight={highlight}
                   mountEntry={mountByInstance.get(instance)}
                   onSelect={(name) => void selectInstance(name)}
-                  onDragActiveChange={(active) => setControlsEnabled(!active)}
                   suppressNextClickRef={suppressNextClickRef}
                 />
               );
@@ -202,7 +199,12 @@ export function SceneCanvas() {
 
         {ghost && <GhostMesh ghost={ghost} />}
 
-        <OrbitControls ref={controlsRef} makeDefault target={[center.x, center.y, center.z]} />
+        {/* enabled={!dragging}: the reactive half of the two-layer disable
+            (see DraggableInstance's docstring) -- waits on a React
+            re-render, so DraggableInstance ALSO flips controls.enabled
+            directly and synchronously at pointer-down. Both must agree
+            on every exit path or orbit gets stuck disabled. */}
+        <OrbitControls ref={controlsRef} makeDefault enabled={!dragging} target={[center.x, center.y, center.z]} />
       </Canvas>
     </div>
   );

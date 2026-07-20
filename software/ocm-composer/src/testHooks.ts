@@ -19,6 +19,11 @@ export interface ComposerTestHooks {
    * on without re-deriving it from screen pixels or hardcoding the
    * fixture's starting pose. */
   getInstancePoseMm(instance: string): [number, number, number] | null;
+  /** The live OrbitControls' own azimuthal/polar angles -- lets a test
+   * assert the camera did NOT move during a drag (the regression check
+   * for controls.enabled leaking during a drag), not just that the
+   * dragged instance landed correctly. */
+  getOrbitAngles(): { azimuthal: number; polar: number } | null;
 }
 
 declare global {

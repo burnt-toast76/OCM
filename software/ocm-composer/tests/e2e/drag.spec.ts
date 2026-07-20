@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Regression test for the drag rewrite: the instance is client-authoritative
-// for the whole drag (no mid-drag move_instance calls) and commits with a
-// single call on drop. Drags feed1 exactly 3 grid cells and asserts the
-// rendered/confirmed position lands exactly on the computed drop target
-// once the single API round-trip settles -- not approximately, not off by
-// a snap increment.
+// Regression test for the drag rewrite. Two things must both hold after a
+// drag: the instance is client-authoritative for the whole drag (no
+// mid-drag move_instance calls) and commits with a single call on drop,
+// landing exactly on the computed drop target -- AND the camera must not
+// have moved at all, which is the actual regression this test exists to
+// catch: OrbitControls listens on the canvas with its own native
+// listeners, entirely outside React/R3F's event system, so a drag that
+// fails to disable it produces a WRONG final position for a subtler
+// reason than off-by-a-grid-cell math -- the camera itself drifted mid-
+// drag, invalidating the drag's own ray-plane reference frame. Asserting
+// only the module's landed position can't distinguish "drag math is
+// correct" from "drag math and a moving camera happened to cancel out";
+// asserting the camera's own angles is what actually pins this down.
 
 import { test, expect } from "@playwright/test";
 
@@ -14,6 +21,7 @@ declare global {
       getInstanceScreenXY(instance: string): { x: number; y: number } | null;
       worldToScreenXY(xMm: number, yMm: number, zMm: number): { x: number; y: number } | null;
       getInstancePoseMm(instance: string): [number, number, number] | null;
+      getOrbitAngles(): { azimuthal: number; polar: number } | null;
     };
   }
 }
@@ -62,6 +70,9 @@ test("dragging an instance 3 grid cells lands exactly on the drop position", asy
   ]);
   const target = { x: start.x + (worldTarget.x - worldStart.x), y: start.y + (worldTarget.y - worldStart.y) };
 
+  const anglesBefore = await page.evaluate(() => window.__ocmComposerTestHooks!.getOrbitAngles()!);
+  expect(anglesBefore).not.toBeNull();
+
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();
   await page.mouse.move(target.x, target.y, { steps: 10 });
@@ -74,4 +85,18 @@ test("dragging an instance 3 grid cells lands exactly on the drop position", asy
     .toEqual(targetMm);
 
   await expect(page.locator(".toast")).toHaveCount(0);
+
+  // THE regression check for the OrbitControls-not-disabled bug: a whole
+  // mouse-down-move-up gesture happened on the canvas, and the camera's
+  // own angles must be unchanged. If OrbitControls leaked input during
+  // the drag, this fails even when the module still happened to land on
+  // the right mm position. toBeCloseTo, not toEqual: getAzimuthalAngle/
+  // getPolarAngle re-derive the angles from the camera's matrix on every
+  // call, which has ~1e-14 floating-point jitter even with zero real
+  // movement -- 6 digits of precision is far tighter than any real orbit
+  // drag (which moves the angle by whole fractions of a radian) while
+  // comfortably absorbing that noise.
+  const anglesAfter = await page.evaluate(() => window.__ocmComposerTestHooks!.getOrbitAngles()!);
+  expect(anglesAfter.azimuthal).toBeCloseTo(anglesBefore.azimuthal, 6);
+  expect(anglesAfter.polar).toBeCloseTo(anglesBefore.polar, 6);
 });
