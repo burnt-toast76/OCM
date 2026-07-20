@@ -14,7 +14,7 @@ def test_loads_bracket_cell(bracket_cell_path):
     assert cell.id == "com.accelsolutions.cell.bracket-asm-01"
     assert cell.base.module.id == "com.accelsolutions.base.frame1200"
     assert cell.base.module.revision == "2.0.0"
-    assert {m.instance for m in cell.modules} == {"robot1", "sd1", "feed1", "nest1", "cam1", "disp1"}
+    assert {m.instance for m in cell.modules} == {"robot1", "sd1", "feed1", "nest1", "cam1"}
 
 
 def test_module_instance_mount_and_address(bracket_cell_path):

@@ -31,6 +31,7 @@ from ocm_generator.scene import (
     build_scene,
     check_collisions,
     render_html,
+    scene_to_payload,
 )
 
 from .envelope import Codes, Envelope, Refusal, single_refusal
@@ -70,6 +71,13 @@ def build_scene_verb(ws: Workspace, cell_id: str) -> Envelope:
         return Envelope.refuse(refusals)
 
     root = ET.fromstring(scene.urdf_xml)
+    # scene_to_payload is the SAME function the debug HTML viewer's own
+    # embedded JSON comes from (ocm_generator.scene.viewer) -- one
+    # primitive per collision box/cylinder/sphere, a color per instance,
+    # attachment/TCP markers. Reused as-is (not re-derived here) so the
+    # composer's 3D view and the standalone --view debug viewer can never
+    # draw two different pictures of the same cell.
+    payload = scene_to_payload(scene, resolved)
     return Envelope.succeed(
         {
             "cell_id": cell_id,
@@ -77,6 +85,9 @@ def build_scene_verb(ws: Workspace, cell_id: str) -> Envelope:
             "n_joints": len(root.findall("joint")),
             "base": scene.base.root_link,
             "instances": sorted(scene.instances),
+            "colors": payload["colors"],
+            "primitives": payload["primitives"],
+            "markers": payload["markers"],
         }
     )
 

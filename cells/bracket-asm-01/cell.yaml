@@ -72,20 +72,6 @@ modules:
   address:
     ip: 192.168.1.20
   calibration: cal/cam1_2026-07-01.yaml
-- instance: disp1
-  module: com.nordson-kline.dispense.dp8@1.0.0
-  mount:
-    pose:
-      xyz_mm:
-      - 980
-      - 500
-      - 0
-      rpy_deg:
-      - 0
-      - 0
-      - 0
-  address:
-    ethercat_position: 7
 - instance: sd1
   module: com.accelsolutions.screwdriver.sd50@1.2.0
   mount:

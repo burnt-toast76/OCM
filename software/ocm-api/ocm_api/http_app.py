@@ -8,16 +8,28 @@ so this transport's JSON body is exactly the library call's own envelope
 (see tests/test_envelope_consistency.py). `ok=false` is still HTTP 200:
 a refusal is a normal response, not a transport-level error (spec/09
 design principle #1).
+
+Also serves software/ocm-composer's production build (a pure client of
+these same verbs -- ADR-0012: "the web composer calls the exact same
+verbs" the MCP server exposes to agents) at `/composer`, if that build
+exists. `npm run build` writes `ocm-composer/dist/`; nothing here builds
+it or fails if it's absent (a fresh checkout with no `npm run build` yet
+still serves the API fine, just not the GUI).
 """
 
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import Body, FastAPI, Query
+from fastapi.staticfiles import StaticFiles
 
 from .api import OcmApi
+
+# software/ocm-api/ocm_api/http_app.py -> software/ocm-composer/dist
+_COMPOSER_DIST = Path(__file__).resolve().parents[2] / "ocm-composer" / "dist"
 
 
 def build_app(repo_root: str) -> FastAPI:
@@ -172,6 +184,11 @@ def build_app(repo_root: str) -> FastAPI:
         return envelope_response(
             api.emit(cell, urscript=urscript, animation=animation, view=view, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
         )
+
+    # -- Composer static build ---------------------------------------------------
+
+    if _COMPOSER_DIST.is_dir():
+        app.mount("/composer", StaticFiles(directory=_COMPOSER_DIST, html=True), name="composer")
 
     return app
 

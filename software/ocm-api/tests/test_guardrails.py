@@ -38,6 +38,7 @@ def test_place_instance_onto_occupied_mount_is_refused(api: OcmApi):
     assert e.refusals[0].code == Codes.TOOL_SLOT_OCCUPIED
     assert "'sd1'" in e.refusals[0].hint  # names the incumbent
     assert "robot1.flange" in e.refusals[0].message
+    assert e.refusals[0].allowed == {"incumbent": "sd1", "mount_on": "robot1.flange"}
 
 
 def test_place_instance_onto_occupied_mount_does_not_evict_the_incumbent(api: OcmApi, workspace_root: Path):

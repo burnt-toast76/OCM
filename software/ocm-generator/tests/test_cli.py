@@ -85,7 +85,7 @@ def test_scene_succeeds_on_the_real_bracket_cell(capsys, repo_root: Path, tmp_pa
 
     assert exit_code == 0
     out = capsys.readouterr().out
-    assert "19 links, 18 joints" in out
+    assert "18 links, 17 joints" in out
     assert "sd1: sd1__origin -> parent robot1__flange" in out
     assert urdf_path.is_file()
     assert "<robot" in urdf_path.read_text(encoding="utf-8")

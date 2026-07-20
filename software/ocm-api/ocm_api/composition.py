@@ -83,6 +83,10 @@ def _tool_slot_refusal(instance: str, mount_on: str, incumbent: str) -> Refusal:
         code=Codes.TOOL_SLOT_OCCUPIED,
         path=f"modules['{instance}'].mount.on",
         message=f"{mount_on} is already occupied by {incumbent!r} -- cannot also place {instance!r} there",
+        # Structured, not just named in the message -- a client (the
+        # composer's own TOOL_SLOT_OCCUPIED highlight, e.g.) shouldn't
+        # have to parse prose to find out who the incumbent is.
+        allowed={"incumbent": incumbent, "mount_on": mount_on},
         hint=f"remove_instance({incumbent!r}) first if you mean to swap tools -- place_instance never evicts or swaps automatically.",
     )
 

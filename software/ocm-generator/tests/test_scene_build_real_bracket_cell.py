@@ -37,7 +37,7 @@ def test_real_bracket_cell_scene_builds_end_to_end(repo_root: Path):
     scene = build_scene(resolved, repo_root / "modules")
 
     assert isinstance(scene, Scene)
-    assert set(scene.instances) == {"robot1", "sd1", "feed1", "nest1", "cam1", "disp1"}
+    assert set(scene.instances) == {"robot1", "sd1", "feed1", "nest1", "cam1"}
 
 
 def test_real_bracket_cell_sd1_is_kinematically_parented_to_the_real_ur5e_flange(repo_root: Path):
