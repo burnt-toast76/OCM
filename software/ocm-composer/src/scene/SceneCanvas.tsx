@@ -8,6 +8,7 @@
 // server's decision, not this component's.
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { ComponentRef } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -16,10 +17,10 @@ import type { ScenePrimitive } from "../api/types";
 import { DraggableInstance } from "./DraggableInstance";
 import { GhostMesh } from "./GhostMesh";
 import { GRID_MM, snapToGrid } from "./snap";
+import { intersectGroundPlane } from "./dragMath";
 import { suggestInstanceName } from "./instanceName";
 import { registerTestHooks } from "../testHooks";
 
-const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 const BACKGROUND = "#f2f2f2";
 
 interface ThreeHandle {
@@ -54,31 +55,52 @@ export function SceneCanvas() {
 
   const threeRef = useRef<ThreeHandle | null>(null);
   const suppressNextClickRef = useRef(false);
+  const controlsRef = useRef<ComponentRef<typeof OrbitControls>>(null);
+
+  // Instance drags must own the pointer exclusively. drei's OrbitControls
+  // attaches its own native listeners directly on the canvas element,
+  // entirely outside R3F's synthetic event system -- a DraggableInstance's
+  // e.stopPropagation() can't reach it. Toggling `enabled` here is the
+  // only thing that actually stops the camera from orbiting/panning at
+  // the same time as a drag (which is what made drags feel "jumpy": the
+  // ray a drag resolves against is computed from the CURRENT camera each
+  // event, so a camera that's also moving invalidates the drag's own
+  // start reference frame).
+  const setControlsEnabled = useCallback((enabled: boolean) => {
+    if (controlsRef.current) controlsRef.current.enabled = enabled;
+  }, []);
+
+  const worldToScreen = useCallback((xM: number, yM: number, zM: number) => {
+    const three = threeRef.current;
+    if (!three) return null;
+    const ndc = new THREE.Vector3(xM, yM, zM).project(three.camera);
+    const rect = three.gl.domElement.getBoundingClientRect();
+    return { x: rect.left + ((ndc.x + 1) / 2) * rect.width, y: rect.top + ((1 - ndc.y) / 2) * rect.height };
+  }, []);
 
   // e2e-test-only: WebGL canvas content has no per-object DOM elements a
   // Playwright locator can click, so tests need a way to ask "where on
-  // screen is instance X right now" to drive a pointer drag at the right
-  // pixel. This reads the CURRENT camera + CURRENT store state on every
-  // call (not a stale snapshot), so it stays correct as the camera orbits
-  // or an instance moves. A no-op in any context nothing calls it from.
+  // screen is instance X right now" (or an arbitrary mm point) to drive a
+  // pointer drag at the right pixel, and "what mm pose did instance X end
+  // up at" to assert the result. These read the CURRENT camera + CURRENT
+  // store state on every call (not a stale snapshot), so they stay
+  // correct as the camera orbits or an instance moves. A no-op in any
+  // context nothing calls it from.
   useEffect(() => {
     return registerTestHooks({
       getInstanceScreenXY: (instance: string) => {
-        const three = threeRef.current;
         const currentScene = useComposerStore.getState().scene;
-        if (!three || !currentScene) return null;
-        const primitive = currentScene.primitives.find((p) => p.instance === instance);
+        const primitive = currentScene?.primitives.find((p) => p.instance === instance);
         if (!primitive) return null;
-        const worldPos = new THREE.Vector3(...primitive.position);
-        const ndc = worldPos.clone().project(three.camera);
-        const rect = three.gl.domElement.getBoundingClientRect();
-        return {
-          x: rect.left + ((ndc.x + 1) / 2) * rect.width,
-          y: rect.top + ((1 - ndc.y) / 2) * rect.height,
-        };
+        return worldToScreen(...primitive.position);
+      },
+      worldToScreenXY: (xMm: number, yMm: number, zMm: number) => worldToScreen(xMm / 1000, yMm / 1000, zMm / 1000),
+      getInstancePoseMm: (instance: string) => {
+        const mount = useComposerStore.getState().rawCellModules.find((m) => m.instance === instance)?.mount;
+        return mount?.pose ? mount.pose.xyz_mm : null;
       },
     });
-  }, []);
+  }, [worldToScreen]);
 
   const { center, extent } = useMemo(() => {
     if (!scene) return { center: new THREE.Vector3(0, 0, 0), extent: 1 };
@@ -118,8 +140,10 @@ export function SceneCanvas() {
       const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
       const raycaster = new THREE.Raycaster();
       raycaster.setFromCamera(ndc, camera);
-      const point = new THREE.Vector3();
-      raycaster.ray.intersectPlane(GROUND_PLANE, point);
+      // Same fixed-plane intersection DraggableInstance uses for existing
+      // instances (dragMath.ts) -- a new instance always lands at deck
+      // height (z=0), never raycast against scene meshes.
+      const point = intersectGroundPlane(raycaster.ray, 0);
       if (!point) return;
 
       let xMm = point.x * 1000;
@@ -170,6 +194,7 @@ export function SceneCanvas() {
                   highlight={highlight}
                   mountEntry={mountByInstance.get(instance)}
                   onSelect={(name) => void selectInstance(name)}
+                  onDragActiveChange={(active) => setControlsEnabled(!active)}
                   suppressNextClickRef={suppressNextClickRef}
                 />
               );
@@ -177,7 +202,7 @@ export function SceneCanvas() {
 
         {ghost && <GhostMesh ghost={ghost} />}
 
-        <OrbitControls makeDefault target={[center.x, center.y, center.z]} />
+        <OrbitControls ref={controlsRef} makeDefault target={[center.x, center.y, center.z]} />
       </Canvas>
     </div>
   );

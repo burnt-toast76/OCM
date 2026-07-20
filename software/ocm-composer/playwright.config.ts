@@ -4,6 +4,11 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
+  // All spec files share one backend fixture (see setup-fixture.mjs) and
+  // some touch the same instance (feed1) in bracket-asm-01 -- running
+  // spec FILES in parallel workers would race on that shared cell.yaml.
+  // The suite is small enough that serializing it costs nothing real.
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: "list",

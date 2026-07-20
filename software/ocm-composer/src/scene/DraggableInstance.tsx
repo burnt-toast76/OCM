@@ -1,32 +1,31 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// One instance's worth of primitives, draggable on the deck (z=0 plane).
-// Only mount.pose instances drag directly -- an instance mounted via
-// mount.on (bolted to another instance, e.g. a tool on a robot flange)
-// has no free XY position of its own to drag. Dragging updates a LOCAL
-// optimistic offset immediately (so the frame rate isn't gated on the
-// network) and calls move_instance debounced; pointer-up always sends one
-// final, non-debounced call so the true release position is never lost
-// to a pending debounce. The server is still the only authority on
-// whether the resulting pose is acceptable -- this only proposes one.
+// One instance's worth of primitives, draggable on the deck. Only
+// mount.pose instances drag directly -- an instance mounted via mount.on
+// (bolted to another instance, e.g. a tool on a robot flange) has no free
+// XY position of its own to drag.
+//
+// The instance is CLIENT-AUTHORITATIVE for the whole drag: pointer-move
+// only updates a local optimistic offset (no network call, no debounce --
+// mid-drag server validation isn't needed, the ghost-on-refusal covers
+// it). Exactly one move_instance call fires, on pointer-up, with the final
+// pose; only then does the store reconcile with the server. A refusal
+// reverts the local offset (the store deliberately doesn't refresh the
+// scene on refusal, so resetting the offset snaps back to the last
+// confirmed pose) and shows the red ghost + toast instead.
+//
+// OrbitControls listens on the canvas element directly, outside R3F's own
+// synthetic event system -- e.stopPropagation() here does NOT stop it from
+// also orbiting the camera during what's meant to be an instance drag.
+// onDragActiveChange explicitly disables it for the duration.
 
 import { useCallback, useRef, useState } from "react";
-import * as THREE from "three";
 import type { ThreeEvent } from "@react-three/fiber";
 import type { RawCellModule, ScenePrimitive } from "../api/types";
 import type { Highlight } from "./PrimitiveMesh";
 import { PrimitiveMesh } from "./PrimitiveMesh";
-import { GRID_MM, snapToGrid } from "./snap";
+import { intersectGroundPlane, resolveDragXY } from "./dragMath";
+import type { DragStart } from "./dragMath";
 import { useComposerStore } from "../store/store";
-import { debounce } from "../lib/debounce";
-
-const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-
-interface DragState {
-  startWorld: THREE.Vector3;
-  startXYmm: [number, number];
-  zMm: number;
-  rpyDeg: [number, number, number];
-}
 
 export interface DraggableInstanceProps {
   instance: string;
@@ -35,6 +34,8 @@ export interface DraggableInstanceProps {
   highlight: Highlight;
   mountEntry: RawCellModule | undefined;
   onSelect: (instance: string) => void;
+  /** Disables/re-enables OrbitControls for the duration of a real drag. */
+  onDragActiveChange: (active: boolean) => void;
   /** Set true for the moment right after a real drag release, so the
    * browser's trailing "click" (fired at whatever mesh is now under the
    * cursor -- possibly a DIFFERENT instance the dragged one uncovered,
@@ -45,32 +46,30 @@ export interface DraggableInstanceProps {
 
 const DRAG_THRESHOLD_M = 0.01; // 10mm of pointer movement before a press counts as a drag, not a click
 
-export function DraggableInstance({ instance, primitives, color, highlight, mountEntry, onSelect, suppressNextClickRef }: DraggableInstanceProps) {
+export function DraggableInstance({
+  instance,
+  primitives,
+  color,
+  highlight,
+  mountEntry,
+  onSelect,
+  onDragActiveChange,
+  suppressNextClickRef,
+}: DraggableInstanceProps) {
   const moveExistingInstance = useComposerStore((s) => s.moveExistingInstance);
+  const clearGhost = useComposerStore((s) => s.clearGhost);
   const [offsetM, setOffsetM] = useState<[number, number]>([0, 0]);
-  const dragRef = useRef<DragState | null>(null);
+  const dragRef = useRef<DragStart | null>(null);
   const draggedRef = useRef(false);
 
   const pose = mountEntry?.mount?.pose;
   const draggable = pose !== undefined;
 
-  const debouncedMove = useRef(
-    debounce((xMm: number, yMm: number, zMm: number, rpyDeg: [number, number, number]) => {
-      void moveExistingInstance(instance, { pose: { xyz_mm: [xMm, yMm, zMm], rpy_deg: rpyDeg } }, false);
-    }, 200),
-  ).current;
-
-  const resolveDrop = useCallback((e: ThreeEvent<PointerEvent>, drag: DragState): [number, number] => {
-    const point = new THREE.Vector3();
-    e.ray.intersectPlane(GROUND_PLANE, point);
-    let xMm = drag.startXYmm[0] + (point.x - drag.startWorld.x) * 1000;
-    let yMm = drag.startXYmm[1] + (point.y - drag.startWorld.y) * 1000;
-    if (!e.shiftKey) {
-      xMm = snapToGrid(xMm, GRID_MM);
-      yMm = snapToGrid(yMm, GRID_MM);
-    }
-    return [xMm, yMm];
-  }, []);
+  const endDrag = useCallback(() => {
+    dragRef.current = null;
+    draggedRef.current = false;
+    onDragActiveChange(false);
+  }, [onDragActiveChange]);
 
   const handlePointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
@@ -78,11 +77,13 @@ export function DraggableInstance({ instance, primitives, color, highlight, moun
       if (!draggable || !pose) return;
       e.stopPropagation();
       (e.target as Element).setPointerCapture?.(e.pointerId);
-      const point = new THREE.Vector3();
-      e.ray.intersectPlane(GROUND_PLANE, point);
-      dragRef.current = { startWorld: point, startXYmm: [pose.xyz_mm[0], pose.xyz_mm[1]], zMm: pose.xyz_mm[2], rpyDeg: pose.rpy_deg };
+      const point = intersectGroundPlane(e.ray, pose.xyz_mm[2]);
+      if (!point) return; // camera angle grazes the horizon right at this pixel -- bail, no drag starts
+      dragRef.current = { worldX: point.x, worldY: point.y, xMm: pose.xyz_mm[0], yMm: pose.xyz_mm[1], zMm: pose.xyz_mm[2] };
+      onDragActiveChange(true);
+      clearGhost(); // a fresh drag attempt supersedes any stale refusal ghost from a previous one
     },
-    [draggable, pose],
+    [draggable, pose, onDragActiveChange, clearGhost],
   );
 
   const handlePointerMove = useCallback(
@@ -90,13 +91,14 @@ export function DraggableInstance({ instance, primitives, color, highlight, moun
       const drag = dragRef.current;
       if (!drag) return;
       e.stopPropagation();
-      const [xMm, yMm] = resolveDrop(e, drag);
-      const offset: [number, number] = [(xMm - drag.startXYmm[0]) / 1000, (yMm - drag.startXYmm[1]) / 1000];
+      const resolved = resolveDragXY(e.ray, drag, !e.shiftKey);
+      if (!resolved) return; // ray missed the plane this event -- keep the last valid offset
+      const [xMm, yMm] = resolved;
+      const offset: [number, number] = [(xMm - drag.xMm) / 1000, (yMm - drag.yMm) / 1000];
       if (!draggedRef.current && Math.hypot(offset[0], offset[1]) > DRAG_THRESHOLD_M) draggedRef.current = true;
       setOffsetM(offset);
-      debouncedMove(xMm, yMm, drag.zMm, drag.rpyDeg);
     },
-    [debouncedMove, resolveDrop],
+    [],
   );
 
   const handlePointerUp = useCallback(
@@ -109,7 +111,8 @@ export function DraggableInstance({ instance, primitives, color, highlight, moun
         return;
       }
       e.stopPropagation();
-      if (draggedRef.current) {
+      const wasRealDrag = draggedRef.current;
+      if (wasRealDrag) {
         // The pointer moved enough to count as a real drag: the browser's
         // trailing "click" event fires at wherever the cursor ended up,
         // which -- now that this instance has visually moved away -- may
@@ -120,17 +123,37 @@ export function DraggableInstance({ instance, primitives, color, highlight, moun
       } else {
         onSelect(instance);
       }
-      // A pending debounced call that hasn't fired yet must not be allowed
-      // to land AFTER this one and overwrite its (toast-worthy) result --
-      // this IS the final position.
-      debouncedMove.cancel();
-      const [xMm, yMm] = resolveDrop(e, drag);
-      void moveExistingInstance(instance, { pose: { xyz_mm: [xMm, yMm, drag.zMm], rpy_deg: drag.rpyDeg } });
+      onDragActiveChange(false);
+      const resolved = resolveDragXY(e.ray, drag, !e.shiftKey);
       dragRef.current = null;
-      setOffsetM([0, 0]);
+      draggedRef.current = false;
+      if (!resolved || !wasRealDrag) {
+        // No real drag, or the release event itself missed the plane --
+        // nothing to commit either way.
+        setOffsetM([0, 0]);
+        return;
+      }
+      const [xMm, yMm] = resolved;
+      void moveExistingInstance(instance, { pose: { xyz_mm: [xMm, yMm, drag.zMm], rpy_deg: pose!.rpy_deg } }).finally(() => {
+        // Only reset the local offset once the drop has been reconciled:
+        // on success the store has already refreshed the scene to the new
+        // confirmed pose by the time this runs, so offset->0 lands exactly
+        // there with no visible jump; on refusal the scene was
+        // deliberately left alone, so offset->0 snaps back to the last
+        // confirmed pose -- the intended "reverted" affordance.
+        setOffsetM([0, 0]);
+      });
     },
-    [instance, moveExistingInstance, resolveDrop, debouncedMove, onSelect, suppressNextClickRef],
+    [instance, pose, moveExistingInstance, onSelect, onDragActiveChange, suppressNextClickRef],
   );
+
+  const handlePointerCancel = useCallback(() => {
+    if (!dragRef.current) return;
+    // Pointer capture was lost mid-drag (e.g. an OS-level gesture cancel).
+    // Abort without committing -- no move_instance call, just revert.
+    endDrag();
+    setOffsetM([0, 0]);
+  }, [endDrag]);
 
   const handleClick = useCallback(
     (name: string) => {
@@ -149,6 +172,7 @@ export function DraggableInstance({ instance, primitives, color, highlight, moun
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
     >
       {primitives.map((p, i) => (
         // A link may carry several collision primitives (e.g. frame1200's

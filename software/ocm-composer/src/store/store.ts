@@ -58,7 +58,7 @@ interface ComposerState {
   focusInstance: (name: string) => void;
 
   placeNewInstance: (moduleId: string, revision: string, instance: string, mount: Mount) => Promise<void>;
-  moveExistingInstance: (instance: string, mount: Mount, isFinal?: boolean) => Promise<void>;
+  moveExistingInstance: (instance: string, mount: Mount) => Promise<void>;
   deleteInstance: (instance: string) => void;
 
   dismissToast: (id: string) => void;
@@ -196,15 +196,16 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
     }
   },
 
-  moveExistingInstance: async (instance: string, mount: Mount, isFinal = true) => {
+  moveExistingInstance: async (instance: string, mount: Mount) => {
     const { cellId } = get();
     if (!cellId) return;
-    // A drag fires many debounced in-flight calls for the SAME instance;
-    // network ordering doesn't guarantee the pointer-up (final) call's
-    // response arrives last. Only the most-recently-STARTED call for this
-    // instance is allowed to update refusals/toast/scene -- a late-arriving
-    // stale response is silently dropped instead of clobbering the final
-    // result.
+    // The instance is client-authoritative for the whole drag (see
+    // DraggableInstance -- no network calls until pointer-up), so this
+    // fires exactly once per drag. A second drag on the same instance can
+    // still start before this call's response lands; tag each call with a
+    // sequence number and drop a response that arrives after a newer call
+    // for this instance has already started, so it can never clobber the
+    // newer one's result.
     const sequence = (moveSequence.get(instance) ?? 0) + 1;
     moveSequence.set(instance, sequence);
     const isStale = () => moveSequence.get(instance) !== sequence;
@@ -212,20 +213,24 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
       const env: Envelope = await api.moveInstance(cellId, instance, mount);
       if (isStale()) return;
       if (env.ok) {
-        set(() => ({ refusals: [], toolSlotIncumbent: null }));
+        set(() => ({ refusals: [], ghost: null, toolSlotIncumbent: null }));
         await get().refreshScene();
         return;
       }
       const toolSlot = env.refusals.find((r) => r.code === TOOL_SLOT_OCCUPIED);
-      set(() => ({ refusals: env.refusals, toolSlotIncumbent: (toolSlot?.allowed?.incumbent as string | undefined) ?? null }));
-      // A drag fires many debounced intermediate calls -- only the FINAL
-      // one (pointer-up) toasts, or a single continuous drag would spam
-      // one toast per debounce tick. The issues panel still updates live.
-      if (isFinal) pushToastFor(set, env.refusals);
-      // The write still happened server-side even on refusal (spec/09:
-      // writes are unconditional); re-fetch so the 3D view reflects
-      // whatever landed, not a stale optimistic guess.
-      await get().refreshScene();
+      // Deliberately does NOT refresh the scene here. spec/09's writes are
+      // unconditional, so the server already persisted the refused pose to
+      // disk -- but the composer's own render stays at the last CONFIRMED
+      // pose (DraggableInstance resets its local drag offset against the
+      // still-old scene data, which reads as a "snap back"), and the red
+      // ghost marks the attempted location instead of silently rendering
+      // the instance somewhere invalid.
+      const moduleId = get().rawCellModules.find((m) => m.instance === instance)?.module ?? instance;
+      const ghost: Ghost | null = mount.pose
+        ? { moduleId, position: mount.pose.xyz_mm.map((v) => v / 1000) as [number, number, number], rpyDeg: mount.pose.rpy_deg }
+        : null;
+      set(() => ({ refusals: env.refusals, ghost, toolSlotIncumbent: (toolSlot?.allowed?.incumbent as string | undefined) ?? null }));
+      pushToastFor(set, env.refusals);
     } catch (e) {
       handleTransportError(set, e);
     }

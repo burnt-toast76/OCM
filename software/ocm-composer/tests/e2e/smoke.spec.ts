@@ -34,25 +34,22 @@ test("dragging the feeder out of bounds shows the engine's own overhang refusal"
     .not.toBeNull();
   const start = await page.evaluate(() => window.__ocmComposerTestHooks!.getInstanceScreenXY("feed1")!);
 
-  // A large screen-space drag -- more than enough to push a 1200x900mm
-  // deck's feeder past the workspace footprint regardless of the current
-  // camera framing. Few steps deliberately: the camera looks down the
-  // ground plane at an angle, so screen-space movement maps to a LOT of
-  // world-space movement near the top of the canvas (near the horizon);
-  // this also keeps the number of intermediate debounced move_instance
-  // calls small, which matters because ocm-api now serializes every read
-  // AND write to the same cell.yaml through one per-path lock (needed for
-  // correctness -- see workspace.py) -- a drag that fires many overlapping
-  // calls queues up real, measurable latency behind that lock.
+  // A large, PURELY HORIZONTAL screen-space drag -- more than enough to
+  // push a 1200x900mm deck's feeder past the workspace footprint.
+  // Deliberately dy=0: the camera looks down the ground plane at an
+  // angle, so a drag with any significant upward (negative-dy) component
+  // can approach the horizon, where the pointer ray stops intersecting
+  // the ground plane at all (dragMath.ts's resolveDragXY correctly
+  // returns null rather than a garbage position) -- DraggableInstance
+  // then has no final pose to commit, so nothing happens. Horizontal
+  // stays well clear of that, and empirically clears the boundary
+  // cleanly once the drag is client-authoritative (a single commit on
+  // drop, no more mid-drag calls to accumulate queuing latency behind).
   await page.mouse.move(start!.x, start!.y);
   await page.mouse.down();
-  await page.mouse.move(start!.x + 700, start!.y - 650, { steps: 5 });
+  await page.mouse.move(start!.x + 900, start!.y, { steps: 10 });
   await page.mouse.up();
 
-  // Generous timeout: the final pointer-up call may be queued behind
-  // several debounced in-flight calls all serialized on the same
-  // per-path file lock (see above) -- worth waiting out rather than
-  // shortening the drag further and losing margin on the overhang itself.
   const toast = page.locator(".toast", { hasText: "WORKSPACE_OVERHANG" });
   await expect(toast).toBeVisible({ timeout: 10_000 });
 

@@ -9,6 +9,16 @@
 
 export interface ComposerTestHooks {
   getInstanceScreenXY(instance: string): { x: number; y: number } | null;
+  /** Projects an arbitrary mm point (any z) to screen coordinates -- lets
+   * a test compute an exact drop TARGET (e.g. "3 grid cells over") rather
+   * than guessing a screen-pixel delta that only works for one camera
+   * framing. */
+  worldToScreenXY(xMm: number, yMm: number, zMm: number): { x: number; y: number } | null;
+  /** The instance's own mount.pose xyz_mm, straight from the last-loaded
+   * cell data -- lets a test assert the exact mm position a drag landed
+   * on without re-deriving it from screen pixels or hardcoding the
+   * fixture's starting pose. */
+  getInstancePoseMm(instance: string): [number, number, number] | null;
 }
 
 declare global {
