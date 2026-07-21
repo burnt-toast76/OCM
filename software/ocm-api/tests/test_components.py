@@ -90,6 +90,35 @@ def test_component_full_lifecycle(api: OcmApi):
     assert described.data["component"]["part_number"] == "EJ-100"
 
 
+def test_describe_component_succeeds_with_warnings_on_an_incomplete_draft(api: OcmApi):
+    # A fresh draft is EXPECTED to be schema-invalid (ADR-0014: vendor/
+    # source are transcribed facts, never pre-filled) -- describing it
+    # must still return the document (Part B's Components page form needs
+    # to render and keep editing an in-progress draft), not refuse and
+    # withhold `data` the way it did before this behavior matched
+    # describe_cell's own "succeed with warnings" pattern for an
+    # unresolvable cell.
+    api.create_component_draft("com.example.ejector.incomplete1", "vacuum_ejector")
+
+    e = api.describe_component("com.example.ejector.incomplete1")
+
+    assert e.ok
+    assert e.data["component"]["kind"] == "vacuum_ejector"
+    assert e.data["draft"] is True
+    assert any("vendor" in w for w in e.warnings)
+    assert any("source" in w for w in e.warnings)
+
+
+def test_describe_component_has_no_warnings_once_valid(api: OcmApi):
+    api.create_component_draft("com.example.ejector.complete1", "vacuum_ejector")
+    api.update_component("com.example.ejector.complete1", manifest=_ejector_manifest("com.example.ejector.complete1"))
+
+    e = api.describe_component("com.example.ejector.complete1")
+
+    assert e.ok
+    assert e.warnings == ()
+
+
 def test_publish_component_gates_on_validity_same_as_modules(api: OcmApi):
     api.create_component_draft("com.example.ejector.demo2", "vacuum_ejector")
     e = api.publish_component("com.example.ejector.demo2", "1.0.0")

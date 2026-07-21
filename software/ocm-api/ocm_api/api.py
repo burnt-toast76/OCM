@@ -52,8 +52,8 @@ class OcmApi:
     # -- Discovery ---------------------------------------------------
 
     @_never_raise
-    def describe_schema(self, section: str | None = None) -> Envelope:
-        return discovery.describe_schema(self.workspace, section)
+    def describe_schema(self, section: str | None = None, target: str = "module") -> Envelope:
+        return discovery.describe_schema(self.workspace, section, target=target)
 
     @_never_raise
     def get_example(self, kind: str) -> Envelope:

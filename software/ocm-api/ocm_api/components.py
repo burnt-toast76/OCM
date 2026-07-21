@@ -171,6 +171,15 @@ def list_components(ws: Workspace) -> Envelope:
 
 
 def describe_component(ws: Workspace, component_id: str) -> Envelope:
+    """Reads whatever is on disk, valid or not -- an ADR-0014 draft is
+    EXPECTED to be incomplete for a while (that's the point: the
+    validation gaps are the human's completion list, not a broken state
+    to hide), so describing one can't refuse just because it isn't
+    publishable yet. Same pattern discovery.py's describe_cell already
+    uses for an unresolvable cell: succeed with the document, name the
+    gaps as `warnings`, never withhold `data` -- a caller that wants a
+    hard pass/fail already has validate_component for that.
+    """
     if not ws.component_exists(component_id):
         return single_refusal(Codes.NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
 
@@ -180,6 +189,5 @@ def describe_component(ws: Workspace, component_id: str) -> Envelope:
     revision = str(data.get("revision", "0.0.0"))
     payload = {"id": data.get("id", component_id), "revision": revision, "draft": is_draft_revision(revision), "component": data}
 
-    if errors:
-        return Envelope.refuse([schema_violation_to_refusal(e) for e in errors])
-    return Envelope.succeed(payload)
+    warnings = [schema_violation_to_refusal(e).message for e in errors]
+    return Envelope.succeed(payload, warnings=warnings)

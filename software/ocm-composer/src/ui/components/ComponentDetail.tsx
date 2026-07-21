@@ -1,0 +1,49 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { useMemo } from "react";
+import { attachmentDownloadUrl } from "../../api/client";
+import { useComponentsStore } from "../../store/componentsStore";
+import { ComponentForm } from "./ComponentForm";
+import { ChecklistPanel } from "./ChecklistPanel";
+import { ChatPanel } from "./ChatPanel";
+import { GlbViewer } from "./GlbViewer";
+
+export function ComponentDetail() {
+  const selectedComponentId = useComponentsStore((s) => s.selectedComponentId);
+  const detail = useComponentsStore((s) => s.detail);
+  const attachments = useComponentsStore((s) => s.attachments);
+
+  // Any attachment with a converted GLB sibling -- typically the one STEP
+  // file a draft has, but this doesn't assume there's exactly one.
+  const glbFilename = useMemo(() => attachments.find((a) => a.glb)?.glb ?? null, [attachments]);
+
+  if (!selectedComponentId) {
+    return (
+      <div className="component-detail component-detail--empty">
+        <p>Select a component, or create a new draft, to begin.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="component-detail">
+      <header className="component-detail__header">
+        <h1>{selectedComponentId}</h1>
+        {detail && (
+          <span className={`component-detail__badge ${detail.draft ? "component-detail__badge--draft" : ""}`}>
+            {detail.draft ? "draft" : detail.revision}
+          </span>
+        )}
+      </header>
+
+      {glbFilename && <GlbViewer url={attachmentDownloadUrl(selectedComponentId, glbFilename)} />}
+
+      <div className="component-detail__body">
+        <ComponentForm />
+        <div className="component-detail__side">
+          <ChecklistPanel />
+          <ChatPanel />
+        </div>
+      </div>
+    </div>
+  );
+}

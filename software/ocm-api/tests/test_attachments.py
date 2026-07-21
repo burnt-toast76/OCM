@@ -11,8 +11,10 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from fastapi.testclient import TestClient
 
 import ocm_api.attachments as attachments_module
+from ocm_api.http_app import build_app
 from ocm_api.workspace import Workspace
 
 
@@ -140,3 +142,59 @@ def test_step_with_no_successful_conversion_becomes_a_note_saying_so(ws: Workspa
 
 def test_a_filename_that_does_not_exist_is_silently_skipped(ws: Workspace):
     assert attachments_module.attachment_content_blocks(ws, "com.example.demo", ["never-uploaded.pdf"]) == []
+
+
+def test_list_attachments_reports_a_step_files_glb_sibling_and_excludes_the_glb_itself(ws: Workspace, monkeypatch: pytest.MonkeyPatch):
+    class _FakeCascadio:
+        def step_to_glb(self, step_path: str, glb_path: str) -> None:
+            Path(glb_path).write_bytes(b"pretend glb")
+
+    class _FakeMesh:
+        bounds = np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
+
+    class _FakeTrimesh:
+        def load(self, path: str) -> _FakeMesh:
+            return _FakeMesh()
+
+    monkeypatch.setattr(attachments_module, "cascadio", _FakeCascadio())
+    monkeypatch.setattr(attachments_module, "trimesh", _FakeTrimesh())
+
+    attachments_module.save_attachment(ws, "com.example.demo", "part.step", _FAKE_STEP_BYTES)
+    attachments_module.save_attachment(ws, "com.example.demo", "sheet.pdf", b"%PDF-1.4 x")
+
+    rows = attachments_module.list_attachments(ws, "com.example.demo")
+    by_name = {r["filename"]: r for r in rows}
+
+    assert set(by_name) == {"part.step", "sheet.pdf"}  # the .glb itself is not a separate row
+    assert by_name["part.step"]["glb"] == "part.glb"
+    assert by_name["sheet.pdf"]["glb"] is None
+
+
+# ---------------------------------------------------------------------------
+# HTTP transport: upload, list, and download.
+# ---------------------------------------------------------------------------
+
+
+def test_http_upload_then_list_then_download_round_trip(tmp_path: Path):
+    client = TestClient(build_app(str(tmp_path / "repo")))
+
+    upload = client.post(
+        "/components/com.example.http-demo/attachments",
+        files={"file": ("notes.txt", b"stated: 4-6 bar", "text/plain")},
+    )
+    assert upload.status_code == 200
+    assert upload.json()["kind"] == "text"
+
+    listing = client.get("/components/com.example.http-demo/attachments")
+    assert listing.status_code == 200
+    assert listing.json()["files"] == [{"filename": "notes.txt", "kind": "text", "glb": None}]
+
+    download = client.get("/components/com.example.http-demo/attachments/notes.txt")
+    assert download.status_code == 200
+    assert download.content == b"stated: 4-6 bar"
+
+
+def test_http_download_of_an_unknown_attachment_is_a_404(tmp_path: Path):
+    client = TestClient(build_app(str(tmp_path / "repo")))
+    response = client.get("/components/com.example.http-demo/attachments/never-uploaded.pdf")
+    assert response.status_code == 404

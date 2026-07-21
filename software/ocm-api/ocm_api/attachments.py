@@ -46,6 +46,25 @@ _STEP_EXTENSIONS = {".step", ".stp"}
 _TEXT_EXTENSIONS = {".txt", ".md", ".csv"}
 
 
+def list_attachments(ws: Workspace, component_id: str) -> list[dict[str, Any]]:
+    """Everything previously uploaded for this component -- lets a
+    freshly (re)loaded Components detail page discover a GLB that was
+    converted in an earlier session, not just ones staged in this one.
+    """
+    directory = ws.attachments_dir(component_id)
+    if not directory.is_dir():
+        return []
+    rows: list[dict[str, Any]] = []
+    for path in sorted(directory.iterdir()):
+        if not path.is_file() or path.suffix.lower() == ".glb":
+            continue  # a GLB is reported as its STEP sibling's own `glb` field, not a separate row
+        ext = path.suffix.lower()
+        kind = "pdf" if ext == ".pdf" else "text" if ext in _TEXT_EXTENSIONS else "step" if ext in _STEP_EXTENSIONS else "other"
+        glb_sibling = path.with_suffix(".glb")
+        rows.append({"filename": path.name, "kind": kind, "glb": glb_sibling.name if kind == "step" and glb_sibling.is_file() else None})
+    return rows
+
+
 def save_attachment(ws: Workspace, component_id: str, filename: str, content: bytes) -> dict[str, Any]:
     # Path(filename).name strips any directory components a client could
     # smuggle in (e.g. "../../module.yaml") -- an upload only ever lands

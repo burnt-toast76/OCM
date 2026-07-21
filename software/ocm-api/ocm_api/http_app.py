@@ -24,13 +24,13 @@ from pathlib import Path
 from typing import Any
 
 import anthropic
-from fastapi import Body, FastAPI, File, Query, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .agent import agent_unavailable_stream, run_agent_chat
 from .api import OcmApi
-from .attachments import attachment_content_blocks, save_attachment
+from .attachments import attachment_content_blocks, list_attachments, save_attachment
 
 # software/ocm-api/ocm_api/http_app.py -> software/ocm-composer/dist
 _COMPOSER_DIST = Path(__file__).resolve().parents[2] / "ocm-composer" / "dist"
@@ -46,8 +46,8 @@ def build_app(repo_root: str) -> FastAPI:
     # -- Discovery ---------------------------------------------------
 
     @app.get("/describe_schema")
-    def describe_schema(section: str | None = Query(default=None)) -> dict[str, Any]:
-        return envelope_response(api.describe_schema(section))
+    def describe_schema(section: str | None = Query(default=None), target: str = Query(default="module")) -> dict[str, Any]:
+        return envelope_response(api.describe_schema(section, target=target))
 
     @app.get("/get_example")
     def get_example(kind: str = Query(...)) -> dict[str, Any]:
@@ -194,6 +194,21 @@ def build_app(repo_root: str) -> FastAPI:
     @app.post("/components/{component_id}/attachments")
     def upload_component_attachment(component_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
         return save_attachment(api.workspace, component_id, file.filename or "upload", file.file.read())
+
+    @app.get("/components/{component_id}/attachments")
+    def list_component_attachments(component_id: str) -> dict[str, Any]:
+        return {"files": list_attachments(api.workspace, component_id)}
+
+    @app.get("/components/{component_id}/attachments/{filename}")
+    def download_component_attachment(component_id: str, filename: str) -> FileResponse:
+        # Path(filename).name, same as save_attachment -- never trust a
+        # client-supplied path component, only ever look inside this
+        # component's own attachments directory.
+        safe_name = Path(filename).name
+        target = api.workspace.attachments_dir(component_id) / safe_name
+        if not target.is_file():
+            raise HTTPException(status_code=404, detail=f"no attachment {filename!r} for component {component_id!r}")
+        return FileResponse(target)
 
     @app.post("/agent/chat")
     def agent_chat(

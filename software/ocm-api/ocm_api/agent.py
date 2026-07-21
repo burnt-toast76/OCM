@@ -46,8 +46,14 @@ MAX_TOOL_TURNS = 8  # a hard ceiling -- a misbehaving loop reports itself instea
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "name": "describe_schema",
-        "description": "The component (or module) JSON Schema, or one named section of it (e.g. 'electrical', 'pneumatic', 'comms'). Call this before guessing a field name.",
-        "input_schema": {"type": "object", "properties": {"section": {"type": "string"}}},
+        "description": "The component JSON Schema (target='component', the default here -- this agent authors components, not modules), or one named section of it (e.g. 'electrical', 'pneumatic', 'comms'). Call this before guessing a field name.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "section": {"type": "string"},
+                "target": {"type": "string", "enum": ["component", "module"], "description": "Defaults to 'component' -- only pass 'module' if get_example's own module manifest needs a schema section to interpret."},
+            },
+        },
     },
     {
         "name": "get_example",
@@ -143,6 +149,15 @@ def _call_tool(api: OcmApi, name: str, arguments: dict[str, Any]) -> dict[str, A
             "warnings": [],
             "data": None,
         }
+    if name == "describe_schema":
+        # describe_schema's OWN default (OcmApi.describe_schema) is
+        # target="module", for backward compatibility with callers that
+        # predate ADR-0014's component schema. This agent's entire domain
+        # is components, so default to that HERE rather than trust every
+        # model turn to remember to pass target explicitly -- a model that
+        # omits it should still get the schema it's actually working
+        # against, not silently fall back to the wrong artifact type.
+        arguments = {"target": "component", **arguments}
     method = getattr(api, name)
     return method(**arguments).to_dict()
 

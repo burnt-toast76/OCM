@@ -32,8 +32,24 @@ EXAMPLE_MODULE_BY_KIND: dict[str, str] = {
 }
 
 
-def describe_schema(ws: Workspace, section: str | None = None) -> Envelope:
-    schema = load_schema(ws.schema_path)
+def describe_schema(ws: Workspace, section: str | None = None, target: str = "module") -> Envelope:
+    """`target` selects WHICH schema -- spec/09 originally wrote this verb
+    with only modules in mind; ADR-0014 later gave components their own
+    schema (spec/10), so a caller authoring a component (the /agent/chat
+    tool loop, the Components page's schema-driven form) needs a way to
+    ask for that one instead. Defaults to "module" -- every caller written
+    before ADR-0014 (the MCP server's own module-authoring tools) keeps
+    working unchanged.
+    """
+    if target not in ("module", "component"):
+        return single_refusal(
+            Codes.INVALID_ARGUMENT,
+            path="target",
+            message=f"target={target!r} is not 'module' or 'component'",
+            allowed={"values": ["module", "component"]},
+        )
+    schema_path = ws.component_schema_path if target == "component" else ws.schema_path
+    schema = load_schema(schema_path)
     subtree: Any = schema
     if section:
         subtree = schema.get("properties", {}).get(section) or schema.get("$defs", {}).get(section)
@@ -42,7 +58,7 @@ def describe_schema(ws: Workspace, section: str | None = None) -> Envelope:
             return single_refusal(
                 Codes.NOT_FOUND,
                 path=f"section='{section}'",
-                message=f"no schema section {section!r} (known: {known})",
+                message=f"no schema section {section!r} for target={target!r} (known: {known})",
                 allowed={"values": known},
             )
 
@@ -50,6 +66,7 @@ def describe_schema(ws: Workspace, section: str | None = None) -> Envelope:
     return Envelope.succeed(
         {
             "ocm_version": schema.get("properties", {}).get("ocm_version", {}).get("enum", []),
+            "target": target,
             "section": section,
             "schema": subtree,
             "changelog": changelog,

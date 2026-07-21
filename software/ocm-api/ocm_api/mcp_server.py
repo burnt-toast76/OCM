@@ -67,13 +67,14 @@ def build_server(repo_root: str) -> FastMCP:
     # -- Discovery ---------------------------------------------------
 
     @mcp.tool(description=_doc(
-        "The module JSON Schema, or one section of it (e.g. section='capabilities'). "
-        "Includes the supported ocm_version list and the full spec changelog.",
+        "The JSON Schema (module by default, or target='component' for the ADR-0014 component "
+        "schema), or one section of it (e.g. section='capabilities'). Includes the supported "
+        "ocm_version list and the full spec changelog.",
         '  call: describe_schema(section="capabilities")\n'
-        '  response: {"ok": true, "data": {"ocm_version": ["1.0","1.1"], "schema": {...}, "changelog": "..."}}',
+        '  response: {"ok": true, "data": {"ocm_version": ["1.0","1.1"], "target": "module", "schema": {...}, "changelog": "..."}}',
     ))
-    def describe_schema(section: str | None = None) -> dict[str, Any]:
-        return api.describe_schema(section).to_dict()
+    def describe_schema(section: str | None = None, target: str = "module") -> dict[str, Any]:
+        return api.describe_schema(section, target=target).to_dict()
 
     @mcp.tool(description=_doc(
         "The best-matching REAL, committed manifest for a module kind (e.g. sd50 for "

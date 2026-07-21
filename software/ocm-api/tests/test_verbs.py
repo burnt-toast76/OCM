@@ -33,6 +33,30 @@ def test_describe_schema_section(api: OcmApi):
     assert e.data["schema"]["type"] == "array"
 
 
+def test_describe_schema_defaults_to_module_target(api: OcmApi):
+    e = api.describe_schema()
+    assert e.ok
+    assert e.data["target"] == "module"
+
+
+def test_describe_schema_component_target(api: OcmApi):
+    # ADR-0014 gave components their own schema (spec/10) -- target
+    # selects which one, so a component-authoring caller (the Components
+    # page's form, /agent/chat) isn't stuck reading the module schema.
+    e = api.describe_schema(target="component")
+    assert e.ok
+    assert e.data["target"] == "component"
+    assert e.data["schema"]["title"].startswith("OCM Component Definition")
+    assert "vendor" in e.data["schema"]["properties"]
+    assert "mechanical" not in e.data["schema"]["properties"]  # module-only section
+
+
+def test_describe_schema_unknown_target_is_refused(api: OcmApi):
+    e = api.describe_schema(target="cell")
+    assert not e.ok
+    assert e.refusals[0].code == Codes.INVALID_ARGUMENT
+
+
 def test_get_example_for_every_registered_kind(api: OcmApi):
     from ocm_api.discovery import EXAMPLE_MODULE_BY_KIND
 
