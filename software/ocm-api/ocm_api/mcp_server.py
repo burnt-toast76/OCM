@@ -35,6 +35,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from .api import OcmApi
+from .prompts import ZERO_ASSUMPTION_DOCTRINE
 
 _ENVELOPE_CONTRACT = (
     "Returns the ocm-api envelope: "
@@ -58,11 +59,8 @@ def build_server(repo_root: str) -> FastMCP:
         name="ocm-api",
         instructions=(
             "OCM's authoring/composition/planning surface (spec/09-ocm-api.md, ADR-0014). "
-            "Workflow: datasheet -> component (create_component_draft/update_component, "
-            "transcription only, zero assumption) -> module (create_module_draft/update_module, "
-            "design -- references published components via a components: list, human-approved). "
-            "NEVER author a module directly from a datasheet; NEVER guess field names -- start "
-            "with describe_schema and get_example. " + _ENVELOPE_CONTRACT
+            "NEVER guess field names -- start with describe_schema and get_example.\n\n"
+            + ZERO_ASSUMPTION_DOCTRINE + "\n\n" + _ENVELOPE_CONTRACT
         ),
     )
 

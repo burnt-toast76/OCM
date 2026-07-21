@@ -12,6 +12,10 @@ dependencies = [
     "jsonpatch>=1.33",
     "mcp>=1.2.0",
     "fastapi>=0.110",
+    # /agent/chat's Anthropic Messages API tool-use loop. Always a real
+    # dependency -- the degraded case is a missing ANTHROPIC_API_KEY
+    # (AGENT_UNAVAILABLE), not a missing package.
+    "anthropic>=0.40",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +30,12 @@ serve = ["uvicorn[standard]>=0.29"]
 # `plan_cell`/`check_collision`'s happy path needs ocm-generator's own
 # `tesseract` extra; everything else in this package works without it.
 tesseract = ["ocm-generator[tesseract]"]
+# STEP->GLB conversion for component attachments (spec/09 "Agent
+# orchestrator") is best-effort and gracefully degrades if unavailable --
+# cascadio's Windows wheel availability was uncertain at the time this was
+# written, so this stays a separate extra rather than a hard dependency of
+# the whole package; ocm_api.attachments handles ImportError itself.
+cad = ["cascadio>=0.0.10", "trimesh>=4.0"]
 test = ["pytest>=8.0", "httpx>=0.27"]
 
 [project.scripts]

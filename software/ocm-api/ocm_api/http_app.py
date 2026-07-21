@@ -23,10 +23,14 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import Body, FastAPI, Query
+import anthropic
+from fastapi import Body, FastAPI, File, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
+from .agent import agent_unavailable_stream, run_agent_chat
 from .api import OcmApi
+from .attachments import attachment_content_blocks, save_attachment
 
 # software/ocm-api/ocm_api/http_app.py -> software/ocm-composer/dist
 _COMPOSER_DIST = Path(__file__).resolve().parents[2] / "ocm-composer" / "dist"
@@ -184,6 +188,37 @@ def build_app(repo_root: str) -> FastAPI:
         return envelope_response(
             api.emit(cell, urscript=urscript, animation=animation, view=view, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
         )
+
+    # -- Agent orchestrator (spec/09 "Agent orchestrator") ---------------------------------------------------
+
+    @app.post("/components/{component_id}/attachments")
+    def upload_component_attachment(component_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+        return save_attachment(api.workspace, component_id, file.filename or "upload", file.file.read())
+
+    @app.post("/agent/chat")
+    def agent_chat(
+        component_id: str | None = Body(default=None),
+        messages: list[dict[str, Any]] = Body(...),
+        attachment_filenames: list[str] = Body(default=[]),
+    ) -> StreamingResponse:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            return StreamingResponse(
+                agent_unavailable_stream("ANTHROPIC_API_KEY is not set in this server's environment"),
+                media_type="text/event-stream",
+            )
+
+        # Attachments merge into the LAST user turn only -- they're what
+        # this specific message is about, not resent on every later turn.
+        conversation = [dict(m) for m in messages]
+        if attachment_filenames and component_id and conversation and conversation[-1].get("role") == "user":
+            blocks = attachment_content_blocks(api.workspace, component_id, attachment_filenames)
+            if blocks:
+                text = conversation[-1].get("content", "")
+                conversation[-1] = {"role": "user", "content": [{"type": "text", "text": text}, *blocks]}
+
+        client = anthropic.Anthropic(api_key=api_key)
+        return StreamingResponse(run_agent_chat(client, api, conversation, component_id=component_id), media_type="text/event-stream")
 
     # -- Composer static build ---------------------------------------------------
 

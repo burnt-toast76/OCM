@@ -203,6 +203,13 @@ class Workspace:
     def component_path(self, component_id: str) -> Path:
         return self.component_dir(component_id) / "component.yaml"
 
+    def attachments_dir(self, component_id: str) -> Path:
+        # Uploads (datasheets, STEP files, ...) live alongside the
+        # component they document -- not a separate top-level tree -- so
+        # `components/<id>/` stays the one place everything about that
+        # component lives, same convention module geometry already follows.
+        return self.component_dir(component_id) / "attachments"
+
     def module_exists(self, module_id: str) -> bool:
         return self.module_path(module_id).is_file()
 

@@ -51,6 +51,7 @@ class Codes:
     DUPLICATE_REFDES = "DUPLICATE_REFDES"  # ADR-0014: two components: entries share a refdes
     INVALID_SOURCE = "INVALID_SOURCE"  # ADR-0014: a signal's source: provenance doesn't check out
     TOOL_SLOT_OCCUPIED = "TOOL_SLOT_OCCUPIED"  # place_instance onto a mount.on flange that's already carrying an instance
+    AGENT_UNAVAILABLE = "AGENT_UNAVAILABLE"  # /agent/chat with no ANTHROPIC_API_KEY configured
 
 
 @dataclass(frozen=True)
