@@ -45,7 +45,7 @@ def test_loads_a_minimal_valid_component(tmp_path, component_schema_path):
 
 def test_loads_a_component_with_ranged_pneumatic_and_signals(tmp_path, component_schema_path):
     data = _minimal_component()
-    data["pneumatic"] = {"pressure_min": 4.0, "pressure_max": 6.0, "units": "bar", "flow_nl_min": 25.0, "port": "M5"}
+    data["pneumatic"] = {"pressure_min": 4.0, "pressure_max": 6.0, "pressure_units": "bar", "flow": 25.0, "flow_units": "Nl/min", "port": "M5"}
     data["comms"] = {
         "protocol": "discrete-io",
         "signals": [
@@ -62,7 +62,9 @@ def test_loads_a_component_with_ranged_pneumatic_and_signals(tmp_path, component
     # within a stated range is design, a module-layer decision.
     assert component.pneumatic.pressure_min == 4.0
     assert component.pneumatic.pressure_max == 6.0
-    assert component.pneumatic.units == "bar"
+    assert component.pneumatic.pressure_units == "bar"
+    assert component.pneumatic.flow == 25.0
+    assert component.pneumatic.flow_units == "Nl/min"
     assert component.comms.signal("vacuum_switch").direction_device == "output"
     assert component.geometry.mass_kg == 0.05
     assert component.hazards == ("pinch",)

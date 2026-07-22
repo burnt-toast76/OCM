@@ -1,6 +1,6 @@
 ocm_version: '1.1'
 id: com.nordson-kline.dispenser.dp8
-revision: 0.1.0
+revision: 1.0.0
 kind: dispenser
 source:
   kind: datasheet
@@ -16,7 +16,7 @@ pneumatic:
   port: G1/8
   pressure_max: 6
   pressure_min: 4
-  units: bar
+  pressure_units: bar
 vendor: Nordson-Kline
 comms:
   protocol: ethercat

@@ -12,7 +12,8 @@ Only questions a datasheet answers:
 - identity: id, vendor, part number, datasheet reference (url or filename)
 - `electrical` — supplies (peak/nominal *as stated*), connectors
 - `pneumatic` — pressure as a **range** if the source gives one (`pressure_min/max` plus a
-  verbatim `units` field -- never converted), ports, flow
+  verbatim `pressure_units` field -- never converted), ports, flow (`flow` plus a verbatim
+  `flow_units` field -- also never converted)
 - `signals` — the device's own I/O as documented, device-perspective directions
   (`direction_device: output` for a PNP part-present), protocol incl. `x-` customs, IODD/ESI
   references as *citations* (a note naming the file, never an invented path)

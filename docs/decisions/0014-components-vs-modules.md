@@ -24,11 +24,18 @@ Two artifact types, two authoring rules:
 | Lives in | `components/<id>/component.yaml` | `modules/<id>/module.yaml` (unchanged) |
 
 **The zero-assumption rule (components):** a value appears in a component definition only if
-the source document states it. Unit conversion and restatement are transcription ("~4 min"
-→ `240 s`). **Choosing within a stated range is design** — the component records the range
-(`4–6 bar`); a module picks the operating point. Anything the datasheet doesn't answer is
-OMITTED. Incomplete components remain drafts; the validation refusals ARE the handoff list
-of what a human must supply. No "ASSUMED:" markers — omission, not annotation.
+the source document states it. Units are never converted — every value is recorded in the
+exact unit the source prints, verbatim (`bar`, `psi`, `VDC`); conversion is a downstream-code
+concern, not a transcription one. **Choosing within a stated range is design** — the component
+records the range (`pressure_min`/`pressure_max` = `4`/`6`, `pressure_units: bar`); a module
+picks the operating point. Anything the datasheet doesn't answer is OMITTED. Incomplete
+components remain drafts; the validation refusals ARE the handoff list of what a human must
+supply. No "ASSUMED:" markers — omission, not annotation.
+
+*(Amended after initial acceptance: the rule originally read "unit conversion and
+restatement are transcription" — reversed once real datasheet extraction showed converting
+introduces its own assumptions, e.g. a rounding or reference-temperature choice. Restatement
+alone is still fine; conversion is not.)*
 
 **Modules may reference components** via an optional `components:` list (refdes + id@rev).
 Module-boundary signals may declare provenance (`source: VG1.part_present`). Aggregations —

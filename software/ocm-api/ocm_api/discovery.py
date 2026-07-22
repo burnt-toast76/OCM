@@ -115,6 +115,16 @@ def _component_aggregates(ws: Workspace, module_data: dict[str, Any]) -> tuple[d
     sum passed off as a total) and a warning names the incomplete
     component -- the same "report the gap, don't guess" discipline
     authoring.py's own zero-assumption components already follow.
+
+    Air consumption has its own extra way to be "incomplete": components
+    record flow in whatever unit their own datasheet printed (flow_units,
+    never converted at authoring time -- see ADR-0014/prompts.py), so two
+    components stating flow in different units (one "Nl/min", one "SCFM")
+    can't be summed into one number without silently pretending a
+    conversion happened. That's treated the same as a missing value --
+    omit the aggregate, name the mismatch in a warning -- rather than
+    quietly summing mismatched units into a meaningless total.
+
     Returns ({} , []) for a module with no components: list at all (ADR-0014:
     "a module with no components list stays valid" -- nothing to derive).
     """
@@ -126,6 +136,7 @@ def _component_aggregates(ws: Workspace, module_data: dict[str, Any]) -> tuple[d
     power_by_rail: dict[str, list[float | None]] = {}
     power_gap_notes: dict[str, list[str]] = {}
     air_values: list[float] = []
+    air_units: set[str] = set()
     air_gap_notes: list[str] = []
     warnings: list[str] = []
 
@@ -153,11 +164,15 @@ def _component_aggregates(ws: Workspace, module_data: dict[str, Any]) -> tuple[d
 
         pneumatic = cdata.get("pneumatic")
         if pneumatic:
-            flow = pneumatic.get("flow_nl_min")
+            flow = pneumatic.get("flow")
+            flow_units = pneumatic.get("flow_units")
             if flow is None:
-                air_gap_notes.append(f"{component_label} doesn't state flow_nl_min")
+                air_gap_notes.append(f"{component_label} doesn't state flow")
+            elif not flow_units:
+                air_gap_notes.append(f"{component_label} states flow but not flow_units")
             else:
                 air_values.append(flow)
+                air_units.add(flow_units)
 
     aggregates: dict[str, Any] = {"bom": bom}
 
@@ -169,8 +184,11 @@ def _component_aggregates(ws: Workspace, module_data: dict[str, Any]) -> tuple[d
 
     if air_gap_notes:
         warnings.append("air consumption is incomplete: " + "; ".join(air_gap_notes))
+    elif len(air_units) > 1:
+        warnings.append(f"air consumption mixes units across components ({', '.join(sorted(air_units))}) -- not summed")
     elif air_values:
-        aggregates["air_consumption_nl_min"] = sum(air_values)
+        aggregates["air_consumption"] = sum(air_values)
+        aggregates["air_consumption_units"] = next(iter(air_units))
 
     return aggregates, warnings
 

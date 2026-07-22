@@ -103,7 +103,7 @@ def build_server(repo_root: str) -> FastMCP:
         '  call: describe_module(id="com.example.pickhead.pk100")\n'
         '  response: {"ok": true, "data": {"id": "...", "revision": "1.0.0", "draft": false, "manifest": {...}, '
         '"aggregates": {"bom": [{"refdes": "VG1", "id": "com.smc.ejector.zk2-agh", "vendor": "SMC", "part_number": "ZK2-AGH"}], '
-        '"power_budget": {"24VDC": {"current_nominal_a": 0.4}}, "air_consumption_nl_min": 12.0}}, "warnings": []}',
+        '"power_budget": {"24VDC": {"current_nominal_a": 0.4}}, "air_consumption": 12.0, "air_consumption_units": "Nl/min"}}, "warnings": []}',
     ))
     def describe_module(id: str) -> dict[str, Any]:
         return api.describe_module(id).to_dict()
@@ -214,8 +214,8 @@ def build_server(repo_root: str) -> FastMCP:
         "with every schema violation as a refusal) -- validation gates publish_component, not this "
         "call. ZERO ASSUMPTION (ADR-0014): a value goes in only if the source document states it -- "
         "never convert units, record every value in the exact unit the source prints, verbatim "
-        "('bar', 'psi', 'VDC'). A stated RANGE stays a range (pressure_min/pressure_max, "
-        "plus a verbatim units field), never narrowed to one number, and anything the datasheet "
+        "('bar', 'psi', 'VDC'). A stated RANGE stays a range (pressure_min/pressure_max plus "
+        "pressure_units; flow plus flow_units), never narrowed to one number, and anything the datasheet "
         "doesn't answer is OMITTED, never estimated, never copied from another component. Leave the draft "
         "incomplete and report the refusals as the human's completion list -- do not guess to make "
         "validation pass.",

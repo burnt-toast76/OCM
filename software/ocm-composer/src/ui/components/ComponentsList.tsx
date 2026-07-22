@@ -31,10 +31,23 @@ function slugify(s: string): string {
   return s.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "x";
 }
 
-const TRANSCRIBE_PROMPT =
-  "I've attached a datasheet for this part. Please transcribe it into the component definition -- " +
-  "zero assumption: only include what it actually states, restate/convert units freely, and tell me " +
-  "what's left for me to fill in.";
+// A second (or third) file is a real, expected case -- a connector's own
+// pinout is often printed on a separate wiring-diagram PDF, not the main
+// cutsheet, and attachment_content_blocks (ocm_api/attachments.py) already
+// sends every staged file to the model together in one turn, each titled
+// with its own filename, so it can genuinely cross-reference them.
+function buildTranscribePrompt(fileCount: number): string {
+  const docs = fileCount > 1 ? "documents" : "a datasheet";
+  return (
+    `I've attached ${docs} for this part -- if there's more than one, treat them together ` +
+    "(e.g. a connector's pinout is sometimes printed on a separate document from the main " +
+    "datasheet). Please transcribe into the component definition -- zero assumption: only " +
+    "include what's actually stated, and record every value in the exact unit the source " +
+    "prints, verbatim (never convert). For each connector, extract its pinout too -- pin " +
+    "number, function, and wire color, wherever the source gives them. Tell me what's left " +
+    "for me to fill in."
+  );
+}
 
 export function ComponentsList() {
   const components = useComponentsStore((s) => s.components);
@@ -112,7 +125,7 @@ export function ComponentsList() {
         // sendChatMessage picks up whatever uploadAttachment just staged
         // in the store, same as if the user had dropped these files onto
         // the chat panel themselves and typed this prompt.
-        sendChatMessage(TRANSCRIBE_PROMPT);
+        sendChatMessage(buildTranscribePrompt(files.length));
       }
     } finally {
       setSubmitting(false);
@@ -186,7 +199,8 @@ export function ComponentsList() {
             }}
           />
           <button type="button" className="components-list__attach" onClick={() => fileInputRef.current?.click()}>
-            📎 Attach datasheet (optional -- pdf, txt, step)
+            📎 Attach datasheet (optional -- pdf, txt, step; add a second file if the pinout is
+            in a separate document)
           </button>
           {stagedFiles.length > 0 && (
             <ul className="components-list__staged-files">

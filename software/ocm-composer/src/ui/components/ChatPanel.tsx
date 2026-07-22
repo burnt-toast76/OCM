@@ -141,7 +141,12 @@ export function ChatPanel() {
             e.target.value = "";
           }}
         />
-        <button type="button" className="chat-panel__attach" onClick={() => fileInputRef.current?.click()} title="Attach a datasheet (pdf, txt, step)">
+        <button
+          type="button"
+          className="chat-panel__attach"
+          onClick={() => fileInputRef.current?.click()}
+          title="Attach a datasheet (pdf, txt, step) -- add more than one if, e.g., the pinout is in a separate document"
+        >
           📎
         </button>
         <textarea

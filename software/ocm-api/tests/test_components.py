@@ -24,7 +24,7 @@ def _ejector_manifest(component_id: str = "com.example.ejector.demo1") -> dict:
         "part_number": "EJ-100",
         "source": {"kind": "datasheet", "ref": "fictional demo datasheet, worked-example only"},
         "electrical": {"supplies": [{"rail": "24VDC", "current_nominal_a": 0.3}]},
-        "pneumatic": {"pressure_min": 4.0, "pressure_max": 6.0, "units": "bar", "flow_nl_min": 12.0},
+        "pneumatic": {"pressure_min": 4.0, "pressure_max": 6.0, "pressure_units": "bar", "flow": 12.0, "flow_units": "Nl/min"},
         "comms": {
             "protocol": "discrete-io",
             "signals": [{"name": "vacuum_switch", "direction_device": "output", "type": "bool"}],
@@ -246,7 +246,8 @@ def test_module_referencing_two_components_resolves_and_aggregates(api: OcmApi):
     aggregates = described.data["aggregates"]
     assert {row["refdes"] for row in aggregates["bom"]} == {"VG1", "IO1"}
     assert aggregates["power_budget"]["24VDC"]["current_nominal_a"] == 0.4
-    assert aggregates["air_consumption_nl_min"] == 12.0
+    assert aggregates["air_consumption"] == 12.0
+    assert aggregates["air_consumption_units"] == "Nl/min"
 
     # And the module genuinely resolves into a cell -- ADR-0014's whole
     # point (a module referencing components is still just a module).
@@ -256,6 +257,43 @@ def test_module_referencing_two_components_resolves_and_aggregates(api: OcmApi):
         {"pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}},
     )
     assert placed.ok, placed.refusals
+
+
+def test_air_consumption_aggregate_is_omitted_when_components_disagree_on_flow_units(api: OcmApi):
+    # flow_units is never converted at authoring time (ADR-0014/prompts.py:
+    # "never convert units") -- two components stating flow in different
+    # units can't be summed into one meaningful number, so this is treated
+    # the same as a missing value: the aggregate is omitted, not silently
+    # (and wrongly) summed across mismatched units.
+    _publish_ejector(api, "com.example.ejector.mixed1")
+
+    api.create_component_draft("com.example.ejector.mixed2", "vacuum_ejector")
+    manifest2 = _ejector_manifest("com.example.ejector.mixed2")
+    manifest2["pneumatic"]["flow_units"] = "SCFM"
+    api.update_component("com.example.ejector.mixed2", manifest=manifest2)
+    published2 = api.publish_component("com.example.ejector.mixed2", "1.0.0")
+    assert published2.ok, published2.refusals
+
+    api.create_module_draft("com.example.pickhead.mixedunits", "end_effector")
+    manifest = _tool_module_manifest(
+        "com.example.pickhead.mixedunits",
+        components=[
+            {"refdes": "VG1", "ref": "com.example.ejector.mixed1@1.0.0"},
+            {"refdes": "VG2", "ref": "com.example.ejector.mixed2@1.0.0"},
+        ],
+        signal_source="VG1.vacuum_switch",
+    )
+    e = api.update_module("com.example.pickhead.mixedunits", manifest=manifest)
+    assert e.ok, e.refusals
+    geom = api.generate_geometry_stub("com.example.pickhead.mixedunits", (70.0, 70.0), 100.0)
+    assert geom.ok, geom.refusals
+
+    described = api.describe_module("com.example.pickhead.mixedunits")
+    assert described.ok, described.refusals
+    aggregates = described.data["aggregates"]
+    assert "air_consumption" not in aggregates
+    assert "air_consumption_units" not in aggregates
+    assert any("mixes units" in w and "Nl/min" in w and "SCFM" in w for w in described.warnings)
 
 
 def test_describe_module_with_no_components_list_has_no_aggregates(api: OcmApi):

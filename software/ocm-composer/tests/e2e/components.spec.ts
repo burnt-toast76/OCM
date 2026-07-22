@@ -172,6 +172,62 @@ test("attaching a datasheet before creating uploads it to the new draft and auto
   fs.rmSync(pdfPath, { force: true });
 });
 
+test("attaching two datasheets before creating uploads and sends both together, e.g. a main cutsheet plus a separate pinout diagram", async ({ page }) => {
+  const vendor = "example";
+  const partNumber = `two-pdf-test-${Date.now()}`;
+  const testId = `com.${vendor}.${partNumber}`;
+  const cutsheetPath = path.join(os.tmpdir(), `ocm-e2e-cutsheet-${Date.now()}.pdf`);
+  const pinoutPath = path.join(os.tmpdir(), `ocm-e2e-pinout-${Date.now()}.pdf`);
+  fs.writeFileSync(cutsheetPath, "%PDF-1.4 fake cutsheet bytes for testing");
+  fs.writeFileSync(pinoutPath, "%PDF-1.4 fake pinout-diagram bytes for testing");
+
+  await page.goto("/composer/");
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("menuitem", { name: "Components" }).click();
+
+  await page.getByPlaceholder("Vendor").fill(vendor);
+  await page.getByPlaceholder("Part number").fill(partNumber);
+  await page.getByLabel("New component kind").selectOption("sensor");
+
+  // Two separate picks, same as attaching the cutsheet first and then
+  // realizing the pinout lives in a second document -- addFiles is
+  // additive, not a replace.
+  await page.locator(".components-list__file-input").setInputFiles(cutsheetPath);
+  await page.locator(".components-list__file-input").setInputFiles(pinoutPath);
+  await expect(page.locator(".components-list__staged-files li")).toHaveCount(2);
+
+  let capturedBody: { attachment_filenames?: string[]; messages?: { content: string }[] } | undefined;
+  await page.route("**/agent/chat", async (route) => {
+    capturedBody = route.request().postDataJSON();
+    await route.fulfill({ status: 200, contentType: "text/event-stream", body: "event: done\ndata: {}\n\n" });
+  });
+
+  await page.getByRole("button", { name: /New draft/ }).click();
+  await expect(page.locator("h1", { hasText: testId })).toBeVisible();
+
+  // Both files reached the SAME /agent/chat call -- attachment_content_blocks
+  // (ocm_api/attachments.py) sends every filename in one turn, so the model
+  // can genuinely cross-reference the pinout diagram against the cutsheet,
+  // not just see one or the other.
+  await expect.poll(() => capturedBody?.attachment_filenames?.length).toBe(2);
+  expect(capturedBody?.attachment_filenames).toEqual(
+    expect.arrayContaining([path.basename(cutsheetPath), path.basename(pinoutPath)]),
+  );
+
+  // The prompt itself acknowledges multiple documents (not "a datasheet")
+  // and calls out pinout extraction specifically.
+  const promptText = capturedBody?.messages?.[0]?.content ?? "";
+  expect(promptText).toContain("I've attached documents");
+  expect(promptText).toContain("wire color");
+
+  const listRes = await fetch(`${BACKEND}/components/${encodeURIComponent(testId)}/attachments`);
+  const files = (await listRes.json()).files as Array<{ filename: string; kind: string }>;
+  expect(files).toHaveLength(2);
+
+  fs.rmSync(cutsheetPath, { force: true });
+  fs.rmSync(pinoutPath, { force: true });
+});
+
 test("deleting a component removes it from the list and the workspace, after a confirm", async ({ page }) => {
   const vendor = "example";
   const partNumber = `delete-test-${Date.now()}`;

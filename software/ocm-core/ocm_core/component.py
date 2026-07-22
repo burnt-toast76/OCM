@@ -77,8 +77,9 @@ class ComponentPneumatic:
 
     pressure_min: float | None = None
     pressure_max: float | None = None
-    units: str | None = None  # verbatim as printed (e.g. "bar", "psi") -- never converted
-    flow_nl_min: float | None = None
+    pressure_units: str | None = None  # verbatim as printed (e.g. "bar", "psi") -- never converted
+    flow: float | None = None
+    flow_units: str | None = None  # verbatim as printed (e.g. "Nl/min", "SCFM") -- never converted
     port: str | None = None
 
     @classmethod
@@ -86,8 +87,9 @@ class ComponentPneumatic:
         return cls(
             pressure_min=data.get("pressure_min"),
             pressure_max=data.get("pressure_max"),
-            units=data.get("units"),
-            flow_nl_min=data.get("flow_nl_min"),
+            pressure_units=data.get("pressure_units"),
+            flow=data.get("flow"),
+            flow_units=data.get("flow_units"),
             port=data.get("port"),
         )
 

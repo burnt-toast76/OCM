@@ -22,7 +22,7 @@ ZERO_ASSUMPTION_DOCTRINE = (
     "states it. Never convert units -- record every value in the exact unit the source prints, "
     "verbatim ('bar', 'psi', 'VDC'); conversion happens downstream in code, not here. Choosing a "
     "single value within a stated range is DESIGN, not transcription -- record the range "
-    "(e.g. pressure_min/pressure_max, plus a verbatim units field) and leave picking an "
+    "(e.g. pressure_min/pressure_max plus pressure_units; flow plus flow_units) and leave picking an "
     "operating point to a module. Anything the source doesn't answer is OMITTED -- never estimated, never guessed, never copied "
     "from another component's definition, and never marked with an 'ASSUMED:' note; omission "
     "is the honest signal, not an annotation. Leave the draft incomplete and report "
