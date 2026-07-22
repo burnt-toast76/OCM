@@ -75,16 +75,18 @@ class ComponentPneumatic:
     operating point is a module-layer decision (ADR-0014), never made here.
     """
 
-    pressure_bar_min: float | None = None
-    pressure_bar_max: float | None = None
+    pressure_min: float | None = None
+    pressure_max: float | None = None
+    units: str | None = None  # verbatim as printed (e.g. "bar", "psi") -- never converted
     flow_nl_min: float | None = None
     port: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ComponentPneumatic":
         return cls(
-            pressure_bar_min=data.get("pressure_bar_min"),
-            pressure_bar_max=data.get("pressure_bar_max"),
+            pressure_min=data.get("pressure_min"),
+            pressure_max=data.get("pressure_max"),
+            units=data.get("units"),
             flow_nl_min=data.get("flow_nl_min"),
             port=data.get("port"),
         )

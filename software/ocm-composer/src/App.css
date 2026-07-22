@@ -782,6 +782,50 @@
   min-width: 0;
 }
 
+/* -- Attachments list -- */
+
+.attachments-list {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.attachments-list h2 {
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+
+.attachments-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attachments-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.attachments-list__link {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachments-list__kind {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
 /* -- Chat panel -- */
 
 .chat-panel {

@@ -34,7 +34,7 @@ from typing import Any
 
 from .api import OcmApi
 from .envelope import Codes
-from .prompts import ZERO_ASSUMPTION_DOCTRINE
+from .prompts import DATASHEET_EXTRACTION_PROMPT, ZERO_ASSUMPTION_DOCTRINE
 
 DEFAULT_MODEL = "claude-sonnet-5"
 MAX_TOOL_TURNS = 8  # a hard ceiling -- a misbehaving loop reports itself instead of running forever
@@ -171,6 +171,8 @@ def build_system_prompt(component_id: str | None) -> str:
         + "\n\n"
         + ZERO_ASSUMPTION_DOCTRINE
         + action_note
+        + "\n\n"
+        + DATASHEET_EXTRACTION_PROMPT
     )
 
 

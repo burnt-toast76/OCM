@@ -62,7 +62,7 @@ interface ComponentsState {
 
   loadComponents: () => Promise<void>;
   selectComponent: (id: string) => Promise<void>;
-  createDraft: (id: string, kind: string) => Promise<void>;
+  createDraft: (id: string, kind: string, initialFields?: Record<string, unknown>) => Promise<void>;
   saveField: (path: string[], value: unknown) => Promise<void>;
   refreshChecklist: () => Promise<void>;
   refreshAttachments: () => Promise<void>;
@@ -185,13 +185,21 @@ export const useComponentsStore = create<ComponentsState>((set, get) => ({
     }
   },
 
-  createDraft: async (id: string, kind: string) => {
+  createDraft: async (id: string, kind: string, initialFields?: Record<string, unknown>) => {
     set(() => ({ loading: true, error: null }));
     try {
       const env = await api.createComponentDraft(id, kind);
       if (!env.ok) {
         set(() => ({ loading: false, error: env.refusals[0]?.message ?? "create_component_draft was refused" }));
         return;
+      }
+      // Patched in right after the scaffold write, still part of the same
+      // "create" gesture from the human's point of view -- create_component_draft
+      // itself stays a bare (id, kind) scaffold (ADR-0014: never pre-filled
+      // by the verb itself), same as it's always been for the AI chat path.
+      if (initialFields && Object.keys(initialFields).length > 0) {
+        const patch = Object.entries(initialFields).map(([path, value]) => ({ op: "add", path: `/${path}`, value }));
+        await api.updateComponent(id, { patch });
       }
       await get().loadComponents();
       set(() => ({ loading: false }));

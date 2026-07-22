@@ -151,9 +151,16 @@ interface SchemaFieldRowProps extends SchemaFieldProps {
 function SchemaFieldRow({ label, schema, path, value, onCommit, disabled }: SchemaFieldRowProps) {
   const id = fieldId(path);
   const isContainer = schema.type === "object" || schema.type === "array" || (schema.properties && !schema.type);
+  // A container's nested group re-uses `id` for its own aria-labelledby
+  // (see SchemaField's object/array-of-enum branches), so the label needs
+  // it. A leaf's `id` belongs to its own <input> (SchemaField sets it
+  // there) -- the label only needs `htmlFor` pointing at it, never its own
+  // matching `id`, or the two elements would share one id and `htmlFor`
+  // would resolve back to the (non-labellable) <label> itself instead of
+  // the input.
   return (
     <div className={`schema-field ${isContainer ? "schema-field--container" : ""}`}>
-      <label id={id} htmlFor={isContainer ? undefined : id}>
+      <label id={isContainer ? id : undefined} htmlFor={isContainer ? undefined : id}>
         {label}
       </label>
       <SchemaField schema={schema} path={path} value={value} onCommit={onCommit} disabled={disabled} />

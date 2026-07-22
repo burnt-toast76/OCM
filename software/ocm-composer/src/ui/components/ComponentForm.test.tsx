@@ -2,8 +2,8 @@
 // The task's own explicit requirements: the form renders every top-level
 // schema section, and a refusal path maps to the right field.
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ComponentForm } from "./ComponentForm";
 import { useComponentsStore } from "../../store/componentsStore";
 import type { JsonSchemaNode } from "../../api/types";
@@ -142,5 +142,65 @@ describe("ComponentForm", () => {
     const electricalSection = sectionHeading("electrical").closest("section")!;
     expect(electricalSection.querySelector(".schema-array__row")).toBeNull();
     expect(electricalSection.querySelector(".schema-array__add")).not.toBeNull();
+  });
+
+  it("supports a two-level-nested array -- a connector's own pins -- committing each leaf edit at the right path", () => {
+    // electrical.connectors[].pins[] (spec/schema/ocm-component-1.0.schema.json):
+    // an array-of-objects (connectors) whose own item schema has ANOTHER
+    // array-of-objects property (pins). SchemaField is fully generic/
+    // recursive, so this ought to "just work" with no code change beyond
+    // the schema -- this pins it down for the real nested shape, not just
+    // one level of array.
+    const saveField = vi.fn();
+    const schemaWithPins: JsonSchemaNode = {
+      ...FAKE_SCHEMA,
+      properties: {
+        ...FAKE_SCHEMA.properties,
+        electrical: {
+          type: "object",
+          properties: {
+            connectors: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  ref: { type: "string" },
+                  pins: {
+                    type: "array",
+                    items: { type: "object", properties: { pin: { type: "string" }, function: { type: "string" } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    useComponentsStore.setState({
+      schema: schemaWithPins,
+      detail: {
+        id: "com.example.test-part",
+        revision: "0.1.0",
+        draft: true,
+        component: {
+          ocm_version: "1.1",
+          id: "com.example.test-part",
+          revision: "0.1.0",
+          electrical: { connectors: [{ ref: "M12", pins: [{}] }] },
+        },
+      },
+      saveField,
+    });
+
+    render(<ComponentForm />);
+
+    fireEvent.change(screen.getByLabelText("pin"), { target: { value: "1" } });
+    fireEvent.blur(screen.getByLabelText("pin"));
+    fireEvent.change(screen.getByLabelText("function"), { target: { value: "24VDC supply" } });
+    fireEvent.blur(screen.getByLabelText("function"));
+
+    expect(saveField).toHaveBeenCalledWith(["electrical", "connectors", "0", "pins", "0", "pin"], "1");
+    expect(saveField).toHaveBeenCalledWith(["electrical", "connectors", "0", "pins", "0", "function"], "24VDC supply");
   });
 });

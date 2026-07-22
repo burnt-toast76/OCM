@@ -107,6 +107,12 @@ def test_system_prompt_requires_ending_with_a_write_not_just_discovery():
     assert "MUST end by actually calling update_component" in prompt
 
 
+def test_system_prompt_includes_the_user_authored_extraction_prompt():
+    prompt = build_system_prompt("com.example.ejector.demo1")
+    assert "ABSOLUTE RULES" in prompt
+    assert "Never convert units" in prompt
+
+
 # ---------------------------------------------------------------------------
 # The tool-use loop: fake Anthropic CLIENT (not a faked stream_turn), so
 # _stream_turn's own SDK-shape parsing is exercised for real, and the tool

@@ -21,6 +21,16 @@ const KNOWN_KINDS = [
 
 const ACCEPTED_EXTENSIONS = [".pdf", ".txt", ".step", ".stp"];
 
+// The id is still `com.<vendor>.<part_number>` underneath (every verb,
+// storage path, and cross-reference still keys off it) -- the user just
+// never has to type or see that dotted form anymore. Lowercased and
+// stripped to the id schema's own charset (`^[a-z0-9]+(\.[a-z0-9_-]+)+$`
+// per segment); the vendor/part_number FIELDS still get the human's exact
+// text, unmodified -- this only affects the derived identifier.
+function slugify(s: string): string {
+  return s.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "x";
+}
+
 const TRANSCRIBE_PROMPT =
   "I've attached a datasheet for this part. Please transcribe it into the component definition -- " +
   "zero assumption: only include what it actually states, restate/convert units freely, and tell me " +
@@ -36,7 +46,9 @@ export function ComponentsList() {
   const uploadAttachment = useComponentsStore((s) => s.uploadAttachment);
   const sendChatMessage = useComponentsStore((s) => s.sendChatMessage);
 
-  const [newId, setNewId] = useState("");
+  const [newVendor, setNewVendor] = useState("");
+  const [newPartNumber, setNewPartNumber] = useState("");
+  const [newDescription, setNewDescription] = useState("");
   const [newKind, setNewKind] = useState(KNOWN_KINDS[0]);
   // Staged client-side only, until a draft exists to attach them to --
   // uploadComponentAttachment needs a component id, which doesn't exist
@@ -64,12 +76,22 @@ export function ComponentsList() {
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
-    const id = newId.trim();
-    if (!id || submitting) return;
+    const vendor = newVendor.trim();
+    const partNumber = newPartNumber.trim();
+    const description = newDescription.trim();
+    if (!vendor || !partNumber || submitting) return;
+    const id = `com.${slugify(vendor)}.${slugify(partNumber)}`;
+
+    // Authored directly by the human at creation time, not transcribed --
+    // unlike vendor/source's usual "leave blank until the datasheet says
+    // so" rule (ADR-0014), these are known right now, before any datasheet
+    // is even attached: they're WHY this draft is being created at all.
+    const initialFields: Record<string, unknown> = { vendor, part_number: partNumber };
+    if (description) initialFields.name = description;
 
     setSubmitting(true);
     try {
-      await createDraft(id, newKind);
+      await createDraft(id, newKind, initialFields);
       // createDraft only reaches selectComponent(id) on success (e.g. NOT
       // if the id already exists) -- checking selection is how the caller
       // tells success from refusal without createDraft needing its own
@@ -77,7 +99,9 @@ export function ComponentsList() {
       if (useComponentsStore.getState().selectedComponentId !== id) return;
 
       const files = stagedFiles;
-      setNewId("");
+      setNewVendor("");
+      setNewPartNumber("");
+      setNewDescription("");
       setStagedFiles([]);
 
       for (const file of files) {
@@ -114,7 +138,21 @@ export function ComponentsList() {
       </ul>
 
       <form className="components-list__new" onSubmit={(e) => void handleCreate(e)}>
-        <input type="text" value={newId} onChange={(e) => setNewId(e.target.value)} placeholder="com.vendor.part.model" aria-label="New component id" />
+        <input type="text" value={newVendor} onChange={(e) => setNewVendor(e.target.value)} placeholder="Vendor" aria-label="New component vendor" />
+        <input
+          type="text"
+          value={newPartNumber}
+          onChange={(e) => setNewPartNumber(e.target.value)}
+          placeholder="Part number"
+          aria-label="New component part number"
+        />
+        <input
+          type="text"
+          value={newDescription}
+          onChange={(e) => setNewDescription(e.target.value)}
+          placeholder="Description (optional)"
+          aria-label="New component description"
+        />
         <select value={newKind} onChange={(e) => setNewKind(e.target.value)} aria-label="New component kind">
           {KNOWN_KINDS.map((k) => (
             <option key={k} value={k}>
@@ -168,7 +206,7 @@ export function ComponentsList() {
           )}
         </div>
 
-        <button type="submit" disabled={!newId.trim() || submitting}>
+        <button type="submit" disabled={!newVendor.trim() || !newPartNumber.trim() || submitting}>
           {stagedFiles.length > 0 ? "New draft & transcribe" : "New draft"}
         </button>
       </form>

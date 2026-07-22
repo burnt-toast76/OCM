@@ -21,77 +21,85 @@ import path from "node:path";
 
 const BACKEND = `http://127.0.0.1:${process.env.OCM_TEST_BACKEND_PORT ?? "8000"}`;
 
-test("create draft, chat sets a field (mocked SSE), then a direct field edit shrinks the checklist further", async ({ page }) => {
-  const testId = `com.example.chat-test-${Date.now()}`;
+test("create draft (vendor/part number captured up front), chat sets source, then a direct field edit updates it further", async ({ page }) => {
+  const vendor = "example";
+  const partNumber = `chat-test-${Date.now()}`;
+  const testId = `com.${vendor}.${partNumber}`;
 
   await page.goto("/composer/");
   await page.getByRole("button", { name: "Menu" }).click();
   await page.getByRole("menuitem", { name: "Components" }).click();
 
-  // -- create draft --------------------------------------------------
-  await page.getByPlaceholder("com.vendor.part.model").fill(testId);
+  // -- create draft: vendor + part number captured directly, no raw
+  // dotted id typed anywhere -------------------------------------------
+  await page.getByPlaceholder("Vendor").fill(vendor);
+  await page.getByPlaceholder("Part number").fill(partNumber);
   await page.getByLabel("New component kind").selectOption("vacuum_ejector");
   await page.getByRole("button", { name: "New draft" }).click();
   await expect(page.locator("h1", { hasText: testId })).toBeVisible();
 
-  // A fresh draft is missing vendor + source (ADR-0014: never pre-filled).
-  await expect(page.locator(".checklist-panel__item")).toHaveCount(2);
+  // Vendor is captured (and committed) by the create form itself now --
+  // only source (ADR-0014: a genuine datasheet fact, never pre-filled)
+  // is still missing.
+  await expect(page.locator('[data-field="vendor"] input')).toHaveValue(vendor);
+  await expect(page.locator(".checklist-panel__item")).toHaveCount(1);
+  await expect(page.locator(".checklist-panel__item")).toContainText("source");
 
-  // -- mock /agent/chat: the "agent" sets vendor for real, then tells the
+  // -- mock /agent/chat: the "agent" sets source for real, then tells the
   // frontend it did, over a canned SSE stream ------------------------
-  const agentVendor = "Acme Pneumatics (via agent)";
   await page.route("**/agent/chat", async (route) => {
     const res = await fetch(`${BACKEND}/update_component`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id: testId, patch: [{ op: "add", path: "/vendor", value: agentVendor }] }),
+      body: JSON.stringify({
+        id: testId,
+        patch: [{ op: "add", path: "/source", value: { kind: "datasheet", ref: "Fake datasheet, worked example only" } }],
+      }),
     });
     expect(res.ok).toBe(true);
 
     const sse =
-      'event: text\ndata: {"delta":"Setting the vendor now."}\n\n' +
+      'event: text\ndata: {"delta":"Setting the source now."}\n\n' +
       `event: tool_call\ndata: {"name":"update_component","ok":true,"refusal_count":0,"envelope":{"ok":true,"refusals":[],"warnings":[],"data":{"id":"${testId}","revision":"0.1.0","draft":true}}}\n\n` +
       "event: done\ndata: {}\n\n";
 
     await route.fulfill({ status: 200, contentType: "text/event-stream", body: sse });
   });
 
-  await page.getByPlaceholder("Transcribe this datasheet…").fill("This part's vendor is Acme Pneumatics.");
+  await page.getByPlaceholder("Transcribe this datasheet…").fill("This part's source is a datasheet.");
   await page.getByRole("button", { name: "Send" }).click();
 
-  await expect(page.locator(".chat-turn--assistant").last()).toContainText("Setting the vendor now.");
+  await expect(page.locator(".chat-turn--assistant").last()).toContainText("Setting the source now.");
   await expect(page.locator(".chat-tool-chip__label")).toContainText("update_component ✓");
 
-  // -- form updates: the vendor field now shows what the "agent" set,
-  // via a REAL describe_component refetch triggered by the tool_call
-  // event, not just something painted onto the DOM directly -----------
-  await expect(page.locator('[data-field="vendor"] input')).toHaveValue(agentVendor);
-
-  // -- checklist shrinks (from chat): vendor's own refusal is gone,
-  // source's is not (the agent never touched it) ----------------------
-  await expect(page.locator(".checklist-panel__item")).toHaveCount(1);
-  await expect(page.locator(".checklist-panel__item")).toContainText("source");
-
-  // -- edit a field directly (no chat involved this time) --------------
+  // -- form updates: source now shows what the "agent" set, via a REAL
+  // describe_component refetch triggered by the tool_call event, not
+  // just something painted onto the DOM directly -----------------------
   const sourceInputs = page.locator('[data-field="source"] input, [data-field="source"] textarea');
-  await sourceInputs.nth(0).fill("datasheet");
-  await sourceInputs.nth(0).blur();
-  await sourceInputs.nth(1).fill("Fake datasheet, worked example only");
-  await sourceInputs.nth(1).blur();
+  await expect(sourceInputs.nth(1)).toHaveValue("Fake datasheet, worked example only");
 
-  // -- checklist shrinks again (from a direct field edit): nothing left --
+  // -- checklist shrinks to nothing outstanding ------------------------
   await expect(page.locator(".checklist-panel__item")).toHaveCount(0);
   await expect(page.getByText("Nothing outstanding -- ready to publish.")).toBeVisible();
+
+  // -- edit a field directly (no chat involved this time): direct form
+  // edits still commit and persist even once nothing's required --------
+  await sourceInputs.nth(1).fill("Updated citation, worked example only");
+  await sourceInputs.nth(1).blur();
+  await expect(sourceInputs.nth(1)).toHaveValue("Updated citation, worked example only");
 });
 
 test("the chat panel lets you choose which AI model to use, and sends that choice with the request", async ({ page }) => {
-  const testId = `com.example.model-picker-test-${Date.now()}`;
+  const vendor = "example";
+  const partNumber = `model-picker-test-${Date.now()}`;
+  const testId = `com.${vendor}.${partNumber}`;
 
   await page.goto("/composer/");
   await page.getByRole("button", { name: "Menu" }).click();
   await page.getByRole("menuitem", { name: "Components" }).click();
 
-  await page.getByPlaceholder("com.vendor.part.model").fill(testId);
+  await page.getByPlaceholder("Vendor").fill(vendor);
+  await page.getByPlaceholder("Part number").fill(partNumber);
   await page.getByLabel("New component kind").selectOption("sensor");
   await page.getByRole("button", { name: "New draft" }).click();
   await expect(page.locator("h1", { hasText: testId })).toBeVisible();
@@ -116,7 +124,9 @@ test("the chat panel lets you choose which AI model to use, and sends that choic
 });
 
 test("attaching a datasheet before creating uploads it to the new draft and auto-starts transcription", async ({ page }) => {
-  const testId = `com.example.precreate-test-${Date.now()}`;
+  const vendor = "example";
+  const partNumber = `precreate-test-${Date.now()}`;
+  const testId = `com.${vendor}.${partNumber}`;
   const pdfPath = path.join(os.tmpdir(), `ocm-e2e-datasheet-${Date.now()}.pdf`);
   fs.writeFileSync(pdfPath, "%PDF-1.4 fake datasheet bytes for testing");
 
@@ -124,7 +134,8 @@ test("attaching a datasheet before creating uploads it to the new draft and auto
   await page.getByRole("button", { name: "Menu" }).click();
   await page.getByRole("menuitem", { name: "Components" }).click();
 
-  await page.getByPlaceholder("com.vendor.part.model").fill(testId);
+  await page.getByPlaceholder("Vendor").fill(vendor);
+  await page.getByPlaceholder("Part number").fill(partNumber);
   await page.getByLabel("New component kind").selectOption("sensor");
 
   // The file input is deliberately hidden (browse via the button instead)
@@ -154,17 +165,24 @@ test("attaching a datasheet before creating uploads it to the new draft and auto
   expect(files).toHaveLength(1);
   expect(files[0].kind).toBe("pdf");
 
+  // And it's visible in the UI too -- not just reachable via the API --
+  // so a human can come back later and re-check the source datasheet.
+  await expect(page.locator(".attachments-list__link", { hasText: path.basename(pdfPath) })).toBeVisible();
+
   fs.rmSync(pdfPath, { force: true });
 });
 
 test("deleting a component removes it from the list and the workspace, after a confirm", async ({ page }) => {
-  const testId = `com.example.delete-test-${Date.now()}`;
+  const vendor = "example";
+  const partNumber = `delete-test-${Date.now()}`;
+  const testId = `com.${vendor}.${partNumber}`;
 
   await page.goto("/composer/");
   await page.getByRole("button", { name: "Menu" }).click();
   await page.getByRole("menuitem", { name: "Components" }).click();
 
-  await page.getByPlaceholder("com.vendor.part.model").fill(testId);
+  await page.getByPlaceholder("Vendor").fill(vendor);
+  await page.getByPlaceholder("Part number").fill(partNumber);
   await page.getByLabel("New component kind").selectOption("sensor");
   await page.getByRole("button", { name: "New draft" }).click();
   await expect(page.locator("h1", { hasText: testId })).toBeVisible();

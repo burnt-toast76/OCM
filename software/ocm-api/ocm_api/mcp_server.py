@@ -213,9 +213,10 @@ def build_server(repo_root: str) -> FastMCP:
         "patch (`patch`), exactly one of the two. ALWAYS WRITES, even if invalid (ok=false then, "
         "with every schema violation as a refusal) -- validation gates publish_component, not this "
         "call. ZERO ASSUMPTION (ADR-0014): a value goes in only if the source document states it -- "
-        "restate/convert units freely ('~4 min' -> 240 s), but a stated RANGE stays a range "
-        "(pressure_bar_min/max), never narrowed to one number, and anything the datasheet doesn't "
-        "answer is OMITTED, never estimated, never copied from another component. Leave the draft "
+        "never convert units, record every value in the exact unit the source prints, verbatim "
+        "('bar', 'psi', 'VDC'). A stated RANGE stays a range (pressure_min/pressure_max, "
+        "plus a verbatim units field), never narrowed to one number, and anything the datasheet "
+        "doesn't answer is OMITTED, never estimated, never copied from another component. Leave the draft "
         "incomplete and report the refusals as the human's completion list -- do not guess to make "
         "validation pass.",
         '  call: update_component(id="com.smc.ejector.zk2-agh", manifest={"ocm_version": "1.1", "vendor": "SMC", "source": {"kind": "datasheet", "ref": "ZK2-AGH catalog page, 2024 ed."}, ...})\n'

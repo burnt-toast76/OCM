@@ -24,7 +24,7 @@ def _ejector_manifest(component_id: str = "com.example.ejector.demo1") -> dict:
         "part_number": "EJ-100",
         "source": {"kind": "datasheet", "ref": "fictional demo datasheet, worked-example only"},
         "electrical": {"supplies": [{"rail": "24VDC", "current_nominal_a": 0.3}]},
-        "pneumatic": {"pressure_bar_min": 4.0, "pressure_bar_max": 6.0, "flow_nl_min": 12.0},
+        "pneumatic": {"pressure_min": 4.0, "pressure_max": 6.0, "units": "bar", "flow_nl_min": 12.0},
         "comms": {
             "protocol": "discrete-io",
             "signals": [{"name": "vacuum_switch", "direction_device": "output", "type": "bool"}],

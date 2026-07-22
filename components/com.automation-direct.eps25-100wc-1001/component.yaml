@@ -1,0 +1,32 @@
+ocm_version: '1.1'
+id: com.automation-direct.eps25-100wc-1001
+revision: 0.1.0
+kind: sensor
+vendor: Automation Direct
+name: ProSense digital pressure sensor
+part_number: EPS25-100WC-1001
+notes: "Brand: ProSense. Item: Digital pressure sensor. Media Type: Liquid and gases. Pressure Range: -5 to +100.4 inches of water column (min -5, max +100.4, unit 'inches of water column' verbatim; NOT converted to bar). Accuracy: +/-0.5% of full range. Sensing Element Material: Ceramic. Seal Material: FKM. Wetted Parts: Ceramic, FKM, 316 stainless steel. Display Type: 4-digit, two-color LED display. Operating Voltage: 18-30 VDC (min 18, max 30). Additional Information: Purchase cable separately. Agency Approvals: UL Listed File # E320431; UL Recognized None; UL Hazardous None; CE (see CE declarations); CSA None; RoHS Yes (See CE Doc); EU REACH document available. 2D Drawing: https://cdn.automationdirect.com/static/drawings/EPS25-100WC-1001.pdf"
+comms:
+  protocol: discrete-io
+  signals:
+  - name: output_1
+    direction_device: output
+    type: bool
+    electrical: Switch (N.O./N.C.), PNP/NPN selectable
+    note: 'Output (spec table): Switch (N.O./N.C.), PNP/NPN selectable'
+  - name: output_2
+    direction_device: output
+    type: bool
+    electrical: Switch (N.O./N.C.), PNP/NPN selectable, or 4-20 mA / 0-10 VDC
+    note: 'Output 2 (spec table): Switch (N.O./N.C.), PNP/NPN selectable or 4-20 mA / 0-10 VDC'
+electrical:
+  connectors:
+  - ref: electrical
+    type: 4-pin M12 quick-disconnect
+    carries: power + outputs
+source:
+  kind: datasheet
+  ref: EPS25-100WC-1001_cutsheet.pdf (https://www.automationdirect.com/pn/EPS25-100WC-1001)
+  date: '2026-06-11'
+pneumatic:
+  port: 1/4in male NPT

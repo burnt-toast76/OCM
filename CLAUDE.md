@@ -33,8 +33,9 @@ Module authoring goes through the ocm MCP tools (create_module_draft → update_
 ## Authoring from datasheets (ADR-0014)
 
 A datasheet describes a COMPONENT. Author it as one (components/ registry), by
-TRANSCRIPTION ONLY: a value appears only if the source states it. Unit conversion and
-restatement are fine ("~4 min" -> 240 s). Choosing within a stated range is design --
+TRANSCRIPTION ONLY: a value appears only if the source states it. Never convert units --
+record every value in the exact unit the source prints, verbatim ("bar", "inH2O", "VDC");
+conversion happens downstream in code, not here. Choosing within a stated range is design --
 record the range, do not pick. Anything unanswered is OMITTED, never estimated, never
 copied from other definitions. Leave the draft incomplete and report the validation
 refusals as the list of what the human must supply.

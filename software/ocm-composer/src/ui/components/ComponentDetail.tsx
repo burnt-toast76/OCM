@@ -6,6 +6,7 @@ import { ComponentForm } from "./ComponentForm";
 import { ChecklistPanel } from "./ChecklistPanel";
 import { ChatPanel } from "./ChatPanel";
 import { GlbViewer } from "./GlbViewer";
+import { AttachmentsList } from "./AttachmentsList";
 
 export function ComponentDetail() {
   const selectedComponentId = useComponentsStore((s) => s.selectedComponentId);
@@ -53,6 +54,7 @@ export function ComponentDetail() {
         <ComponentForm />
         <div className="component-detail__side">
           <ChecklistPanel />
+          <AttachmentsList />
           <ChatPanel />
         </div>
       </div>
