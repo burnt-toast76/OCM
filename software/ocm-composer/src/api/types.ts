@@ -235,3 +235,13 @@ export interface ChatToolCallEvent {
   refusal_count: number;
   envelope: Envelope;
 }
+
+export interface AgentModel {
+  id: string;
+  label: string;
+}
+
+export interface AgentModelsData {
+  models: AgentModel[];
+  default: string;
+}

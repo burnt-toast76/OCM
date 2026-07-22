@@ -261,6 +261,18 @@ def build_server(repo_root: str) -> FastMCP:
     def describe_component(id: str) -> dict[str, Any]:
         return api.describe_component(id).to_dict()
 
+    @mcp.tool(description=_doc(
+        "Delete a component permanently -- removes its directory (manifest + attachments) from "
+        "the workspace. Unconditional, like every other write here: if a module still references "
+        "this component, the delete still happens and the response's warnings name which module(s) "
+        "will no longer resolve. This is a deliberate, destructive, human-gated action -- it is not "
+        "offered to the /agent/chat assistant.",
+        '  call: delete_component(id="com.smc.ejector.zk2-agh")\n'
+        '  response: {"ok": true, "data": {"id": "com.smc.ejector.zk2-agh", "deleted": true}}',
+    ))
+    def delete_component(id: str) -> dict[str, Any]:
+        return api.delete_component(id).to_dict()
+
     # -- Cell composition ---------------------------------------------------
 
     @mcp.tool(description=_doc(

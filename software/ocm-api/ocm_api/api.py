@@ -127,6 +127,10 @@ class OcmApi:
     def describe_component(self, id: str) -> Envelope:
         return components.describe_component(self.workspace, id)
 
+    @_never_raise
+    def delete_component(self, id: str) -> Envelope:
+        return components.delete_component(self.workspace, id)
+
     # -- Cell composition ---------------------------------------------------
 
     @_never_raise

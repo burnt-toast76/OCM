@@ -33,6 +33,9 @@ export function ChatPanel() {
   const uploadAttachment = useComponentsStore((s) => s.uploadAttachment);
   const removeStagedAttachment = useComponentsStore((s) => s.removeStagedAttachment);
   const selectedComponentId = useComponentsStore((s) => s.selectedComponentId);
+  const agentModels = useComponentsStore((s) => s.agentModels);
+  const selectedModel = useComponentsStore((s) => s.selectedModel);
+  const setSelectedModel = useComponentsStore((s) => s.setSelectedModel);
 
   const [draft, setDraft] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -75,7 +78,24 @@ export function ChatPanel() {
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
     >
-      <h2>Chat</h2>
+      <div className="chat-panel__header">
+        <h2>Chat</h2>
+        {agentModels.length > 0 && (
+          <select
+            className="chat-panel__model"
+            aria-label="AI model"
+            value={selectedModel ?? ""}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            disabled={chatStreaming}
+          >
+            {agentModels.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
       <div className="chat-panel__transcript">
         {chatTurns.length === 0 && <p className="chat-panel__empty">Describe what you're transcribing, or drop a datasheet below.</p>}
         {chatTurns.map((turn) => (

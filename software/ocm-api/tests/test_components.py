@@ -334,3 +334,55 @@ def test_draft_component_referenced_by_a_published_module_blocks_resolution(api:
     e = _place_tool(api, "c-draftcomp", "com.example.pickhead.draftcomp1", [{"refdes": "VG1", "ref": "com.example.ejector.draft1@0.1.0"}])
     assert not e.ok
     assert e.refusals[0].code == Codes.DRAFT_MODULE_REFERENCED
+
+
+# ---------------------------------------------------------------------------
+# delete_component
+# ---------------------------------------------------------------------------
+
+
+def test_delete_component_removes_it_from_the_workspace(api: OcmApi, workspace_root):
+    api.create_component_draft("com.example.ejector.deleteme1", "vacuum_ejector")
+    assert (workspace_root / "components" / "com.example.ejector.deleteme1").is_dir()
+
+    e = api.delete_component("com.example.ejector.deleteme1")
+
+    assert e.ok, e.refusals
+    assert e.data == {"id": "com.example.ejector.deleteme1", "deleted": True}
+    assert not (workspace_root / "components" / "com.example.ejector.deleteme1").exists()
+    assert e.warnings == ()
+
+    listed = api.list_components()
+    assert all(r["id"] != "com.example.ejector.deleteme1" for r in listed.data)
+
+    described = api.describe_component("com.example.ejector.deleteme1")
+    assert not described.ok
+    assert described.refusals[0].code == Codes.NOT_FOUND
+
+
+def test_delete_nonexistent_component_is_not_found(api: OcmApi):
+    e = api.delete_component("com.example.ejector.doesnotexist")
+    assert not e.ok
+    assert e.refusals[0].code == Codes.NOT_FOUND
+
+
+def test_delete_component_warns_but_still_deletes_when_referenced_by_a_module(api: OcmApi):
+    _publish_ejector(api, "com.example.ejector.referenced1")
+    api.create_module_draft("com.example.pickhead.refby1", "end_effector")
+    manifest = _tool_module_manifest(
+        "com.example.pickhead.refby1",
+        components=[{"refdes": "VG1", "ref": "com.example.ejector.referenced1@1.0.0"}],
+        signal_source="VG1.vacuum_switch",
+    )
+    api.update_module("com.example.pickhead.refby1", manifest=manifest)
+
+    e = api.delete_component("com.example.ejector.referenced1")
+
+    assert e.ok, e.refusals
+    assert e.data["deleted"] is True
+    assert len(e.warnings) == 1
+    assert "com.example.pickhead.refby1" in e.warnings[0]
+
+    described = api.describe_component("com.example.ejector.referenced1")
+    assert not described.ok
+    assert described.refusals[0].code == Codes.NOT_FOUND

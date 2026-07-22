@@ -11,6 +11,7 @@ export function ComponentDetail() {
   const selectedComponentId = useComponentsStore((s) => s.selectedComponentId);
   const detail = useComponentsStore((s) => s.detail);
   const attachments = useComponentsStore((s) => s.attachments);
+  const deleteComponent = useComponentsStore((s) => s.deleteComponent);
 
   // Any attachment with a converted GLB sibling -- typically the one STEP
   // file a draft has, but this doesn't assume there's exactly one.
@@ -33,6 +34,17 @@ export function ComponentDetail() {
             {detail.draft ? "draft" : detail.revision}
           </span>
         )}
+        <button
+          type="button"
+          className="component-detail__delete"
+          onClick={() => {
+            if (window.confirm(`Delete ${selectedComponentId}? This removes its manifest and attachments permanently.`)) {
+              void deleteComponent(selectedComponentId);
+            }
+          }}
+        >
+          Delete
+        </button>
       </header>
 
       {glbFilename && <GlbViewer url={attachmentDownloadUrl(selectedComponentId, glbFilename)} />}

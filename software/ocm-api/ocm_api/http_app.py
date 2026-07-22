@@ -28,7 +28,7 @@ from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from .agent import agent_unavailable_stream, run_agent_chat
+from .agent import ALLOWED_MODELS, DEFAULT_MODEL, agent_unavailable_stream, invalid_model_stream, run_agent_chat
 from .api import OcmApi
 from .attachments import attachment_content_blocks, list_attachments, save_attachment
 
@@ -134,6 +134,10 @@ def build_app(repo_root: str) -> FastAPI:
     def describe_component(id: str = Query(...)) -> dict[str, Any]:
         return envelope_response(api.describe_component(id))
 
+    @app.post("/delete_component")
+    def delete_component(id: str = Body(..., embed=True)) -> dict[str, Any]:
+        return envelope_response(api.delete_component(id))
+
     # -- Cell composition ---------------------------------------------------
 
     @app.post("/create_cell")
@@ -210,12 +214,21 @@ def build_app(repo_root: str) -> FastAPI:
             raise HTTPException(status_code=404, detail=f"no attachment {filename!r} for component {component_id!r}")
         return FileResponse(target)
 
+    @app.get("/agent/models")
+    def agent_models() -> dict[str, Any]:
+        return {"models": [{"id": model_id, "label": label} for model_id, label in ALLOWED_MODELS.items()], "default": DEFAULT_MODEL}
+
     @app.post("/agent/chat")
     def agent_chat(
         component_id: str | None = Body(default=None),
         messages: list[dict[str, Any]] = Body(...),
         attachment_filenames: list[str] = Body(default=[]),
+        model: str | None = Body(default=None),
     ) -> StreamingResponse:
+        selected_model = model or DEFAULT_MODEL
+        if selected_model not in ALLOWED_MODELS:
+            return StreamingResponse(invalid_model_stream(selected_model), media_type="text/event-stream")
+
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             return StreamingResponse(
@@ -233,7 +246,9 @@ def build_app(repo_root: str) -> FastAPI:
                 conversation[-1] = {"role": "user", "content": [{"type": "text", "text": text}, *blocks]}
 
         client = anthropic.Anthropic(api_key=api_key)
-        return StreamingResponse(run_agent_chat(client, api, conversation, component_id=component_id), media_type="text/event-stream")
+        return StreamingResponse(
+            run_agent_chat(client, api, conversation, component_id=component_id, model=selected_model), media_type="text/event-stream"
+        )
 
     # -- Composer static build ---------------------------------------------------
 

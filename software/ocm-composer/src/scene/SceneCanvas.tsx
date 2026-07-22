@@ -161,7 +161,12 @@ export function SceneCanvas() {
     <div className="scene-canvas" onDragOver={handleDragOver} onDrop={handleDrop}>
       <Canvas
         camera={{ up: [0, 0, 1], position: [center.x + extent, center.y - extent, center.z + extent * 0.8], fov: 50, near: 0.01, far: 100 }}
-        onPointerMissed={() => void selectInstance(null)}
+        onPointerMissed={() => {
+          // TEMP DIAGNOSTIC (remove once the still-rotates report is root-caused).
+          // eslint-disable-next-line no-console
+          console.debug("[ocm-composer] drag: pointer MISSED every mesh entirely -- orbit controls were never touched");
+          void selectInstance(null);
+        }}
       >
         <ThreeBridge handleRef={threeRef} />
         <color attach="background" args={[BACKGROUND]} />

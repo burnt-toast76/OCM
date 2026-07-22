@@ -24,6 +24,7 @@ oversights:
 from __future__ import annotations
 
 import re
+import shutil
 from typing import Any
 
 import jsonpatch
@@ -168,6 +169,39 @@ def list_components(ws: Workspace) -> Envelope:
             }
         )
     return Envelope.succeed(rows)
+
+
+def delete_component(ws: Workspace, component_id: str) -> Envelope:
+    """Unconditional, like every other write here (spec/09: "writes are
+    unconditional") -- a component referenced by a module is still
+    deletable, same as remove_instance never blocks on a cell-level
+    reference. The reference is named as a `warnings` entry, not a refusal,
+    so the caller finds out what it broke without the delete itself being
+    gated behind resolving that first.
+    """
+    if not ws.component_exists(component_id):
+        return single_refusal(Codes.NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
+
+    referencing_modules = []
+    for module_id in ws.list_module_ids():
+        data = read_yaml(ws.module_path(module_id)) or {}
+        for mc in data.get("components") or []:
+            ref = mc.get("ref", "")
+            ref_id, _, _ = ref.partition("@")
+            if ref_id == component_id:
+                referencing_modules.append(module_id)
+                break
+
+    shutil.rmtree(ws.component_dir(component_id))
+
+    warnings = []
+    if referencing_modules:
+        warnings.append(
+            f"{component_id} was referenced by {len(referencing_modules)} module(s) "
+            f"({', '.join(sorted(referencing_modules))}); those modules will no longer resolve."
+        )
+
+    return Envelope.succeed({"id": component_id, "deleted": True}, warnings=warnings)
 
 
 def describe_component(ws: Workspace, component_id: str) -> Envelope:

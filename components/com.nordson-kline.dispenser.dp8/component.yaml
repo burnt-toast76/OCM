@@ -13,8 +13,8 @@ geometry:
   mass_kg: 4.2
 name: Nordson-Kline DP-8 Precision Dot Dispenser
 pneumatic:
-  pressure_bar_min: 4.0
-  pressure_bar_max: 6.0
+  pressure_bar_min: 4
+  pressure_bar_max: 6
   port: G1/8
 vendor: Nordson-Kline
 comms:

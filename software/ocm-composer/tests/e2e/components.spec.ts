@@ -15,6 +15,9 @@
 // handler actually wrote it moments earlier.
 
 import { test, expect } from "@playwright/test";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 const BACKEND = `http://127.0.0.1:${process.env.OCM_TEST_BACKEND_PORT ?? "8000"}`;
 
@@ -22,7 +25,8 @@ test("create draft, chat sets a field (mocked SSE), then a direct field edit shr
   const testId = `com.example.chat-test-${Date.now()}`;
 
   await page.goto("/composer/");
-  await page.getByRole("button", { name: "Components" }).click();
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("menuitem", { name: "Components" }).click();
 
   // -- create draft --------------------------------------------------
   await page.getByPlaceholder("com.vendor.part.model").fill(testId);
@@ -78,4 +82,106 @@ test("create draft, chat sets a field (mocked SSE), then a direct field edit shr
   // -- checklist shrinks again (from a direct field edit): nothing left --
   await expect(page.locator(".checklist-panel__item")).toHaveCount(0);
   await expect(page.getByText("Nothing outstanding -- ready to publish.")).toBeVisible();
+});
+
+test("the chat panel lets you choose which AI model to use, and sends that choice with the request", async ({ page }) => {
+  const testId = `com.example.model-picker-test-${Date.now()}`;
+
+  await page.goto("/composer/");
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("menuitem", { name: "Components" }).click();
+
+  await page.getByPlaceholder("com.vendor.part.model").fill(testId);
+  await page.getByLabel("New component kind").selectOption("sensor");
+  await page.getByRole("button", { name: "New draft" }).click();
+  await expect(page.locator("h1", { hasText: testId })).toBeVisible();
+
+  // Populated for real from GET /agent/models against the fixture
+  // backend -- not mocked -- and defaults to whatever that response's own
+  // `default` field says.
+  const picker = page.getByLabel("AI model");
+  await expect(picker).toHaveValue("claude-sonnet-5");
+  await picker.selectOption("claude-haiku-4-5-20251001");
+
+  let capturedModel: string | undefined;
+  await page.route("**/agent/chat", async (route) => {
+    capturedModel = route.request().postDataJSON().model;
+    await route.fulfill({ status: 200, contentType: "text/event-stream", body: "event: done\ndata: {}\n\n" });
+  });
+
+  await page.getByPlaceholder("Transcribe this datasheet…").fill("hello");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  await expect.poll(() => capturedModel).toBe("claude-haiku-4-5-20251001");
+});
+
+test("attaching a datasheet before creating uploads it to the new draft and auto-starts transcription", async ({ page }) => {
+  const testId = `com.example.precreate-test-${Date.now()}`;
+  const pdfPath = path.join(os.tmpdir(), `ocm-e2e-datasheet-${Date.now()}.pdf`);
+  fs.writeFileSync(pdfPath, "%PDF-1.4 fake datasheet bytes for testing");
+
+  await page.goto("/composer/");
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("menuitem", { name: "Components" }).click();
+
+  await page.getByPlaceholder("com.vendor.part.model").fill(testId);
+  await page.getByLabel("New component kind").selectOption("sensor");
+
+  // The file input is deliberately hidden (browse via the button instead)
+  // -- setInputFiles still targets it directly, same as a real file
+  // picker would populate it.
+  await page.locator(".components-list__file-input").setInputFiles(pdfPath);
+  await expect(page.locator(".components-list__staged-files li")).toContainText(path.basename(pdfPath));
+
+  // The button label itself reflects that a file is staged.
+  const createButton = page.getByRole("button", { name: /New draft/ });
+  await expect(createButton).toHaveText("New draft & transcribe");
+  await createButton.click();
+
+  await expect(page.locator("h1", { hasText: testId })).toBeVisible();
+
+  // Chat auto-fires a transcription request -- no manual send needed --
+  // and (since this test doesn't mock /agent/chat) the real backend
+  // degrades cleanly to AGENT_UNAVAILABLE with no key configured, proving
+  // the request genuinely reached the server rather than silently no-op-ing.
+  await expect(page.locator(".chat-turn--user")).toContainText("I've attached a datasheet");
+  await expect(page.locator(".chat-panel__transcript")).toContainText("ANTHROPIC_API_KEY");
+
+  // And the file itself is genuinely stored under the NEW draft's own
+  // attachments directory, reachable via the real download route.
+  const listRes = await fetch(`${BACKEND}/components/${encodeURIComponent(testId)}/attachments`);
+  const files = (await listRes.json()).files as Array<{ filename: string; kind: string }>;
+  expect(files).toHaveLength(1);
+  expect(files[0].kind).toBe("pdf");
+
+  fs.rmSync(pdfPath, { force: true });
+});
+
+test("deleting a component removes it from the list and the workspace, after a confirm", async ({ page }) => {
+  const testId = `com.example.delete-test-${Date.now()}`;
+
+  await page.goto("/composer/");
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("menuitem", { name: "Components" }).click();
+
+  await page.getByPlaceholder("com.vendor.part.model").fill(testId);
+  await page.getByLabel("New component kind").selectOption("sensor");
+  await page.getByRole("button", { name: "New draft" }).click();
+  await expect(page.locator("h1", { hasText: testId })).toBeVisible();
+
+  // Dismissing the confirm must leave the component untouched.
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.locator("h1", { hasText: testId })).toBeVisible();
+
+  // Accepting it actually deletes -- back to the empty-selection state,
+  // and the row is gone from the list.
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("Select a component, or create a new draft, to begin.")).toBeVisible();
+  await expect(page.locator(".components-list__id", { hasText: testId })).toHaveCount(0);
+
+  const describeRes = await fetch(`${BACKEND}/describe_component?id=${encodeURIComponent(testId)}`);
+  const describeEnv = await describeRes.json();
+  expect(describeEnv.ok).toBe(false);
 });

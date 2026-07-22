@@ -36,8 +36,22 @@ from .api import OcmApi
 from .envelope import Codes
 from .prompts import ZERO_ASSUMPTION_DOCTRINE
 
-MODEL = "claude-sonnet-4-6"
+DEFAULT_MODEL = "claude-sonnet-5"
 MAX_TOOL_TURNS = 8  # a hard ceiling -- a misbehaving loop reports itself instead of running forever
+
+# The model choices this agent offers, restricted to the current, tool-
+# capable Claude models -- deliberately excludes Fable 5, which targets
+# creative writing, not schema-constrained JSON tool calls. Label text is
+# for the Components page's own picker; id is the literal string sent to
+# the Anthropic API, validated against this same dict before every call
+# (Codes.INVALID_ARGUMENT, not a raw 400 from the API, for a typo'd or
+# retired model id -- the same "surface it, don't swallow it" lesson the
+# earlier stream_turn/parsed_output fixes exist for).
+ALLOWED_MODELS: dict[str, str] = {
+    "claude-sonnet-5": "Sonnet 5 (balanced, default)",
+    "claude-opus-4-8": "Opus 4.8 (most capable, slower)",
+    "claude-haiku-4-5-20251001": "Haiku 4.5 (fastest, lighter)",
+}
 
 # -- Tool schemas -------------------------------------------------------
 # The FUNCTION signature Anthropic calls (arguments in, envelope out), not
@@ -129,12 +143,34 @@ TOOL_NAMES: frozenset[str] = frozenset(t["name"] for t in TOOL_DEFINITIONS)
 
 def build_system_prompt(component_id: str | None) -> str:
     subject = f"the component `{component_id}`" if component_id else "a component"
+    draft_note = (
+        f"\n\nA draft for `{component_id}` already exists -- the Components page always creates it "
+        "(via its own \"New draft\" action) before you are ever asked to transcribe into it. Use "
+        "update_component to write into it. Do NOT call create_component_draft for this id: it "
+        "already exists, so that call will only be refused as ALREADY_EXISTS."
+        if component_id
+        else ""
+    )
+    action_note = (
+        "\n\nGathering context first (describe_schema, get_example, describe_component) is fine and "
+        "expected, but it is not the deliverable -- you MUST end by actually calling update_component "
+        "with whatever you were able to transcribe, even if that's only one or two fields. A partial, "
+        "honest write beats a well-informed silence: the doctrine above already tells you omission is "
+        "the correct move for anything the source doesn't state, so schema strictness or an incomplete "
+        "picture is never a reason to end the conversation without writing anything at all. If you "
+        "truly cannot transcribe a single fact (e.g. no datasheet was actually attached), say so in "
+        "words -- never just stop."
+    )
     return (
         f"You are the OCM component-authoring assistant, embedded in the Components page, helping "
         f"transcribe a datasheet, manual, or catalog page into {subject}. You can only see and touch "
         "components and read-only discovery data through your tools -- you have no way to create or "
         "edit a cell or a module, and no way to publish a component yourself; that boundary is "
-        "intentional (ADR-0012, ADR-0014), not a bug to route around.\n\n" + ZERO_ASSUMPTION_DOCTRINE
+        "intentional (ADR-0012, ADR-0014), not a bug to route around."
+        + draft_note
+        + "\n\n"
+        + ZERO_ASSUMPTION_DOCTRINE
+        + action_note
     )
 
 
@@ -166,10 +202,10 @@ def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-def _envelope_event(event: str, code: str, message: str, hint: str | None = None) -> str:
+def _envelope_event(event: str, code: str, message: str, hint: str | None = None, allowed: Any = None) -> str:
     return _sse(
         event,
-        {"envelope": {"ok": False, "refusals": [{"code": code, "path": "$", "message": message, "allowed": None, "hint": hint}], "warnings": [], "data": None}},
+        {"envelope": {"ok": False, "refusals": [{"code": code, "path": "$", "message": message, "allowed": allowed, "hint": hint}], "warnings": [], "data": None}},
     )
 
 
@@ -179,7 +215,41 @@ def agent_unavailable_stream(reason: str) -> Iterable[str]:
     )
 
 
-def _stream_turn(client: Any, *, system: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> Generator[tuple[str, Any], None, None]:
+def invalid_model_stream(model: str) -> Iterable[str]:
+    yield _envelope_event(
+        "error",
+        Codes.INVALID_ARGUMENT,
+        f"{model!r} is not one of this agent's allowed models",
+        hint="Choose one of the models GET /agent/models returns.",
+        allowed={"values": list(ALLOWED_MODELS)},
+    )
+
+
+def _to_input_content_block(block: Any) -> dict[str, Any]:
+    """Re-serialize a RESPONSE content block into the shape the API's
+    REQUEST-side schema actually accepts, rather than a raw `model_dump()`
+    of whatever fields happened to be present. Confirmed live: a `text`
+    block's response can carry a `parsed_output` field this SDK version
+    doesn't declare (the SDK's base model allows unknown fields, for
+    forward compatibility) -- `model_dump()` faithfully includes it, and
+    the instant that gets round-tripped back as the next turn's own
+    conversation history, the API rejects it outright: "Extra inputs are
+    not permitted". Response-only fields (citations, parsed_output,
+    whatever comes next) are exactly the kind of thing that keeps
+    accumulating across a real multi-turn tool-use loop -- allowlisting
+    the known-safe input fields per type is what makes this immune to the
+    next one of these, not just this one.
+    """
+    if block.type == "text":
+        return {"type": "text", "text": block.text}
+    if block.type == "tool_use":
+        return {"type": "tool_use", "id": block.id, "name": block.name, "input": block.input}
+    return block.model_dump()  # unreachable with this agent's own tool/thinking config, kept as a defensive fallback
+
+
+def _stream_turn(
+    client: Any, *, model: str, system: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
+) -> Generator[tuple[str, Any], None, None]:
     """One model turn against the real Anthropic API. Yields ('text', str)
     for each text delta as it streams, then exactly one
     ('stop', {'tool_uses', 'stop_reason', 'assistant_content'}) once the
@@ -188,14 +258,14 @@ def _stream_turn(client: Any, *, system: str, messages: list[dict[str, Any]], to
     itself only depends on this two-tuple shape, which is what lets tests
     substitute a trivial fake generator instead (see tests/test_agent.py).
     """
-    with client.messages.stream(model=MODEL, max_tokens=4096, system=system, messages=messages, tools=tools) as stream:
+    with client.messages.stream(model=model, max_tokens=4096, system=system, messages=messages, tools=tools) as stream:
         for event in stream:
             if event.type == "content_block_delta" and event.delta.type == "text_delta":
                 yield ("text", event.delta.text)
         final = stream.get_final_message()
 
     tool_uses = [{"id": block.id, "name": block.name, "input": block.input} for block in final.content if block.type == "tool_use"]
-    assistant_content = [block.model_dump() for block in final.content]
+    assistant_content = [_to_input_content_block(block) for block in final.content]
     yield ("stop", {"tool_uses": tool_uses, "stop_reason": final.stop_reason, "assistant_content": assistant_content})
 
 
@@ -208,6 +278,7 @@ def run_agent_chat(
     messages: list[dict[str, Any]],
     *,
     component_id: str | None = None,
+    model: str = DEFAULT_MODEL,
     stream_turn: StreamTurnFn = _stream_turn,
 ) -> Generator[str, None, None]:
     """The tool-use loop: stream text, and when the model asks for a tool,
@@ -216,26 +287,79 @@ def run_agent_chat(
     the full envelope for the UI's own expand-to-see-detail affordance,
     append the tool_result, and loop -- until the model stops asking for
     tools or MAX_TOOL_TURNS is hit.
+
+    `stream_turn` itself is the one call that leaves this process (the real
+    Anthropic API) -- a bad model id, a rate limit, a dropped connection,
+    anything the SDK can raise, must not be allowed to kill this generator
+    silently. Before this try/except existed, that kind of failure just
+    ended the SSE stream mid-flight with no terminal event at all: the
+    frontend's reader loop sees a plain end-of-stream (not an error), so it
+    never fires onDone or onError -- the UI is left showing whatever text
+    had already streamed (often just "I'll transcribe this now...") with
+    chatStreaming stuck true forever. Turning it into a real `error` event
+    is what lets the UI actually tell the user something went wrong instead
+    of quietly doing nothing.
+
+    Two more silent-completion traps, found by actually running this
+    against a real multi-page datasheet: (1) `stop_reason` can legitimately
+    come back as "refusal" (a real, documented value -- the model declining
+    to continue, distinct from an exception), which used to be treated
+    exactly like an ordinary "I'm done" and silently closed the stream. (2)
+    A turn can end with `stop_reason: end_turn` and NO tool_use AND no text
+    at all -- after several real, successful discovery tool calls
+    (describe_schema, describe_component, get_example, list_components),
+    the model can still simply stop without ever calling update_component
+    or saying a word, which used to look identical to a clean, satisfied
+    "done". Both cases now surface something a human can actually read,
+    instead of an empty transcript that looks hung.
     """
     system = build_system_prompt(component_id)
     conversation = list(messages)
+    any_text_emitted = False
 
     for _turn in range(MAX_TOOL_TURNS):
         tool_uses: list[dict[str, Any]] = []
         stop_reason = "end_turn"
         assistant_content: list[dict[str, Any]] = []
 
-        for kind, payload in stream_turn(client, system=system, messages=conversation, tools=TOOL_DEFINITIONS):
-            if kind == "text":
-                yield _sse("text", {"delta": payload})
-            elif kind == "stop":
-                tool_uses = payload["tool_uses"]
-                stop_reason = payload["stop_reason"]
-                assistant_content = payload["assistant_content"]
+        try:
+            for kind, payload in stream_turn(client, model=model, system=system, messages=conversation, tools=TOOL_DEFINITIONS):
+                if kind == "text":
+                    any_text_emitted = True
+                    yield _sse("text", {"delta": payload})
+                elif kind == "stop":
+                    tool_uses = payload["tool_uses"]
+                    stop_reason = payload["stop_reason"]
+                    assistant_content = payload["assistant_content"]
+        except Exception as e:  # noqa: BLE001 -- deliberately broad, see docstring
+            yield _envelope_event(
+                "error",
+                Codes.INVALID_ARGUMENT,
+                f"the agent's call to the model failed: {e}",
+                hint="Try again, or check the ocm-api server's own logs for the underlying error.",
+            )
+            return
 
         conversation.append({"role": "assistant", "content": assistant_content})
 
+        if stop_reason == "refusal":
+            yield _envelope_event(
+                "error",
+                Codes.INVALID_ARGUMENT,
+                "the model declined to continue this turn (Anthropic reported stop_reason: refusal)",
+                hint="Try rephrasing the request, narrowing it, or filling in the remaining fields yourself.",
+            )
+            return
+
         if stop_reason != "tool_use" or not tool_uses:
+            if not any_text_emitted:
+                yield _sse(
+                    "text",
+                    {
+                        "delta": "(The agent stopped without writing anything or explaining why. "
+                        "Try again, or fill in the remaining fields yourself.)"
+                    },
+                )
             yield _sse("done", {})
             return
 

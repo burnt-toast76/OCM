@@ -76,8 +76,14 @@ export function SchemaField({ schema, path, value, onCommit, disabled }: SchemaF
     }
 
     // Array of objects (e.g. electrical.supplies, comms.signals) --
-    // repeatable rows, each its own nested object form.
-    const rows = (value ?? []) as Record<string, unknown>[];
+    // repeatable rows, each its own nested object form. `value` is
+    // whatever's genuinely on disk for an ADR-0014 draft, which can be
+    // malformed (a past bug wrote one of these as an object keyed by
+    // stringified index instead of a real array) -- guard with
+    // Array.isArray rather than trusting the schema's own claim, so a
+    // bad shape renders as an empty, fixable list instead of crashing the
+    // whole page on `rows.map`.
+    const rows = Array.isArray(value) ? (value as Record<string, unknown>[]) : [];
     return (
       <div className="schema-array">
         {rows.map((row, i) => (

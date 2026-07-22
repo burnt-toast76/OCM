@@ -116,4 +116,31 @@ describe("ComponentForm", () => {
     const vendorSection = sectionHeading("vendor").closest("section")!;
     expect(vendorSection.querySelector(".component-form__agent-marker")).toBeNull();
   });
+
+  it("renders an array-of-objects field as an empty, fixable list instead of crashing when the stored value isn't actually an array", () => {
+    // Reproduces a real corrupted draft: a past setAtPath bug wrote
+    // electrical.supplies as an object keyed by stringified index
+    // ({"0": {rail: "24VDC"}}) instead of a real array. The schema still
+    // says "array", so SchemaField's own array renderer must not trust
+    // that and call .map on whatever's actually there.
+    useComponentsStore.setState({
+      detail: {
+        id: "com.example.test-part",
+        revision: "0.1.0",
+        draft: true,
+        component: {
+          ocm_version: "1.1",
+          id: "com.example.test-part",
+          revision: "0.1.0",
+          electrical: { supplies: { "0": { rail: "24VDC" } } },
+        },
+      },
+    });
+
+    expect(() => render(<ComponentForm />)).not.toThrow();
+
+    const electricalSection = sectionHeading("electrical").closest("section")!;
+    expect(electricalSection.querySelector(".schema-array__row")).toBeNull();
+    expect(electricalSection.querySelector(".schema-array__add")).not.toBeNull();
+  });
 });

@@ -11,13 +11,15 @@ import { GET_VERBS, POST_VERBS } from "./src/api/verbs.ts";
 // /composer (see ocm_api/http_app.py's StaticFiles mount).
 const API_TARGET = process.env.OCM_API_URL ?? "http://127.0.0.1:8000";
 const proxy = Object.fromEntries([...GET_VERBS, ...POST_VERBS].map((verb) => [`/${verb}`, { target: API_TARGET, changeOrigin: true }]));
-// /agent/chat and /components/{id}/attachments (spec/09 "Agent
-// orchestrator") aren't flat verb names -- the former just isn't IN
-// GET_VERBS/POST_VERBS (it's SSE, not a plain JSON verb call), the latter
-// is path-parameterized and can't be expressed as one of those literal
-// strings at all. Two explicit rules, same target as everything else --
-// Vite treats a leading `^` proxy key as a regex, not a literal prefix.
+// /agent/chat, /agent/models, and /components/{id}/attachments (spec/09
+// "Agent orchestrator") aren't in GET_VERBS/POST_VERBS -- none of the
+// three is an OcmApi verb wrapped in the standard Envelope shape (the
+// first is SSE, the second is static server config, the third is path-
+// parameterized and can't be expressed as one of those literal strings at
+// all). Three explicit rules, same target as everything else -- Vite
+// treats a leading `^` proxy key as a regex, not a literal prefix.
 proxy["/agent/chat"] = { target: API_TARGET, changeOrigin: true };
+proxy["/agent/models"] = { target: API_TARGET, changeOrigin: true };
 proxy["^/components/.+/attachments"] = { target: API_TARGET, changeOrigin: true };
 
 export default defineConfig({

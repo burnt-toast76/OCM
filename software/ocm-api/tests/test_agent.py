@@ -22,7 +22,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ocm_api import OcmApi
-from ocm_api.agent import TOOL_DEFINITIONS, TOOL_NAMES, run_agent_chat
+from ocm_api.agent import ALLOWED_MODELS, DEFAULT_MODEL, TOOL_DEFINITIONS, TOOL_NAMES, build_system_prompt, run_agent_chat
 from ocm_api.envelope import Codes
 from ocm_api.http_app import build_app
 
@@ -73,6 +73,38 @@ def test_every_tool_definition_has_a_matching_ocm_api_method():
     api = OcmApi(".")
     for tool in TOOL_DEFINITIONS:
         assert callable(getattr(api, tool["name"], None)), f"OcmApi has no method {tool['name']!r}"
+
+
+# ---------------------------------------------------------------------------
+# System prompt: a component_id means the Components page already created
+# that draft (its own "New draft" action, a direct REST call the agent
+# never sees) before any chat message reaches the model -- the model must
+# not re-discover this the hard way via an ALREADY_EXISTS refusal.
+# ---------------------------------------------------------------------------
+
+
+def test_system_prompt_tells_the_agent_the_draft_already_exists_when_scoped_to_one():
+    prompt = build_system_prompt("com.example.ejector.demo1")
+    assert "com.example.ejector.demo1" in prompt
+    assert "already exists" in prompt
+    assert "create_component_draft" in prompt
+    assert "update_component" in prompt
+
+
+def test_system_prompt_says_nothing_about_an_existing_draft_when_unscoped():
+    prompt = build_system_prompt(None)
+    assert "already exists" not in prompt
+
+
+def test_system_prompt_requires_ending_with_a_write_not_just_discovery():
+    # A real, observed failure mode: the model makes several legitimate
+    # discovery calls (describe_schema, describe_component, get_example,
+    # list_components) and then simply stops -- no update_component call,
+    # no text. The doctrine already permits an incomplete draft; this is
+    # the explicit instruction that gathering context is not itself the
+    # deliverable.
+    prompt = build_system_prompt("com.example.ejector.demo1")
+    assert "MUST end by actually calling update_component" in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +255,126 @@ def test_a_refused_tool_call_still_streams_its_envelope_and_continues(api: OcmAp
     assert tool_call["envelope"]["refusals"][0]["code"] == Codes.NOT_FOUND
 
 
+def test_a_model_call_failure_mid_stream_becomes_a_real_error_event_not_a_silent_hang(api: OcmApi):
+    # Before the try/except around stream_turn existed, an exception here
+    # (bad model id, dropped connection, anything the real Anthropic SDK
+    # can raise) just ended the generator -- the SSE stream stopped with no
+    # terminal event, so the frontend never learns anything went wrong and
+    # is left showing whatever text already streamed, forever "streaming".
+    def _raising_stream_turn(client: Any, *, model: str, system: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]):
+        yield ("text", "I'll transcribe this now...")
+        raise RuntimeError("model: claude-sonnet-4-6 not found")
+
+    events = _parse_sse(
+        "".join(run_agent_chat(object(), api, [{"role": "user", "content": "Transcribe this."}], stream_turn=_raising_stream_turn))
+    )
+
+    kinds = [e for e, _ in events]
+    assert kinds == ["text", "error"]
+    assert events[0][1]["delta"] == "I'll transcribe this now..."
+    refusal = events[1][1]["envelope"]["refusals"][0]
+    assert refusal["code"] == Codes.INVALID_ARGUMENT
+    assert "claude-sonnet-4-6" in refusal["message"]
+
+
+# ---------------------------------------------------------------------------
+# Model selection
+# ---------------------------------------------------------------------------
+
+
+def test_default_model_is_used_when_the_caller_does_not_pick_one(api: OcmApi):
+    seen: dict[str, Any] = {}
+
+    def _capturing_stream_turn(client: Any, *, model: str, system: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]):
+        seen["model"] = model
+        return iter([("stop", {"tool_uses": [], "stop_reason": "end_turn", "assistant_content": []})])
+
+    list(run_agent_chat(object(), api, [{"role": "user", "content": "hi"}], stream_turn=_capturing_stream_turn))
+
+    assert seen["model"] == DEFAULT_MODEL
+
+
+def test_a_requested_model_is_passed_through_to_stream_turn(api: OcmApi):
+    seen: dict[str, Any] = {}
+
+    def _capturing_stream_turn(client: Any, *, model: str, system: str, messages: list[dict[str, Any]], tools: list[dict[str, Any]]):
+        seen["model"] = model
+        return iter([("stop", {"tool_uses": [], "stop_reason": "end_turn", "assistant_content": []})])
+
+    list(
+        run_agent_chat(
+            object(), api, [{"role": "user", "content": "hi"}], model="claude-opus-4-8", stream_turn=_capturing_stream_turn
+        )
+    )
+
+    assert seen["model"] == "claude-opus-4-8"
+
+
+def test_allowed_models_are_all_documented_with_a_label():
+    assert DEFAULT_MODEL in ALLOWED_MODELS
+    for model_id, label in ALLOWED_MODELS.items():
+        assert isinstance(model_id, str) and model_id
+        assert isinstance(label, str) and label
+
+
+def test_response_only_fields_are_stripped_before_a_content_block_is_replayed_back_to_the_api(api: OcmApi):
+    # Confirmed against the real Anthropic API: a response text block can
+    # carry a field (here: `parsed_output`) this installed SDK version
+    # doesn't declare -- the SDK's base model allows unknown fields for
+    # forward compatibility, so model_dump() faithfully includes it. The
+    # instant that gets replayed back as conversation history on the next
+    # turn, the API's own request-side schema rejects the whole call:
+    # "Extra inputs are not permitted". Only the known-safe input fields
+    # per block type may survive the round trip.
+    noisy_text_block = _FakeContentBlock("text", text="Noting the vendor.", parsed_output={"junk": "field"})
+    tool_block = _FakeContentBlock("tool_use", id="t1", name="list_components", input={})
+    turn1 = _FakeStreamContext([], _FakeFinalMessage([noisy_text_block, tool_block], "tool_use"))
+    client = _FakeClient([turn1, _text_turn("Done.")])
+
+    events = _parse_sse("".join(run_agent_chat(client, api, [{"role": "user", "content": "Transcribe this."}])))
+    assert [e for e, _ in events][-1] == "done"
+
+    second_call_messages = client.messages.calls[1]["messages"]
+    assistant_msg = second_call_messages[-2]
+    assert assistant_msg["role"] == "assistant"
+    assert assistant_msg["content"] == [
+        {"type": "text", "text": "Noting the vendor."},
+        {"type": "tool_use", "id": "t1", "name": "list_components", "input": {}},
+    ]
+
+
+def test_a_refusal_stop_reason_becomes_a_real_error_event_not_a_silent_done(api: OcmApi):
+    # "refusal" is a real, documented Anthropic stop_reason (the model
+    # declining to continue) -- distinct from an exception, and previously
+    # treated exactly like an ordinary successful completion.
+    client = _FakeClient([_FakeStreamContext([], _FakeFinalMessage([], "refusal"))])
+
+    events = _parse_sse("".join(run_agent_chat(client, api, [{"role": "user", "content": "Transcribe this."}])))
+
+    kinds = [e for e, _ in events]
+    assert kinds == ["error"]
+    refusal = events[0][1]["envelope"]["refusals"][0]
+    assert refusal["code"] == Codes.INVALID_ARGUMENT
+    assert "refusal" in refusal["message"]
+
+
+def test_a_turn_that_ends_with_no_tool_use_and_no_text_gets_a_fallback_message(api: OcmApi):
+    # Reproduces a real observed failure: several successful discovery tool
+    # calls, then a final turn with stop_reason=end_turn, no tool_use, and
+    # no text at all -- previously indistinguishable from a clean, quiet
+    # "I'm satisfied, done" completion.
+    silent_tool_use = _FakeStreamContext(
+        [], _FakeFinalMessage([_FakeContentBlock("tool_use", id="t1", name="list_components", input={})], "tool_use")
+    )
+    client = _FakeClient([silent_tool_use, _FakeStreamContext([], _FakeFinalMessage([], "end_turn"))])
+
+    events = _parse_sse("".join(run_agent_chat(client, api, [{"role": "user", "content": "Transcribe this."}])))
+
+    kinds = [e for e, _ in events]
+    assert kinds == ["tool_call", "text", "done"]
+    assert "stopped without writing anything" in events[1][1]["delta"]
+
+
 def test_loop_terminates_and_reports_itself_if_the_model_never_stops_calling_tools(api: OcmApi):
     # MAX_TOOL_TURNS+1 tool-use turns, all of the same harmless read-only
     # call, so the loop can't finish on its own -- must self-terminate.
@@ -263,3 +415,36 @@ def test_agent_chat_does_not_reach_anthropic_at_all_when_unavailable(workspace_r
     client = TestClient(build_app(str(workspace_root)))
     response = client.post("/agent/chat", json={"messages": [{"role": "user", "content": "hi"}]})
     assert "AGENT_UNAVAILABLE" in response.text
+
+
+# ---------------------------------------------------------------------------
+# /agent/models, and /agent/chat's own model validation (HTTP layer)
+# ---------------------------------------------------------------------------
+
+
+def test_agent_models_lists_every_allowed_model_and_the_default(workspace_root):
+    client = TestClient(build_app(str(workspace_root)))
+    response = client.get("/agent/models")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["default"] == DEFAULT_MODEL
+    assert {row["id"] for row in body["models"]} == set(ALLOWED_MODELS)
+
+
+def test_agent_chat_rejects_an_unknown_model_before_ever_checking_for_an_api_key(workspace_root, monkeypatch: pytest.MonkeyPatch):
+    # No ANTHROPIC_API_KEY is set here either -- an invalid model is a bad
+    # request regardless of whether the server could otherwise reach
+    # Anthropic, so it must be caught first, not masked by AGENT_UNAVAILABLE.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    client = TestClient(build_app(str(workspace_root)))
+
+    response = client.post("/agent/chat", json={"messages": [{"role": "user", "content": "hi"}], "model": "gpt-not-a-claude-model"})
+
+    assert response.status_code == 200
+    events = _parse_sse(response.text)
+    assert events[0][0] == "error"
+    refusal = events[0][1]["envelope"]["refusals"][0]
+    assert refusal["code"] == Codes.INVALID_ARGUMENT
+    assert "gpt-not-a-claude-model" in refusal["message"]
+    assert set(refusal["allowed"]["values"]) == set(ALLOWED_MODELS)

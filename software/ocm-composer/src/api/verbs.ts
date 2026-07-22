@@ -27,6 +27,7 @@ export const POST_VERBS = [
   "update_component",
   "validate_component",
   "publish_component",
+  "delete_component",
   "create_cell",
   "place_instance",
   "move_instance",

@@ -48,8 +48,8 @@ modules:
   mount:
     pose:
       xyz_mm:
-      - 750
-      - 125
+      - 640
+      - 300
       - 0
       rpy_deg:
       - 0
@@ -62,8 +62,8 @@ modules:
   mount:
     pose:
       xyz_mm:
-      - 640
-      - 300
+      - 625
+      - 250
       - 600
       rpy_deg:
       - 180

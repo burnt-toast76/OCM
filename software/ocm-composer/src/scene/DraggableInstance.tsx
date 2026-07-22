@@ -75,8 +75,17 @@ export function DraggableInstance({ instance, primitives, color, highlight, moun
   const handlePointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       draggedRef.current = false;
-      if (!draggable || !pose) return;
+      if (!draggable || !pose) {
+        // TEMP DIAGNOSTIC (remove once the still-rotates report is root-caused):
+        // confirms whether this instance's own pointerdown fired at all, and
+        // if so, why it bailed before disabling OrbitControls.
+        // eslint-disable-next-line no-console
+        console.debug("[ocm-composer] drag: pointerdown on", instance, "but not draggable (pose:", pose, ")");
+        return;
+      }
       e.stopPropagation();
+      // eslint-disable-next-line no-console
+      console.debug("[ocm-composer] drag: pointerdown HIT", instance, "-- disabling orbit controls now. controls present:", !!controls);
       // Synchronous, before React re-renders -- see the module docstring.
       if (controls) controls.enabled = false;
       useComposerStore.getState().setDragging(true);

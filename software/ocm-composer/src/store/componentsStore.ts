@@ -9,7 +9,7 @@
 import { create } from "zustand";
 import * as api from "../api/client";
 import { ApiTransportError } from "../api/client";
-import type { AttachmentResult, AttachmentRow, ChatMessage, ChatToolCallEvent, ComponentDoc, ComponentSummary, DescribeComponentData, Envelope, JsonSchemaNode, Refusal } from "../api/types";
+import type { AgentModel, AttachmentResult, AttachmentRow, ChatMessage, ChatToolCallEvent, ComponentDoc, ComponentSummary, DescribeComponentData, Envelope, JsonSchemaNode, Refusal } from "../api/types";
 import { groupRefusalsByField } from "../ui/components/refusalField";
 
 export interface ChatTurnToolCall {
@@ -55,6 +55,8 @@ interface ComponentsState {
   stagedAttachments: AttachmentResult[]; // uploaded THIS session, pending inclusion in the next chat message
   chatTurns: ChatTurn[];
   chatStreaming: boolean;
+  agentModels: AgentModel[];
+  selectedModel: string | null; // null defers to the server's own default until the picker has loaded
   loading: boolean;
   error: string | null;
 
@@ -65,6 +67,8 @@ interface ComponentsState {
   refreshChecklist: () => Promise<void>;
   refreshAttachments: () => Promise<void>;
   publish: (revision: string) => Promise<void>;
+  deleteComponent: (id: string) => Promise<void>;
+  setSelectedModel: (id: string) => void;
   sendChatMessage: (text: string) => void;
   uploadAttachment: (file: File) => Promise<void>;
   removeStagedAttachment: (filename: string) => void;
@@ -77,9 +81,23 @@ function setAtPath(doc: ComponentDoc, path: string[], value: unknown): Component
   for (let i = 0; i < path.length - 1; i++) {
     const key = path[i];
     const existing = cursor[key];
-    const copy = existing && typeof existing === "object" && !Array.isArray(existing) ? { ...(existing as Record<string, unknown>) } : {};
+    // An array-of-objects field (electrical.supplies, comms.signals, ...)
+    // walked through as an INTERMEDIATE segment -- e.g. committing row 0's
+    // own "rail" field, path ["electrical","supplies","0","rail"] -- used
+    // to fall through the `!Array.isArray` branch below and get replaced
+    // with a fresh `{}`, silently turning the array into a plain object
+    // keyed by the stringified index ("0") instead of a real array index.
+    // Confirmed in the wild: a real draft's `supplies` ended up as
+    // `{"0": {rail: "24VDC"}}`, which then crashed SchemaField's own
+    // `rows.map` (it assumes an array, per the schema). Cloning an
+    // existing array AS an array is what keeps it an array.
+    const copy: Record<string, unknown> | unknown[] = Array.isArray(existing)
+      ? [...existing]
+      : existing && typeof existing === "object"
+        ? { ...(existing as Record<string, unknown>) }
+        : {};
     cursor[key] = copy;
-    cursor = copy;
+    cursor = copy as Record<string, unknown>;
   }
   const lastKey = path[path.length - 1];
   if (value === undefined) {
@@ -91,6 +109,9 @@ function setAtPath(doc: ComponentDoc, path: string[], value: unknown): Component
 }
 
 let activeChatAbort: (() => void) | null = null;
+// See saveField's own docstring -- serializes field commits so a fast
+// second edit can't build off a stale pre-first-edit snapshot.
+let saveQueue: Promise<void> = Promise.resolve();
 
 export const useComponentsStore = create<ComponentsState>((set, get) => ({
   components: [],
@@ -104,6 +125,8 @@ export const useComponentsStore = create<ComponentsState>((set, get) => ({
   stagedAttachments: [],
   chatTurns: [],
   chatStreaming: false,
+  agentModels: [],
+  selectedModel: null,
   loading: false,
   error: null,
 
@@ -136,6 +159,10 @@ export const useComponentsStore = create<ComponentsState>((set, get) => ({
       if (!get().schema) {
         const schemaEnv = await api.describeSchema(undefined, "component");
         if (schemaEnv.ok && schemaEnv.data) set(() => ({ schema: schemaEnv.data!.schema }));
+      }
+      if (get().agentModels.length === 0) {
+        const modelsData = await api.getAgentModels();
+        set(() => ({ agentModels: modelsData.models, selectedModel: get().selectedModel ?? modelsData.default }));
       }
       // describe_component succeeds (with warnings) even for an
       // incomplete draft (ADR-0014: that's the expected in-progress
@@ -174,23 +201,38 @@ export const useComponentsStore = create<ComponentsState>((set, get) => ({
     }
   },
 
-  saveField: async (path: string[], value: unknown) => {
-    const { selectedComponentId, detail } = get();
-    if (!selectedComponentId || !detail) return;
-    const nextDoc = setAtPath(detail.component, path, value);
-    try {
-      // update_component ALWAYS writes, even when refused (spec/09) -- the
-      // doc on disk matches nextDoc either way, so refresh from the
-      // server's own describe_component rather than trusting the
-      // locally-computed nextDoc might have diverged from what actually
-      // persisted (e.g. a schema coercion).
-      await api.updateComponent(selectedComponentId, { manifest: nextDoc as Record<string, unknown> });
-      const detailEnv = await api.describeComponent(selectedComponentId);
-      if (detailEnv.data) set(() => ({ detail: detailEnv.data }));
-      await get().refreshChecklist();
-    } catch (e) {
-      set(() => ({ error: e instanceof Error ? e.message : String(e) }));
-    }
+  saveField: (path: string[], value: unknown) => {
+    // Queued, not fired directly: two fields committed in quick
+    // succession (e.g. blurring one input right after another, before
+    // the first's own round trip lands) would otherwise both read the
+    // SAME stale `detail.component` snapshot at call time and each build
+    // their own full-manifest write from it -- the second write, landing
+    // after the first, would silently overwrite the first field's change
+    // with a document that never saw it (a lost update). Chaining onto
+    // `saveQueue` means each save's own `get().detail` read only happens
+    // once every save queued before it has actually landed (including
+    // the describe_component refresh that updates `detail`), so it's
+    // always building on the true latest state, never a stale one.
+    const run = async () => {
+      const { selectedComponentId, detail } = get();
+      if (!selectedComponentId || !detail) return;
+      const nextDoc = setAtPath(detail.component, path, value);
+      try {
+        // update_component ALWAYS writes, even when refused (spec/09) --
+        // the doc on disk matches nextDoc either way, so refresh from the
+        // server's own describe_component rather than trusting the
+        // locally-computed nextDoc might have diverged from what actually
+        // persisted (e.g. a schema coercion).
+        await api.updateComponent(selectedComponentId, { manifest: nextDoc as Record<string, unknown> });
+        const detailEnv = await api.describeComponent(selectedComponentId);
+        if (detailEnv.data) set(() => ({ detail: detailEnv.data }));
+        await get().refreshChecklist();
+      } catch (e) {
+        set(() => ({ error: e instanceof Error ? e.message : String(e) }));
+      }
+    };
+    saveQueue = saveQueue.then(run);
+    return saveQueue;
   },
 
   refreshChecklist: async () => {
@@ -220,6 +262,39 @@ export const useComponentsStore = create<ComponentsState>((set, get) => ({
     }
   },
 
+  deleteComponent: async (id: string) => {
+    try {
+      const env = await api.deleteComponent(id);
+      if (!env.ok) {
+        set(() => ({ error: env.refusals[0]?.message ?? "delete_component was refused" }));
+        return;
+      }
+      const { selectedComponentId } = get();
+      if (selectedComponentId === id) {
+        activeChatAbort?.();
+        activeChatAbort = null;
+        set(() => ({
+          selectedComponentId: null,
+          detail: null,
+          checklist: [],
+          fieldErrors: {},
+          agentFilledFields: new Set(),
+          attachments: [],
+          stagedAttachments: [],
+          chatTurns: [],
+        }));
+      }
+      // Same "server decided, this store just renders it" convention as
+      // every other write here -- a reference warning goes through the
+      // same `error` surface a refusal would, it just isn't fatal to the
+      // delete itself (spec/09: writes are unconditional).
+      set(() => ({ error: env.warnings[0] ?? null }));
+      await get().loadComponents();
+    } catch (e) {
+      set(() => ({ error: e instanceof Error ? e.message : String(e) }));
+    }
+  },
+
   uploadAttachment: async (file: File) => {
     const { selectedComponentId } = get();
     if (!selectedComponentId) return;
@@ -235,8 +310,10 @@ export const useComponentsStore = create<ComponentsState>((set, get) => ({
 
   removeStagedAttachment: (filename: string) => set((s) => ({ stagedAttachments: s.stagedAttachments.filter((a) => a.filename !== filename) })),
 
+  setSelectedModel: (id: string) => set(() => ({ selectedModel: id })),
+
   sendChatMessage: (text: string) => {
-    const { selectedComponentId, chatTurns, stagedAttachments } = get();
+    const { selectedComponentId, chatTurns, stagedAttachments, selectedModel } = get();
     activeChatAbort?.();
 
     const userTurn: ChatTurn = { id: String(nextTurnId++), role: "user", text, toolCalls: [] };
@@ -248,7 +325,12 @@ export const useComponentsStore = create<ComponentsState>((set, get) => ({
     const docBeforeThisMessage = get().detail?.component ?? null;
 
     const { abort } = api.streamAgentChat(
-      { component_id: selectedComponentId, messages: history, attachment_filenames: stagedAttachments.map((a) => a.filename) },
+      {
+        component_id: selectedComponentId,
+        messages: history,
+        attachment_filenames: stagedAttachments.map((a) => a.filename),
+        ...(selectedModel ? { model: selectedModel } : {}),
+      },
       {
         onText: (delta) => {
           set((s) => ({

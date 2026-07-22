@@ -10,6 +10,7 @@
 // the call never reached the refusal engine at all.
 
 import type {
+  AgentModelsData,
   AttachmentResult,
   AttachmentRow,
   CellSummary,
@@ -119,6 +120,8 @@ export const validateComponent = (id: string) => post<{ id: string; valid: boole
 export const publishComponent = (id: string, revision: string) =>
   post<{ id: string; revision: string; draft: boolean; published: boolean }>("publish_component", { id, revision });
 
+export const deleteComponent = (id: string) => post<{ id: string; deleted: boolean }>("delete_component", { id });
+
 // -- Component attachments (spec/09 "Agent orchestrator") ---------------------------------------------------
 // Not JSON, and the response isn't an Envelope (an upload either reaches
 // the filesystem or it doesn't -- there's no refusal-shaped outcome for
@@ -136,6 +139,22 @@ export async function listComponentAttachments(componentId: string): Promise<Att
   }
   const body = (await res.json()) as { files: AttachmentRow[] };
   return body.files;
+}
+
+// Same "not an Envelope" reasoning as attachments above -- /agent/models
+// is static server config (which Claude models this server will accept),
+// not an OcmApi verb with a refusal-shaped outcome.
+export async function getAgentModels(): Promise<AgentModelsData> {
+  let res: Response;
+  try {
+    res = await fetch("/agent/models");
+  } catch (e) {
+    throw new ApiTransportError(`agent/models: ${(e as Error).message}`);
+  }
+  if (!res.ok) {
+    throw new ApiTransportError(`agent/models: HTTP ${res.status} ${res.statusText}`, res.status);
+  }
+  return (await res.json()) as AgentModelsData;
 }
 
 export function attachmentDownloadUrl(componentId: string, filename: string): string {
@@ -193,7 +212,7 @@ function dispatchSseChunk(chunk: string, handlers: AgentChatHandlers): void {
 }
 
 export function streamAgentChat(
-  body: { component_id: string | null; messages: ChatMessage[]; attachment_filenames?: string[] },
+  body: { component_id: string | null; messages: ChatMessage[]; attachment_filenames?: string[]; model?: string },
   handlers: AgentChatHandlers,
 ): { abort: () => void } {
   const controller = new AbortController();
