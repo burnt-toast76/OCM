@@ -6,11 +6,13 @@ source:
   kind: datasheet
   ref: Nordson-Kline DP-8 Precision Dot Dispenser datasheet
 geometry:
-  envelope_mm:
-  - 120.0
-  - 160.0
-  - 210.0
-  mass_kg: 4.2
+  units: kg
+  mass: 4.2
+  envelope:
+    length: 120.0
+    width: 160.0
+    height: 210.0
+    units: mm
 name: Nordson-Kline DP-8 Precision Dot Dispenser
 pneumatic:
   port: G1/8

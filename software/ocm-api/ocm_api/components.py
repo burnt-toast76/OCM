@@ -33,7 +33,7 @@ import jsonpointer
 from ocm_core import load_schema
 from ocm_core.loader import validate_module_dict
 
-from .envelope import Codes, Envelope, Refusal, single_refusal
+from .envelope import Codes, Envelope, single_refusal
 from .translate import schema_violation_to_refusal
 from .workspace import Workspace, is_draft_revision, read_yaml, write_yaml
 
@@ -100,9 +100,10 @@ def update_component(ws: Workspace, component_id: str, manifest: dict[str, Any] 
 
 
 def validate_component(ws: Workspace, component_id: str) -> Envelope:
-    """Full validation including the one cross-file check schema
-    validation alone can't do: does `geometry.mesh` exist, if declared
-    (spec/10: "mesh: only if the file exists").
+    """Full schema validation. Unlike validate_module, there is no
+    cross-file check here -- geometry no longer declares a `mesh` path
+    (removed: a component's geometry is envelope/mass facts, never a file
+    reference), so schema validation alone is the whole story.
     """
     if not ws.component_exists(component_id):
         return single_refusal(Codes.NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
@@ -111,18 +112,6 @@ def validate_component(ws: Workspace, component_id: str) -> Envelope:
     schema = load_schema(ws.component_schema_path)
     errors = validate_module_dict(doc, schema)
     refusals = [schema_violation_to_refusal(e) for e in errors]
-
-    component_dir = ws.component_dir(component_id)
-    mesh = doc.get("geometry", {}).get("mesh")
-    if mesh and not (component_dir / mesh).is_file():
-        refusals.append(
-            Refusal(
-                code=Codes.NOT_FOUND,
-                path="geometry.mesh",
-                message=f"{mesh!r} does not exist under {component_dir}",
-                hint="Only declare geometry.mesh once the file is actually committed, or omit it.",
-            )
-        )
 
     if refusals:
         return Envelope.refuse(refusals)

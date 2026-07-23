@@ -226,8 +226,7 @@ def build_server(repo_root: str) -> FastMCP:
         return api.update_component(id, manifest=manifest, patch=patch).to_dict()
 
     @mcp.tool(description=_doc(
-        "Full validation: schema PLUS the one cross-file check schema validation alone can't do "
-        "(does geometry.mesh exist on disk, if declared). A schema-required field left out by an "
+        "Full schema validation. A schema-required field left out by an "
         "honest transcription (vendor, source) shows up here as a refusal -- that refusal list IS "
         "the handoff to a human, not a bug to work around.",
         '  call: validate_component(id="com.smc.ejector.zk2-agh")\n'

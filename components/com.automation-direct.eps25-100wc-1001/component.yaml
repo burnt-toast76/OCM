@@ -43,3 +43,4 @@ source:
   date: '2026-06-11'
 pneumatic:
   port: 1/4in male NPT
+geometry: {}

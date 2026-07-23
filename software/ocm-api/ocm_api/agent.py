@@ -123,7 +123,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
     },
     {
         "name": "validate_component",
-        "description": "Full validation (schema + the geometry.mesh existence check). The refusal list IS the human's completion list -- report it, don't try to silently satisfy it by guessing.",
+        "description": "Full schema validation. The refusal list IS the human's completion list -- report it, don't try to silently satisfy it by guessing.",
         "input_schema": {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]},
     },
     {

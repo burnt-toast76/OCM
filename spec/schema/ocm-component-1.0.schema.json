@@ -172,14 +172,14 @@
         },
         "pressure_units": {
           "type": "string",
-          "description": "The pressure unit exactly as the source prints it (e.g. 'bar', 'psi', 'kPa') -- never convert; record it verbatim alongside pressure_min/max."
+          "description": "Verbatim as printed (e.g. 'bar', 'psi') -- never convert."
         },
         "flow": {
           "type": "number"
         },
         "flow_units": {
           "type": "string",
-          "description": "The flow unit exactly as the source prints it (e.g. 'Nl/min', 'SCFM', 'L/min') -- never convert; record it verbatim alongside flow."
+          "description": "Verbatim as printed (e.g. 'Nl/min') -- never convert."
         },
         "port": {
           "type": "string"
@@ -269,20 +269,31 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "envelope_mm": {
-          "type": "array",
-          "items": {
-            "type": "number"
-          },
-          "minItems": 3,
-          "maxItems": 3
+        "envelope": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "length": {
+              "type": "number"
+            },
+            "width": {
+              "type": "number"
+            },
+            "height": {
+              "type": "number"
+            },
+            "units": {
+              "type": "string",
+              "description": "Verbatim as printed (e.g. 'mm', 'in') -- never convert."
+            }
+          }
         },
-        "mass_kg": {
+        "mass": {
           "type": "number"
         },
-        "mesh": {
+        "units": {
           "type": "string",
-          "description": "Only if the file exists in this component's directory."
+          "description": "Verbatim as printed (e.g. 'kg', 'lb') -- never convert."
         }
       }
     },

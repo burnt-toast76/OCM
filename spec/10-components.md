@@ -17,7 +17,8 @@ Only questions a datasheet answers:
 - `signals` — the device's own I/O as documented, device-perspective directions
   (`direction_device: output` for a PNP part-present), protocol incl. `x-` customs, IODD/ESI
   references as *citations* (a note naming the file, never an invented path)
-- `geometry` — envelope dims and mass as stated; mesh/step paths only when files exist
+- `geometry` — envelope dims (`length`/`width`/`height` + verbatim `units`) and mass
+  (+ verbatim `units`) as stated
 - `hazards` — intrinsic ones the source states (a heated tip is `burn_hot` at the component)
 - `notes` — verbatim-ish cautions and requirements from the source
 

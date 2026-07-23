@@ -52,7 +52,7 @@ def test_loads_a_component_with_ranged_pneumatic_and_signals(tmp_path, component
             {"name": "vacuum_switch", "direction_device": "output", "type": "bool", "electrical": "PNP"},
         ],
     }
-    data["geometry"] = {"envelope_mm": [40.0, 20.0, 15.0], "mass_kg": 0.05}
+    data["geometry"] = {"envelope": {"length": 40.0, "width": 20.0, "height": 15.0, "units": "mm"}, "mass": 0.05, "units": "kg"}
     data["hazards"] = ["pinch"]
     path = _write(tmp_path, "component.yaml", data)
 
@@ -66,7 +66,12 @@ def test_loads_a_component_with_ranged_pneumatic_and_signals(tmp_path, component
     assert component.pneumatic.flow == 25.0
     assert component.pneumatic.flow_units == "Nl/min"
     assert component.comms.signal("vacuum_switch").direction_device == "output"
-    assert component.geometry.mass_kg == 0.05
+    assert component.geometry.envelope.length == 40.0
+    assert component.geometry.envelope.width == 20.0
+    assert component.geometry.envelope.height == 15.0
+    assert component.geometry.envelope.units == "mm"
+    assert component.geometry.mass == 0.05
+    assert component.geometry.units == "kg"
     assert component.hazards == ("pinch",)
 
 

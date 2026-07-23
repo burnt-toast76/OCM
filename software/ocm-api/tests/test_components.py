@@ -161,7 +161,7 @@ def test_fresh_draft_refusal_list_is_the_completion_list(api: OcmApi):
 
 def test_deliberately_gap_filled_transcription_stays_a_draft(api: OcmApi):
     # A real datasheet often doesn't state mass or current draw. ADR-0014:
-    # omit, don't estimate -- this update still validates cleanly (mass_kg/
+    # omit, don't estimate -- this update still validates cleanly (geometry.mass/
     # current_nominal_a are genuinely optional fields, not required ones),
     # but the component correctly stays at its draft revision because
     # nothing here calls publish_component -- that's the human's decision

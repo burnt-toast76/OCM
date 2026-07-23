@@ -7,6 +7,7 @@ import { ChecklistPanel } from "./ChecklistPanel";
 import { ChatPanel } from "./ChatPanel";
 import { GlbViewer } from "./GlbViewer";
 import { AttachmentsList } from "./AttachmentsList";
+import { ConnectorSymbols } from "./ConnectorSymbols";
 
 export function ComponentDetail() {
   const selectedComponentId = useComponentsStore((s) => s.selectedComponentId);
@@ -49,6 +50,7 @@ export function ComponentDetail() {
       </header>
 
       {glbFilename && <GlbViewer url={attachmentDownloadUrl(selectedComponentId, glbFilename)} />}
+      <ConnectorSymbols />
 
       <div className="component-detail__body">
         <ComponentForm />

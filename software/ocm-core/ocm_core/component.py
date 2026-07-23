@@ -143,18 +143,30 @@ class ComponentComms:
 
 
 @dataclass(frozen=True)
+class ComponentEnvelope:
+    length: float | None = None
+    width: float | None = None
+    height: float | None = None
+    units: str | None = None  # verbatim as printed (e.g. "mm", "in") -- never converted
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ComponentEnvelope":
+        return cls(length=data.get("length"), width=data.get("width"), height=data.get("height"), units=data.get("units"))
+
+
+@dataclass(frozen=True)
 class ComponentGeometry:
-    envelope_mm: tuple[float, float, float] | None = None
-    mass_kg: float | None = None
-    mesh: str | None = None
+    envelope: ComponentEnvelope | None = None
+    mass: float | None = None
+    units: str | None = None  # mass unit, verbatim as printed (e.g. "kg", "lb") -- never converted
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ComponentGeometry":
-        envelope = data.get("envelope_mm")
+        envelope = data.get("envelope")
         return cls(
-            envelope_mm=tuple(envelope) if envelope else None,
-            mass_kg=data.get("mass_kg"),
-            mesh=data.get("mesh"),
+            envelope=ComponentEnvelope.from_dict(envelope) if envelope else None,
+            mass=data.get("mass"),
+            units=data.get("units"),
         )
 
 
