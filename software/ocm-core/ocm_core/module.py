@@ -396,6 +396,25 @@ class ComponentRef:
 
 
 @dataclass(frozen=True)
+class InstancePose:
+    """Where a component instance sits in a module's own local assembly
+    scene (Modules-page authoring UI) -- always relative to the module's
+    own origin, never to a named frame (unlike `Frame`, deliberately no
+    parent/note here: a component instance doesn't chain off another
+    frame the way mechanical.frames entries can).
+    """
+
+    xyz_mm: tuple[float, float, float]
+    rpy_deg: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "InstancePose":
+        xyz = data["xyz_mm"]
+        rpy = data.get("rpy_deg", (0.0, 0.0, 0.0))
+        return cls(xyz_mm=(xyz[0], xyz[1], xyz[2]), rpy_deg=(rpy[0], rpy[1], rpy[2]))
+
+
+@dataclass(frozen=True)
 class ModuleComponent:
     """One entry in a module's `components:` list -- a purchased part this
     module is assembled from, by its own reference designator (ADR-0014).
@@ -403,10 +422,16 @@ class ModuleComponent:
 
     refdes: str
     ref: ComponentRef
+    pose: InstancePose | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ModuleComponent":
-        return cls(refdes=data["refdes"], ref=ComponentRef.parse(data["ref"]))
+        pose = data.get("pose")
+        return cls(
+            refdes=data["refdes"],
+            ref=ComponentRef.parse(data["ref"]),
+            pose=InstancePose.from_dict(pose) if pose else None,
+        )
 
 
 @dataclass(frozen=True)

@@ -734,6 +734,10 @@
             "type": "string",
             "description": "id@revision of a components/ entry. The referenced component must be published (revision >= 1.0.0), same as a module ref.",
             "pattern": "^[a-z0-9]+(\\.[a-z0-9_-]+)+@\\d+\\.\\d+\\.\\d+$"
+          },
+          "pose": {
+            "$ref": "#/$defs/instance_pose",
+            "description": "Where this component instance sits in the module's own local scene (Modules-page authoring UI). Optional -- a components: entry with no pose is still valid."
           }
         }
       }
@@ -870,6 +874,37 @@
         },
         "note": {
           "type": "string"
+        }
+      }
+    },
+    "instance_pose": {
+      "type": "object",
+      "required": [
+        "xyz_mm"
+      ],
+      "additionalProperties": false,
+      "description": "A component instance's own local pose within a module's assembly scene -- always relative to the module's own origin, never to a named frame (unlike $defs/frame, deliberately no parent/note here).",
+      "properties": {
+        "xyz_mm": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "rpy_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "default": [
+            0,
+            0,
+            0
+          ]
         }
       }
     },

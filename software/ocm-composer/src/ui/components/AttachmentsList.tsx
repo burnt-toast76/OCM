@@ -1,20 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Every file previously uploaded for this component (datasheets, manuals,
-// STEP models -- whatever was ever attached, not just what's staged THIS
-// session) so a human can come back later and re-check the source a value
-// was transcribed from. Read-only: uploading/removing happens through
-// ComponentsList's pre-creation dropzone or ChatPanel's own attach button.
+// Every file previously uploaded for a component OR module (datasheets,
+// manuals, STEP models -- whatever was ever attached, not just what's
+// staged THIS session) so a human can come back later and re-check the
+// source a value was transcribed from. Read-only: uploading/removing
+// happens through each page's own upload UI (ComponentsList's pre-creation
+// dropzone, ChatPanel's attach button, or ModuleDetail's STEP-upload
+// button). Takes its data as props rather than reading a specific store
+// directly, so both pages can share this one component.
 
-import { attachmentDownloadUrl } from "../../api/client";
-import { useComponentsStore } from "../../store/componentsStore";
+import type { AttachmentRow } from "../../api/types";
 
 const KIND_LABELS: Record<string, string> = { pdf: "PDF", text: "Text", step: "STEP", other: "File" };
 
-export function AttachmentsList() {
-  const selectedComponentId = useComponentsStore((s) => s.selectedComponentId);
-  const attachments = useComponentsStore((s) => s.attachments);
+export interface AttachmentsListProps {
+  attachments: AttachmentRow[];
+  downloadUrl: (filename: string) => string;
+}
 
-  if (!selectedComponentId || attachments.length === 0) return null;
+export function AttachmentsList({ attachments, downloadUrl }: AttachmentsListProps) {
+  if (attachments.length === 0) return null;
 
   return (
     <div className="attachments-list">
@@ -22,12 +26,7 @@ export function AttachmentsList() {
       <ul className="attachments-list__items">
         {attachments.map((a) => (
           <li key={a.filename} className="attachments-list__row">
-            <a
-              href={attachmentDownloadUrl(selectedComponentId, a.filename)}
-              target="_blank"
-              rel="noreferrer"
-              className="attachments-list__link"
-            >
+            <a href={downloadUrl(a.filename)} target="_blank" rel="noreferrer" className="attachments-list__link">
               {a.filename}
             </a>
             <span className="attachments-list__badges">

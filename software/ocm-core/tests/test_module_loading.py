@@ -165,3 +165,41 @@ def test_module_components_list_and_signal_source_are_parsed():
     assert module.components == (ModuleComponent(refdes="VG1", ref=ComponentRef(id="com.smc.ejector.zk2-agh", revision="1.0.0")),)
     assert str(module.components[0].ref) == "com.smc.ejector.zk2-agh@1.0.0"
     assert module.comms.signals[0].source == "VG1.vacuum_switch"
+    # No pose stated -- stays None, not a fabricated default position.
+    assert module.components[0].pose is None
+
+
+def test_module_component_pose_round_trips_and_defaults_rpy_when_omitted():
+    base = {
+        "ocm_version": "1.1",
+        "id": "com.example.pickhead.pk100",
+        "revision": "0.1.0",
+        "kind": "end_effector",
+        "license": "CERN-OHL-S-2.0",
+        "mechanical": {
+            "mount": {"interface": "custom"},
+            "frames": {"origin": {"xyz_mm": [0, 0, 0]}},
+            "geometry": {"collision": "x.stl"},
+            "mass_kg": 1.0,
+        },
+        "state_machine": {"model": "packml"},
+        "comms": {
+            "protocol": "discrete-io",
+            "signals": [{"name": "part_present", "direction": "input", "type": "bool", "source": "VG1.vacuum_switch"}],
+        },
+    }
+
+    # A component instance's own local placement within the module's
+    # assembly scene (Modules-page authoring UI) -- relative to the
+    # module's own origin, never to a named frame.
+    module = Module.from_dict(
+        {**base, "components": [{"refdes": "VG1", "ref": "com.smc.ejector.zk2-agh@1.0.0", "pose": {"xyz_mm": [10.0, 20.0, 30.0], "rpy_deg": [0.0, 0.0, 90.0]}}]}
+    )
+    pose = module.components[0].pose
+    assert pose is not None
+    assert pose.xyz_mm == (10.0, 20.0, 30.0)
+    assert pose.rpy_deg == (0.0, 0.0, 90.0)
+
+    # rpy_deg omitted -- defaults to no rotation, not a schema violation.
+    module2 = Module.from_dict({**base, "components": [{"refdes": "VG1", "ref": "com.smc.ejector.zk2-agh@1.0.0", "pose": {"xyz_mm": [1.0, 2.0, 3.0]}}]})
+    assert module2.components[0].pose.rpy_deg == (0.0, 0.0, 0.0)

@@ -142,6 +142,47 @@ def test_update_module_with_json_patch(api: OcmApi):
     assert api.describe_module("com.example.pickhead.pk102").data["manifest"]["name"] == "Patched"
 
 
+def test_update_module_can_write_a_components_entry_pose(api: OcmApi):
+    # Modules-page authoring: a component instance's own local placement in
+    # the module's assembly scene. update_module is a fully generic patch
+    # writer gated only by schema validation -- this proves the new
+    # components[].pose schema field is writable with ZERO code changes to
+    # update_module itself, not just asserted in prose.
+    api.create_module_draft("com.example.pickhead.pk104", "end_effector")
+    added = api.update_module(
+        "com.example.pickhead.pk104",
+        patch=[{"op": "add", "path": "/components", "value": [{"refdes": "VG1", "ref": "com.smc.ejector.zk2-agh@1.0.0"}]}],
+    )
+    assert added.ok, added.refusals
+
+    posed = api.update_module(
+        "com.example.pickhead.pk104",
+        patch=[{"op": "add", "path": "/components/0/pose", "value": {"xyz_mm": [10.0, 20.0, 30.0], "rpy_deg": [0.0, 0.0, 90.0]}}],
+    )
+    assert posed.ok, posed.refusals
+
+    manifest = api.describe_module("com.example.pickhead.pk104").data["manifest"]
+    assert manifest["components"][0]["pose"] == {"xyz_mm": [10.0, 20.0, 30.0], "rpy_deg": [0.0, 0.0, 90.0]}
+
+
+def test_update_module_rejects_a_malformed_components_pose(api: OcmApi):
+    api.create_module_draft("com.example.pickhead.pk105", "end_effector")
+    api.update_module(
+        "com.example.pickhead.pk105",
+        patch=[{"op": "add", "path": "/components", "value": [{"refdes": "VG1", "ref": "com.smc.ejector.zk2-agh@1.0.0"}]}],
+    )
+
+    # A 2-element xyz_mm and an extra, undeclared property are both real
+    # schema violations -- plain validation already covers this, per
+    # instance_pose's own additionalProperties: false / minItems/maxItems.
+    e = api.update_module(
+        "com.example.pickhead.pk105",
+        patch=[{"op": "add", "path": "/components/0/pose", "value": {"xyz_mm": [10.0, 20.0], "bogus": True}}],
+    )
+    assert not e.ok
+    assert any(r.code == Codes.SCHEMA_INVALID for r in e.refusals)
+
+
 def test_generate_geometry_stub(api: OcmApi, workspace_root: Path):
     api.create_module_draft("com.example.pickhead.pk103", "end_effector")
     e = api.generate_geometry_stub("com.example.pickhead.pk103", (80, 60), 40)

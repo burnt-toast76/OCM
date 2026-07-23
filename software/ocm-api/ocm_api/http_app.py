@@ -47,7 +47,12 @@ def build_app(repo_root: str) -> FastAPI:
         # "currently converting" set resets on restart, same as the
         # conversion itself did -- there is no persisted "pending" state to
         # get stale, just STEP files that still lack a .glb to catch up on).
-        resume_pending_step_conversions(api.workspace)
+        # Both components' AND modules' own attachments dirs -- a module's
+        # reference STEP backdrop gets the exact same resilience.
+        resume_pending_step_conversions(
+            [api.workspace.attachments_dir(cid) for cid in api.workspace.list_component_ids()]
+            + [api.workspace.module_attachments_dir(mid) for mid in api.workspace.list_module_ids()]
+        )
         yield
 
     app = FastAPI(title="ocm-api", description="spec/09-ocm-api.md's tool surface over HTTP.", lifespan=lifespan)
@@ -209,11 +214,11 @@ def build_app(repo_root: str) -> FastAPI:
 
     @app.post("/components/{component_id}/attachments")
     def upload_component_attachment(component_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
-        return save_attachment(api.workspace, component_id, file.filename or "upload", file.file.read())
+        return save_attachment(api.workspace.attachments_dir(component_id), file.filename or "upload", file.file.read())
 
     @app.get("/components/{component_id}/attachments")
     def list_component_attachments(component_id: str) -> dict[str, Any]:
-        return {"files": list_attachments(api.workspace, component_id)}
+        return {"files": list_attachments(api.workspace.attachments_dir(component_id))}
 
     @app.get("/components/{component_id}/attachments/{filename}")
     def download_component_attachment(component_id: str, filename: str) -> FileResponse:
@@ -224,6 +229,27 @@ def build_app(repo_root: str) -> FastAPI:
         target = api.workspace.attachments_dir(component_id) / safe_name
         if not target.is_file():
             raise HTTPException(status_code=404, detail=f"no attachment {filename!r} for component {component_id!r}")
+        return FileResponse(target)
+
+    # A module's own uploaded STEP file: a non-interactive visual backdrop
+    # for the Modules page (ADR-0014: never sliced/clicked into -- cascadio
+    # doesn't expose meaningful per-part structure, confirmed by spike).
+    # Same storage/conversion machinery as component attachments, just a
+    # different directory -- see attachments.py's own module docstring.
+    @app.post("/modules/{module_id}/attachments")
+    def upload_module_attachment(module_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+        return save_attachment(api.workspace.module_attachments_dir(module_id), file.filename or "upload", file.file.read())
+
+    @app.get("/modules/{module_id}/attachments")
+    def list_module_attachments(module_id: str) -> dict[str, Any]:
+        return {"files": list_attachments(api.workspace.module_attachments_dir(module_id))}
+
+    @app.get("/modules/{module_id}/attachments/{filename}")
+    def download_module_attachment(module_id: str, filename: str) -> FileResponse:
+        safe_name = Path(filename).name
+        target = api.workspace.module_attachments_dir(module_id) / safe_name
+        if not target.is_file():
+            raise HTTPException(status_code=404, detail=f"no attachment {filename!r} for module {module_id!r}")
         return FileResponse(target)
 
     @app.get("/agent/models")
@@ -252,7 +278,7 @@ def build_app(repo_root: str) -> FastAPI:
         # this specific message is about, not resent on every later turn.
         conversation = [dict(m) for m in messages]
         if attachment_filenames and component_id and conversation and conversation[-1].get("role") == "user":
-            blocks = attachment_content_blocks(api.workspace, component_id, attachment_filenames)
+            blocks = attachment_content_blocks(api.workspace.attachments_dir(component_id), attachment_filenames)
             if blocks:
                 text = conversation[-1].get("content", "")
                 conversation[-1] = {"role": "user", "content": [{"type": "text", "text": text}, *blocks]}

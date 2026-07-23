@@ -84,6 +84,17 @@ export const listModules = () => get<ModuleSummary[]>("list_modules");
 
 export const describeModule = (id: string) => get<DescribeModuleData>("describe_module", { id });
 
+export const createModuleDraft = (id: string, kind: string) =>
+  post<{ id: string; revision: string; draft: boolean }>("create_module_draft", { id, kind });
+
+export const updateModule = (id: string, body: { manifest?: Record<string, unknown>; patch?: Record<string, unknown>[] }) =>
+  post<{ id: string; revision: string; draft: boolean; path: string }>("update_module", { id, ...body });
+
+export const validateModule = (id: string) => post<{ id: string; valid: boolean }>("validate_module", { id });
+
+export const publishModule = (id: string, revision: string) =>
+  post<{ id: string; revision: string; draft: boolean; published: boolean }>("publish_module", { id, revision });
+
 export const describeCell = (id: string) => get<DescribeCellData>("describe_cell", { id });
 
 // -- Checking & generation ---------------------------------------------------
@@ -179,6 +190,51 @@ export async function uploadComponentAttachment(componentId: string, file: File)
   } catch {
     throw new ApiTransportError("upload: response body was not valid JSON");
   }
+}
+
+// -- Module attachments -- a module's own uploaded STEP file, a
+// non-interactive visual backdrop for the Modules page (never sliced,
+// never clicked -- cascadio doesn't expose meaningful per-part structure).
+// Byte-for-byte the same shape as the component-attachment functions
+// above, just against /modules/{id}/attachments -- same reasoning, not an
+// Envelope, doesn't go through get<T>/post<T>.
+
+export async function listModuleAttachments(moduleId: string): Promise<AttachmentRow[]> {
+  let res: Response;
+  try {
+    res = await fetch(`/modules/${encodeURIComponent(moduleId)}/attachments`);
+  } catch (e) {
+    throw new ApiTransportError(`list attachments: ${(e as Error).message}`);
+  }
+  if (!res.ok) {
+    throw new ApiTransportError(`list attachments: HTTP ${res.status} ${res.statusText}`, res.status);
+  }
+  const body = (await res.json()) as { files: AttachmentRow[] };
+  return body.files;
+}
+
+export async function uploadModuleAttachment(moduleId: string, file: File): Promise<AttachmentResult> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+
+  let res: Response;
+  try {
+    res = await fetch(`/modules/${encodeURIComponent(moduleId)}/attachments`, { method: "POST", body: form });
+  } catch (e) {
+    throw new ApiTransportError(`upload: ${(e as Error).message}`);
+  }
+  if (!res.ok) {
+    throw new ApiTransportError(`upload: HTTP ${res.status} ${res.statusText}`, res.status);
+  }
+  try {
+    return (await res.json()) as AttachmentResult;
+  } catch {
+    throw new ApiTransportError("upload: response body was not valid JSON");
+  }
+}
+
+export function moduleAttachmentDownloadUrl(moduleId: string, filename: string): string {
+  return `/modules/${encodeURIComponent(moduleId)}/attachments/${encodeURIComponent(filename)}`;
 }
 
 // -- Agent chat (spec/09 "Agent orchestrator") ---------------------------------------------------

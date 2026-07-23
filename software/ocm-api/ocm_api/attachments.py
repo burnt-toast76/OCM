@@ -1,7 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Component attachment storage (spec/09 "Agent orchestrator"): datasheet
-uploads live at `components/<id>/attachments/`, next to the component
-they document. Two things happen to an upload:
+"""Shared component/module attachment storage (spec/09 "Agent
+orchestrator"): datasheet/STEP uploads live at `components/<id>/attachments/`
+or `modules/<id>/attachments/`, next to the entity they document. Every
+public function here is entity-agnostic -- it takes the attachments
+directory itself (`ws.attachments_dir(component_id)` or
+`ws.module_attachments_dir(module_id)`), never a component/module id, so a
+component's datasheet and a module's own reference STEP file go through the
+exact same storage and conversion machinery. Two things happen to an upload:
 
 1. It's stored, unconditionally -- an upload never fails because of what
    comes next.
@@ -34,9 +39,7 @@ import base64
 import logging
 import threading
 from pathlib import Path
-from typing import Any, Callable
-
-from .workspace import Workspace
+from typing import Any, Callable, Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +70,11 @@ def _run_in_background_thread(fn: Callable[[], None]) -> None:
     threading.Thread(target=fn, daemon=True).start()
 
 
-def list_attachments(ws: Workspace, component_id: str) -> list[dict[str, Any]]:
-    """Everything previously uploaded for this component -- lets a
-    freshly (re)loaded Components detail page discover a GLB that was
-    converted in an earlier session, not just ones staged in this one.
+def list_attachments(directory: Path) -> list[dict[str, Any]]:
+    """Everything previously uploaded under this directory -- lets a
+    freshly (re)loaded Components/Modules detail page discover a GLB that
+    was converted in an earlier session, not just ones staged in this one.
     """
-    directory = ws.attachments_dir(component_id)
     if not directory.is_dir():
         return []
     rows: list[dict[str, Any]] = []
@@ -99,14 +101,13 @@ def list_attachments(ws: Workspace, component_id: str) -> list[dict[str, Any]]:
 
 
 def save_attachment(
-    ws: Workspace, component_id: str, filename: str, content: bytes, *, run_conversion: RunConversion | None = None
+    directory: Path, filename: str, content: bytes, *, run_conversion: RunConversion | None = None
 ) -> dict[str, Any]:
     # Path(filename).name strips any directory components a client could
     # smuggle in (e.g. "../../module.yaml") -- an upload only ever lands
-    # inside this component's own attachments/ directory, never anywhere
+    # inside this entity's own attachments/ directory, never anywhere
     # else in the workspace.
     safe_name = Path(filename).name
-    directory = ws.attachments_dir(component_id)
     directory.mkdir(parents=True, exist_ok=True)
     dest = directory / safe_name
     dest.write_bytes(content)
@@ -126,15 +127,14 @@ def save_attachment(
     return result
 
 
-def resume_pending_step_conversions(ws: Workspace, *, run_conversion: RunConversion | None = None) -> None:
-    """Called once at server startup (http_app.py). Any STEP file still
+def resume_pending_step_conversions(directories: Iterable[Path], *, run_conversion: RunConversion | None = None) -> None:
+    """Called once at server startup (http_app.py), over every component's
+    AND every module's own attachments directory. Any STEP file still
     missing its .glb -- never attempted, or interrupted by a previous
     process's restart mid-conversion -- gets a fresh attempt. Cheap and
-    self-healing: a component with nothing to do costs one directory
-    listing per component.
+    self-healing: an entity with nothing to do costs one directory listing.
     """
-    for component_id in ws.list_component_ids():
-        directory = ws.attachments_dir(component_id)
+    for directory in directories:
         if not directory.is_dir():
             continue
         for path in sorted(directory.iterdir()):
@@ -224,9 +224,8 @@ def _remove_partial_glb(glb_path: Path) -> None:
             pass
 
 
-def attachment_content_blocks(ws: Workspace, component_id: str, filenames: list[str]) -> list[dict[str, Any]]:
+def attachment_content_blocks(directory: Path, filenames: list[str]) -> list[dict[str, Any]]:
     blocks: list[dict[str, Any]] = []
-    directory = ws.attachments_dir(component_id)
     for filename in filenames:
         path = directory / Path(filename).name
         if not path.is_file():

@@ -210,6 +210,13 @@ class Workspace:
         # component lives, same convention module geometry already follows.
         return self.component_dir(component_id) / "attachments"
 
+    def module_attachments_dir(self, module_id: str) -> Path:
+        # Same convention as attachments_dir, one level up: a module's own
+        # uploaded STEP (a non-interactive visual backdrop for the Modules
+        # page, never a claimed/authoritative path like mechanical.geometry.*)
+        # lives under modules/<id>/attachments/, not a separate tree.
+        return self.module_dir(module_id) / "attachments"
+
     def module_exists(self, module_id: str) -> bool:
         return self.module_path(module_id).is_file()
 

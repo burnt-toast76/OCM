@@ -9,18 +9,20 @@ import { ToastHost } from "./ui/ToastHost";
 import { ConfirmDialog } from "./ui/ConfirmDialog";
 import { SceneCanvas } from "./scene/SceneCanvas";
 import { ComponentsPage } from "./ui/components/ComponentsPage";
+import { ModulesPage } from "./ui/components/ModulesPage";
 import { NavMenu } from "./ui/NavMenu";
 import type { NavPage } from "./ui/NavMenu";
 import { useComposerStore } from "./store/store";
 import "./App.css";
 
-type View = "cell" | "components";
+type View = "cell" | "components" | "modules";
 
 // One list, in menu order -- add a page here and it shows up in the
 // hamburger menu with no other wiring.
 const PAGES: NavPage[] = [
   { id: "cell", label: "Cell" },
   { id: "components", label: "Components" },
+  { id: "modules", label: "Modules" },
 ];
 
 function App() {
@@ -54,8 +56,10 @@ function App() {
             <IssuesPanel />
           </aside>
         </div>
-      ) : (
+      ) : view === "components" ? (
         <ComponentsPage />
+      ) : (
+        <ModulesPage />
       )}
 
       <ToastHost />

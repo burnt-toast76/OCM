@@ -104,6 +104,25 @@ export interface ModuleCapability {
   parameters?: Record<string, unknown>;
 }
 
+// A 6-DOF pose -- the identical wire shape place_instance/move_instance's
+// own Mount.pose already used, and now also components[].pose (a module's
+// own component-instance placement, Modules-page authoring UI). One type,
+// not two copies that could drift.
+export interface Pose6d {
+  xyz_mm: [number, number, number];
+  rpy_deg: [number, number, number];
+}
+
+// One entry in a module's `components:` list (ADR-0014) -- a purchased
+// part this module is assembled from, by its own reference designator.
+// `pose` is optional: a components: entry with no pose is still valid,
+// it's just not placed anywhere in the Modules page's own local scene yet.
+export interface ModuleComponentRow {
+  refdes: string;
+  ref: string; // "id@revision"
+  pose?: Pose6d;
+}
+
 export interface ModuleManifest {
   id: string;
   revision: string;
@@ -115,6 +134,7 @@ export interface ModuleManifest {
     frames: Record<string, ModuleFrame>;
   };
   capabilities?: ModuleCapability[];
+  components?: ModuleComponentRow[];
   [key: string]: unknown;
 }
 
@@ -127,7 +147,7 @@ export interface DescribeModuleData {
 }
 
 export interface Mount {
-  pose?: { xyz_mm: [number, number, number]; rpy_deg: [number, number, number] };
+  pose?: Pose6d;
   on?: string;
 }
 

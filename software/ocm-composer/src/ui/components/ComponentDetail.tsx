@@ -56,7 +56,7 @@ export function ComponentDetail() {
         <ComponentForm />
         <div className="component-detail__side">
           <ChecklistPanel />
-          <AttachmentsList />
+          <AttachmentsList attachments={attachments} downloadUrl={(filename) => attachmentDownloadUrl(selectedComponentId, filename)} />
           <ChatPanel />
         </div>
       </div>
