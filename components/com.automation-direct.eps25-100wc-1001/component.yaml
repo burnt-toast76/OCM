@@ -24,6 +24,19 @@ electrical:
   - ref: electrical
     type: 4-pin M12 quick-disconnect
     carries: power + outputs
+    pins:
+    - pin: '1'
+      function: L+ (supply)
+      wire_color: BN (brown)
+    - pin: '2'
+      function: OUT2 (switching output or analog output)
+      wire_color: WH (white)
+    - pin: '3'
+      function: L- (supply)
+      wire_color: BU (blue)
+    - pin: '4'
+      function: OUT1 (switching output)
+      wire_color: BK (black)
 source:
   kind: datasheet
   ref: EPS25-100WC-1001_cutsheet.pdf (https://www.automationdirect.com/pn/EPS25-100WC-1001)

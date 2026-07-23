@@ -30,7 +30,20 @@ export function AttachmentsList() {
             >
               {a.filename}
             </a>
-            <span className="attachments-list__kind">{KIND_LABELS[a.kind] ?? a.kind}</span>
+            <span className="attachments-list__badges">
+              <span className="attachments-list__kind">{KIND_LABELS[a.kind] ?? a.kind}</span>
+              {a.glb_status === "pending" && (
+                <span className="attachments-list__status attachments-list__status--pending">Converting geometry…</span>
+              )}
+              {a.glb_status === "failed" && (
+                <span
+                  className="attachments-list__status attachments-list__status--failed"
+                  title="Geometry conversion failed -- the file itself is still stored and downloadable"
+                >
+                  Conversion failed
+                </span>
+              )}
+            </span>
           </li>
         ))}
       </ul>

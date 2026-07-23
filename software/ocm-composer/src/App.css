@@ -817,6 +817,13 @@
   white-space: nowrap;
 }
 
+.attachments-list__badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 .attachments-list__kind {
   flex-shrink: 0;
   font-size: 11px;
@@ -824,6 +831,23 @@
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 1px 6px;
+}
+
+.attachments-list__status {
+  flex-shrink: 0;
+  font-size: 11px;
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.attachments-list__status--pending {
+  color: var(--warning, #b8860b);
+  border: 1px solid var(--warning, #b8860b);
+}
+
+.attachments-list__status--failed {
+  color: var(--danger-fg, #e07070);
+  border: 1px solid var(--danger-border, #a33);
 }
 
 /* -- Chat panel -- */

@@ -180,6 +180,16 @@ export const useComponentsStore = create<ComponentsState>((set, get) => ({
     try {
       const files = await api.listComponentAttachments(selectedComponentId);
       set(() => ({ attachments: files }));
+      // STEP->GLB conversion runs in a background thread server-side and
+      // can take minutes for a real file -- self-poll while anything is
+      // still converting, so the viewer appears on its own once it's
+      // ready instead of needing a manual reload. Stops on its own once
+      // nothing's pending, or the moment the user looks at something else.
+      if (files.some((f) => f.glb_status === "pending")) {
+        setTimeout(() => {
+          if (get().selectedComponentId === selectedComponentId) void get().refreshAttachments();
+        }, 4000);
+      }
     } catch (e) {
       set(() => ({ error: e instanceof Error ? e.message : String(e) }));
     }

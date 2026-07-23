@@ -20,8 +20,9 @@ still serves the API fine, just not the GUI).
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, AsyncIterator
 
 import anthropic
 from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
@@ -30,7 +31,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .agent import ALLOWED_MODELS, DEFAULT_MODEL, agent_unavailable_stream, invalid_model_stream, run_agent_chat
 from .api import OcmApi
-from .attachments import attachment_content_blocks, list_attachments, save_attachment
+from .attachments import attachment_content_blocks, list_attachments, resume_pending_step_conversions, save_attachment
 
 # software/ocm-api/ocm_api/http_app.py -> software/ocm-composer/dist
 _COMPOSER_DIST = Path(__file__).resolve().parents[2] / "ocm-composer" / "dist"
@@ -38,7 +39,18 @@ _COMPOSER_DIST = Path(__file__).resolve().parents[2] / "ocm-composer" / "dist"
 
 def build_app(repo_root: str) -> FastAPI:
     api = OcmApi(repo_root)
-    app = FastAPI(title="ocm-api", description="spec/09-ocm-api.md's tool surface over HTTP.")
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        # Self-healing for the case a previous process's restart killed a
+        # STEP->GLB conversion mid-flight (attachments.py: the in-memory
+        # "currently converting" set resets on restart, same as the
+        # conversion itself did -- there is no persisted "pending" state to
+        # get stale, just STEP files that still lack a .glb to catch up on).
+        resume_pending_step_conversions(api.workspace)
+        yield
+
+    app = FastAPI(title="ocm-api", description="spec/09-ocm-api.md's tool surface over HTTP.", lifespan=lifespan)
 
     def envelope_response(envelope) -> dict[str, Any]:
         return envelope.to_dict()

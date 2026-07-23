@@ -180,17 +180,27 @@ export interface UpdateComponentResult {
   path: string;
 }
 
+// glb_status is only meaningful for kind: "step" -- null for everything
+// else. STEP->GLB conversion runs in a background thread server-side
+// (a real manufacturer STEP file can take minutes, not the near-instant
+// conversion a tiny test fixture suggests), so "pending" is a real,
+// often-observed state, not just a theoretical one.
+export type GlbStatus = "pending" | "ready" | "failed" | null;
+
 export interface AttachmentResult {
   filename: string;
   kind: "pdf" | "text" | "step" | "other";
   measured_envelope_mm: [number, number, number] | null;
   glb: string | null;
+  glb_status: GlbStatus;
 }
 
 export interface AttachmentRow {
   filename: string;
   kind: "pdf" | "text" | "step" | "other";
   glb: string | null;
+  glb_status: GlbStatus;
+  measured_envelope_mm: [number, number, number] | null;
 }
 
 // -- JSON Schema (describe_schema's own output) ---------------------------------------------------
