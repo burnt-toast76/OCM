@@ -215,3 +215,87 @@ the six verbs, against `OcmApi(sandbox_root)` where the sandbox symlinks the rea
 manifest; the fabrication check re-parses those manifests and compares each
 endpoint's `refdes`/`ref`/`pin`/`source` against the parts' real
 `electrical.connectors`, `comms.connectors`, and `comms.signals`.
+
+---
+
+# Run 2 (2026-07-24) — regression check after ADR-0016
+
+Same brief, same six verbs, three fresh agents, same harness — re-run after
+ADR-0015 Erratum 1 and ADR-0016 landed. The harness is unchanged; it now imports
+the updated `OcmApi`, so every difference from Run 1 is attributable to the code,
+not the test. Run 1 predicted three closures; this run checks them. Evidence is the
+objective `runs2/run{1,2,3}/_transcript.jsonl` (every call + every submitted
+manifest), not the agents' narration.
+
+## Per-run `validate_module` sequence
+
+| run | validate_module calls, in order | reached `valid:true` | geometry `NOT_FOUND` seen | pneumatic net refused | fabricated facts |
+|---|---|---|---|---|---|
+| 1 | `UNRESOLVED_ENDPOINT` → `PORT_UNCONNECTED` → **`ok`** → `UNRESOLVED_ENDPOINT` | yes (turn 3) | no | no | 0 |
+| 2 | `UNRESOLVED_ENDPOINT` ×3 | no | no | no | 0 |
+| 3 | **`ok`** → `UNRESOLVED_ENDPOINT` → `SCHEMA_INVALID` → `PORT_UNCONNECTED` → `UNRESOLVED_ENDPOINT` | yes (turns 1 & 4-update) | no | no | 0 |
+
+## The three closures
+
+**Finding 1 — connectivity refusals now fire during authoring. CLOSED.** In Run 1,
+`validate_module` returned *only* the geometry `NOT_FOUND`; connectivity was
+invisible until cell resolution. In Run 2, **every** run's authoring loop is driven
+by connectivity refusals: all three hit `UNRESOLVED_ENDPOINT` naming the dispenser
+(`DP1`/`DISP1`) with no connector `ref`, and runs 1 and 3 also hit
+`PORT_UNCONNECTED` on the orphaned `network_in` port — the exact refusal ADR-0016
+discusses. The loop the platform is built on now closes: the agent proposes, the
+refusal engine corrects, and the agent iterates (run 1: `UNRESOLVED_ENDPOINT` →
+drop endpoints → `PORT_UNCONNECTED` → drop port → `ok`). Two agents even ran their
+own isolation experiments *against the live refusals* to localize the fault to the
+dispenser — impossible in Run 1, where the check never ran.
+
+**Finding 5 / Erratum 1 — the shared pneumatic net resolves. CLOSED.** No run
+produced any refusal against a pneumatic net. The `air_supply`/`air_feed` net —
+`air_in` port plus both parts by bare refdes — resolved in all three, exactly as
+Erratum 1 Correction B intends (a sole unlabelled port needs no `ref`). In Run 1
+this same net was one of the five resolve-time refusals ("declares no connectors —
+pinout missing").
+
+**Finding 2 / Decision 3 — the geometry wall is gone; a definite done state is
+reachable. CLOSED.** Geometry `NOT_FOUND` never appeared in any run. The fresh
+draft is valid out of the box (run 3, turn 1: `ok`), and runs 1 and 3 both reached
+`valid:true` on a fully-wired-where-possible module. The draft now omits the
+artifact claim instead of walling on a placeholder path, so "manifest complete,
+artifacts pending" is an actual state an authoring agent can reach.
+
+## The residual is now honest and correctly placed
+
+No run reached `valid:true` for the *brief-faithful* module — but for the right
+reason, now surfaced in the right place. The DP-8 dispenser genuinely declares no
+electrical or comms connectors (only a `24VDC` supply rail and an EtherCAT signal
+list), so its power and network endpoints cannot resolve, and all three agents
+**refused to fabricate a connector** to satisfy the refusal (zero fabricated facts,
+same as Run 1 — but now the honesty is *enforced* by the refusal engine, not merely
+volunteered: run 2 explicitly tried naming the `24VDC` rail as a connector and was
+told "unknown connector … declared connectors: []"). That is the ADR-0014
+completion-list item — "transcribe the DP-8's connectors" — arriving during
+authoring, where it is useful, instead of silently at cell resolution. Two agents
+demonstrated the green path (drop the un-transcribable dispenser endpoints) and
+then declined it as a misrepresentation of the machine; that is a design judgement
+the tool correctly leaves to a human, not a gap the tool hides.
+
+The pressure-range mismatch (a ≈0.25 bar sensor teed onto a 4–6 bar supply) recurred
+and was again flagged by every agent, who omitted the pneumatic operating point
+rather than invent one — unchanged from Run 1 and out of scope for these ADRs (it
+needs the deferred pressure-rating refusal).
+
+## Verdict
+
+ADR-0016 achieved its stated purpose: the checks the authoring agent can see are
+now the checks that decide. Findings 1, 2, and 5 are closed on all three runs; the
+one thing that still cannot validate is a genuine, correctly-reported upstream data
+gap in a component, not a blind spot in the surface. The cold test is now a passing
+regression test.
+
+## Reproducing (Run 2)
+
+Identical harness and method as Run 1; transcripts under
+`runs2/run{1,2,3}/_transcript.jsonl`. The verification above (validate sequence per
+run, geometry-wall/pneumatic-refusal absence, and the zero-fabrication check
+comparing every final-manifest endpoint against the parts' real
+`electrical.connectors`/`comms.connectors`) is a re-parse of those transcripts.
