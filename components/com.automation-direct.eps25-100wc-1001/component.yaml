@@ -42,5 +42,6 @@ source:
   ref: EPS25-100WC-1001_cutsheet.pdf (https://www.automationdirect.com/pn/EPS25-100WC-1001)
   date: '2026-06-11'
 pneumatic:
-  port: 1/4in male NPT
+  ports:
+  - thread: 1/4in male NPT
 geometry: {}

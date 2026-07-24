@@ -45,7 +45,14 @@ def test_loads_a_minimal_valid_component(tmp_path, component_schema_path):
 
 def test_loads_a_component_with_ranged_pneumatic_and_signals(tmp_path, component_schema_path):
     data = _minimal_component()
-    data["pneumatic"] = {"pressure_min": 4.0, "pressure_max": 6.0, "pressure_units": "bar", "flow": 25.0, "flow_units": "Nl/min", "port": "M5"}
+    data["pneumatic"] = {
+        "pressure_min": 4.0,
+        "pressure_max": 6.0,
+        "pressure_units": "bar",
+        "flow": 25.0,
+        "flow_units": "Nl/min",
+        "ports": [{"port": "P", "thread": "M5", "function": "supply"}],
+    }
     data["comms"] = {
         "protocol": "discrete-io",
         "signals": [
@@ -65,6 +72,9 @@ def test_loads_a_component_with_ranged_pneumatic_and_signals(tmp_path, component
     assert component.pneumatic.pressure_units == "bar"
     assert component.pneumatic.flow == 25.0
     assert component.pneumatic.flow_units == "Nl/min"
+    assert component.pneumatic.ports[0].port == "P"
+    assert component.pneumatic.ports[0].thread == "M5"
+    assert component.pneumatic.ports[0].function == "supply"
     assert component.comms.signal("vacuum_switch").direction_device == "output"
     assert component.geometry.envelope.length == 40.0
     assert component.geometry.envelope.width == 20.0
@@ -73,6 +83,51 @@ def test_loads_a_component_with_ranged_pneumatic_and_signals(tmp_path, component
     assert component.geometry.mass == 0.05
     assert component.geometry.units == "kg"
     assert component.hazards == ("pinch",)
+
+
+def test_loads_a_pneumatic_port_with_only_a_thread_stated(tmp_path, component_schema_path):
+    # A datasheet often states just a thread size for a single, unlabeled
+    # port -- port/function must both stay None, not be guessed (ADR-0014).
+    data = _minimal_component()
+    data["pneumatic"] = {"ports": [{"thread": "1/4in male NPT"}]}
+    path = _write(tmp_path, "component.yaml", data)
+
+    component = load_component(path, component_schema_path)
+
+    port = component.pneumatic.ports[0]
+    assert port.thread == "1/4in male NPT"
+    assert port.port is None
+    assert port.function is None
+
+
+def test_loads_a_comms_connector(tmp_path, component_schema_path):
+    data = _minimal_component()
+    data["comms"] = {
+        "protocol": "ethercat",
+        "connectors": [
+            {"ref": "X1 IN", "type": "M8-4P", "role": "slave_in"},
+            {"ref": "X2 OUT", "type": "M8-4P", "role": "slave_out"},
+        ],
+    }
+    path = _write(tmp_path, "component.yaml", data)
+
+    component = load_component(path, component_schema_path)
+
+    assert [c.ref for c in component.comms.connectors] == ["X1 IN", "X2 OUT"]
+    assert component.comms.connectors[0].role == "slave_in"
+    assert component.comms.connectors[1].role == "slave_out"
+
+
+def test_comms_with_no_connectors_stays_empty_tuple_not_a_gap(tmp_path, component_schema_path):
+    # Absence is correct for a device whose datasheet never enumerates
+    # connectors (e.g. discrete-io) -- not something to backfill.
+    data = _minimal_component()
+    data["comms"] = {"protocol": "discrete-io", "signals": []}
+    path = _write(tmp_path, "component.yaml", data)
+
+    component = load_component(path, component_schema_path)
+
+    assert component.comms.connectors == ()
 
 
 def test_loads_a_connector_pinout(tmp_path, component_schema_path):

@@ -40,6 +40,13 @@ record the range, do not pick. Anything unanswered is OMITTED, never estimated, 
 copied from other definitions. Leave the draft incomplete and report the validation
 refusals as the list of what the human must supply.
 
+This applies just as much to a connector's pinout (`pin`/`function`/`wire_color`), a
+pneumatic port (`port` label/`thread`/`function` -- each independently optional; a
+sensor's process-pressure tap has no correct `function` at all, so leave it out), and a
+comms connector (`ref`/`type`/`protocol`/`role`, e.g. an EtherCAT IN/OUT pair) as to any
+other field. Ask for all of them. A component whose datasheet states none of these stays
+that way -- absence is the correct, honest answer, not a gap to fill in from a similar part.
+
 MODULES are assemblies and design work: TCP placement, capabilities, PackML, safety.
 Do not author or modify modules from a datasheet alone; propose, and let the human
 decide. Never publish an incomplete definition.

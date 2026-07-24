@@ -10,13 +10,23 @@ governing rule of this spec.**
 Only questions a datasheet answers:
 
 - identity: id, vendor, part number, datasheet reference (url or filename)
-- `electrical` — supplies (peak/nominal *as stated*), connectors
+- `electrical` — supplies (peak/nominal *as stated*), connectors (each with its own `pins`:
+  `pin`/`function`, plus `wire_color` if stated)
 - `pneumatic` — pressure as a **range** if the source gives one (`pressure_min/max` plus a
-  verbatim `pressure_units` field -- never converted), ports, flow (`flow` plus a verbatim
-  `flow_units` field -- also never converted)
+  verbatim `pressure_units` field -- never converted), flow (`flow` plus a verbatim
+  `flow_units` field -- also never converted), and `ports` — one entry per pneumatic port,
+  each of `port` (the datasheet's own label, e.g. `P`/`A`/`R`), `thread` (e.g. `G1/8`), and
+  `function` (`supply`/`exhaust`/`work`) independently optional: a single unlabeled inlet
+  gets `thread` alone, and a sensor's process-pressure tap gets no `function` at all, since
+  none of the three values describes it correctly
 - `signals` — the device's own I/O as documented, device-perspective directions
   (`direction_device: output` for a PNP part-present), protocol incl. `x-` customs, IODD/ESI
   references as *citations* (a note naming the file, never an invented path)
+- `connectors` (under `comms`) — the device's own comms/network connectors as stated (e.g.
+  an EtherCAT IN/OUT pair): `ref`, `type`, `protocol`, `role`
+  (`master`/`slave_in`/`slave_out`/`port`). This is what lets a module express an EtherCAT
+  chain one layer up. Absence is correct for a device whose datasheet never enumerates them
+  (a plain discrete-io part has no network connector to list) — never backfilled.
 - `geometry` — envelope dims (`length`/`width`/`height` + verbatim `units`) and mass
   (+ verbatim `units`) as stated
 - `hazards` — intrinsic ones the source states (a heated tip is `burn_hot` at the component)

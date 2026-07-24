@@ -15,10 +15,12 @@ geometry:
     units: mm
 name: Nordson-Kline DP-8 Precision Dot Dispenser
 pneumatic:
-  port: G1/8
   pressure_max: 6
   pressure_min: 4
   pressure_units: bar
+  ports:
+  - thread: G1/8
+    function: supply
 vendor: Nordson-Kline
 comms:
   protocol: ethercat

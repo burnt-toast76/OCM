@@ -89,6 +89,23 @@ class ComponentElectrical:
 
 
 @dataclass(frozen=True)
+class ComponentPneumaticPort:
+    """One pneumatic port, as the source states it. All three fields are
+    independently optional -- a datasheet stating a thread size rarely also
+    prints a P/A/R-style label, and `function` has no correct value at all
+    for e.g. a sensor's process-pressure tap (ADR-0014: omitted, not
+    estimated, whenever the source doesn't support it)."""
+
+    port: str | None = None
+    thread: str | None = None
+    function: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ComponentPneumaticPort":
+        return cls(port=data.get("port"), thread=data.get("thread"), function=data.get("function"))
+
+
+@dataclass(frozen=True)
 class ComponentPneumatic:
     """Pressure as a RANGE if the source gives one -- choosing a single
     operating point is a module-layer decision (ADR-0014), never made here.
@@ -99,7 +116,7 @@ class ComponentPneumatic:
     pressure_units: str | None = None  # verbatim as printed (e.g. "bar", "psi") -- never converted
     flow: float | None = None
     flow_units: str | None = None  # verbatim as printed (e.g. "Nl/min", "SCFM") -- never converted
-    port: str | None = None
+    ports: tuple[ComponentPneumaticPort, ...] = ()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ComponentPneumatic":
@@ -109,7 +126,7 @@ class ComponentPneumatic:
             pressure_units=data.get("pressure_units"),
             flow=data.get("flow"),
             flow_units=data.get("flow_units"),
-            port=data.get("port"),
+            ports=tuple(ComponentPneumaticPort.from_dict(p) for p in data.get("ports", [])),
         )
 
 
@@ -141,9 +158,28 @@ class ComponentSignal:
 
 
 @dataclass(frozen=True)
+class ComponentCommsConnector:
+    """One comms/network connector, as the source states it (e.g. an
+    EtherCAT IN/OUT pair on a daisy-chainable device) -- what makes an
+    EtherCAT chain expressible one layer up, in a module's own
+    comms.connectors. Absence on a component is correct, not a gap, for a
+    device whose datasheet never enumerates them (ADR-0014)."""
+
+    ref: str | None = None
+    type: str | None = None
+    protocol: str | None = None
+    role: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ComponentCommsConnector":
+        return cls(ref=data.get("ref"), type=data.get("type"), protocol=data.get("protocol"), role=data.get("role"))
+
+
+@dataclass(frozen=True)
 class ComponentComms:
     protocol: str | None = None
     device_description: str | None = None
+    connectors: tuple[ComponentCommsConnector, ...] = ()
     signals: tuple[ComponentSignal, ...] = ()
 
     def signal(self, name: str) -> ComponentSignal | None:
@@ -157,6 +193,7 @@ class ComponentComms:
         return cls(
             protocol=data.get("protocol"),
             device_description=data.get("device_description"),
+            connectors=tuple(ComponentCommsConnector.from_dict(c) for c in data.get("connectors", [])),
             signals=tuple(ComponentSignal.from_dict(s) for s in data.get("signals", [])),
         )
 

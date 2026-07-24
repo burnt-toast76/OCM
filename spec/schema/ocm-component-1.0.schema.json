@@ -181,8 +181,32 @@
           "type": "string",
           "description": "Verbatim as printed (e.g. 'Nl/min') -- never convert."
         },
-        "port": {
-          "type": "string"
+        "ports": {
+          "type": "array",
+          "description": "This component's own pneumatic ports, as the source states them. A single-port device (most dispensers/actuators) still gets a one-entry list. Every field is independently optional -- a datasheet rarely states all three for one port; include only what it actually says (ADR-0014).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "port": {
+                "type": "string",
+                "description": "Port label as the datasheet prints it (e.g. 'P', 'A', 'R'). Omit if the source never labels it -- do not invent one for a single unlabeled port."
+              },
+              "thread": {
+                "type": "string",
+                "description": "Verbatim as printed (e.g. 'G1/8', '1/4in NPT')."
+              },
+              "function": {
+                "type": "string",
+                "enum": [
+                  "supply",
+                  "exhaust",
+                  "work"
+                ],
+                "description": "What this port does, per the source's own description. Omit if none of the three fits (e.g. a sensor's process-pressure tap is none of these)."
+              }
+            }
+          }
         }
       },
       "description": "Ranges as stated. A single operating point is a MODULE decision (ADR-0014)."
@@ -213,6 +237,38 @@
         "device_description": {
           "type": "string",
           "description": "Citation for the ESI/IODD/EDS (e.g. 'ESI available from vendor'). NEVER a path to a file that does not exist."
+        },
+        "connectors": {
+          "type": "array",
+          "description": "This component's own comms/network connectors, as the source states them (e.g. an EtherCAT IN/OUT pair on a daisy-chainable device). This is what makes an EtherCAT chain expressible one layer up, in a module's own comms.connectors. Absence is correct, not a gap to fill in, for a device whose datasheet never enumerates them (e.g. a discrete-io device with no chainable network) -- never fabricated.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "ref": {
+                "type": "string",
+                "description": "This connector's own label, as the source states it (e.g. 'X1 IN', 'X2 OUT')."
+              },
+              "type": {
+                "type": "string",
+                "description": "Connector type, as printed (e.g. 'M12-D-4P')."
+              },
+              "protocol": {
+                "type": "string",
+                "description": "Only if the source states a protocol for THIS connector that differs from (or is more specific than) the device's own comms.protocol -- otherwise omit; it's implied."
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "master",
+                  "slave_in",
+                  "slave_out",
+                  "port"
+                ],
+                "description": "As the datasheet labels it -- 'IN'/'OUT' on an EtherCAT slave map to slave_in/slave_out."
+              }
+            }
+          }
         },
         "signals": {
           "type": "array",

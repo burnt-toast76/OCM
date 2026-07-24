@@ -44,8 +44,13 @@ function buildTranscribePrompt(fileCount: number): string {
     "datasheet). Please transcribe into the component definition -- zero assumption: only " +
     "include what's actually stated, and record every value in the exact unit the source " +
     "prints, verbatim (never convert). For each connector, extract its pinout too -- pin " +
-    "number, function, and wire color, wherever the source gives them. Tell me what's left " +
-    "for me to fill in."
+    "number, function, and wire color, wherever the source gives them. If it has a pneumatic " +
+    "connection, extract its port(s) too -- the port's own label if the datasheet prints one " +
+    "(e.g. 'P', 'A', 'R'), its thread size, and its function (supply/exhaust/work) only if " +
+    "that's actually determinable from the source. If it has a comms/network connector (e.g. " +
+    "an EtherCAT IN/OUT pair), extract that too -- ref, type, and role. Leave any of these out " +
+    "entirely if the source doesn't state them; a device with no listed comms connectors stays " +
+    "that way, not backfilled. Tell me what's left for me to fill in."
   );
 }
 
