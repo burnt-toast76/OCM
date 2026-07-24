@@ -1,6 +1,7 @@
 # ADR-0015 — Module connectivity: nets, links, and transcribed pins
 
-**Status:** Accepted (schema additions in ADR-0014's registry precede the wiring UI)
+**Status:** Accepted, with Erratum 1 (2026-07-24) — see the end of this document. The
+pneumatic endpoint model as originally written is wrong and was implemented as written.
 
 ## Context
 
@@ -159,7 +160,7 @@ nets:
       pressure_units: bar
       endpoints:
         - {port: AIR_IN}
-        - {refdes: DP1, ref: air_in}
+        - {refdes: DP1}          # sole pneumatic port, unlabelled — see Erratum 1
 
 links:
   - {id: L_EC_1, protocol: ethercat,
@@ -190,3 +191,52 @@ genuinely a whole module has no internal wiring to describe.
   are already the boundary objects, so connecting modules to each other is the same
   operation one layer up. Out of scope here; the port model is chosen so it does not have to
   change.
+
+---
+
+## Erratum 1 (2026-07-24) — pneumatic endpoints could never resolve
+
+Found by the module-authoring cold test (`docs/cold-test-module-authoring.md`, Finding 5).
+All three agents hit this identically on the shared air supply the brief required.
+
+**What was wrong.** Decision 2 and the `## Shape` example both assumed that everything an
+endpoint can reference is *a connector with a `ref`*. Pneumatic ports are not connectors.
+They are a separate shape carrying `port` / `thread` / `function`, and `_connectors_of`
+consults only `electrical.connectors` and `comms.connectors`. A pneumatic net endpoint
+naming a component therefore **could not resolve under any input** — omit `ref` and it is
+refused for not naming one; supply a `ref` and no such connector exists.
+
+The original example compounded this by writing `{refdes: DP1, ref: air_in}`. `air_in` is
+not a value any field on a pneumatic port provides. It was invented, and the implementation
+followed it faithfully. Both real components make this concrete: `dp8` and `eps25` each
+declare exactly one pneumatic port, and both have `port: None`, because neither datasheet
+labels a single port. There is nothing to transcribe — so "refuse until it is transcribed"
+is not strictness here, it is an unsatisfiable demand.
+
+**Correction A — `ref` resolves against pneumatic ports too.** `endpoint.ref` names what the
+referenced thing calls itself, on any of the three: `electrical.connectors[].ref`,
+`comms.connectors[].ref`, or `pneumatic.ports[].port`. One key, one meaning; no new endpoint
+field and no alias layer.
+
+**Correction B — sole-port endpoints omit `ref`.** When a component declares exactly one
+pneumatic port, a bare `{refdes: DP1}` endpoint is unambiguous and resolves. When it
+declares more than one, `ref` is required and must name a `port`; its absence is a refusal,
+and so is naming a port the component does not declare.
+
+This is not an assumption in the ADR-0014 sense. Nothing is inferred about the part — the
+uniqueness of the port is a fact the manifest states. It is the same test ADR-0014 already
+applies elsewhere: refuse where there is genuine ambiguity, not where there is none.
+
+**Correction C — `declares_any` must count pneumatic ports.** It is currently computed from
+electrical and comms connectors only, so `dp8` reports `declares_any=False` despite carrying
+a correctly transcribed `G1/8` supply port, and is refused with *"its pinout is missing."*
+That message is false for that component, and a purely pneumatic fitting would hit the same
+thing. A component declaring only pneumatic ports declares connectors.
+
+**Correction D — the refusal message must fit the domain.** `COMPONENT_HAS_NO_CONNECTORS`
+should not say "pinout" on a pneumatic net. Name what is actually absent for the domain the
+endpoint sits in.
+
+**Unchanged.** The nets-vs-links split, the derived chain walk, the ports-are-design rule,
+and Decision 4 (pins are transcribed; the wiring UI cannot create one) all stand. The defect
+was in which fields an endpoint can name, not in the model's shape.
