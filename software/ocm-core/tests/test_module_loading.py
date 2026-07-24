@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 from ocm_core import Parameter, Signal, load_module
-from ocm_core.module import ComponentRef, Module, ModuleComponent
+from ocm_core.module import ComponentRef, Electrical, Module, ModuleComponent
 
 
 def test_loads_sd50_end_effector(sd50_path):
@@ -89,6 +89,28 @@ def test_signal_from_dict_carries_frame_for_pose6d():
     assert signal.type == "pose6d"
     assert signal.frame == "nest1.part_datum"
     assert signal.fields is None
+
+
+def test_electrical_connector_pins_round_trip():
+    electrical = Electrical.from_dict(
+        {
+            "connectors": [
+                {
+                    "ref": "J1",
+                    "type": "M12-A-5P",
+                    "carries": "power",
+                    "pins": [
+                        {"pin": "1", "function": "24VDC supply", "wire_color": "brown"},
+                        {"pin": "3", "function": "0V return"},
+                    ],
+                }
+            ]
+        }
+    )
+    connector = electrical.connectors[0]
+    assert connector.pins[0].pin == "1"
+    assert connector.pins[0].wire_color == "brown"
+    assert connector.pins[1].wire_color is None
 
 
 def test_signal_from_dict_carries_fields_for_struct():

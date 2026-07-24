@@ -75,6 +75,35 @@ def test_loads_a_component_with_ranged_pneumatic_and_signals(tmp_path, component
     assert component.hazards == ("pinch",)
 
 
+def test_loads_a_connector_pinout(tmp_path, component_schema_path):
+    data = _minimal_component()
+    data["electrical"] = {
+        "connectors": [
+            {
+                "ref": "J1",
+                "type": "M12-A-5P",
+                "carries": "power",
+                "pins": [
+                    {"pin": "1", "function": "24VDC supply", "wire_color": "brown"},
+                    {"pin": "3", "function": "0V return"},
+                ],
+            }
+        ]
+    }
+    path = _write(tmp_path, "component.yaml", data)
+
+    component = load_component(path, component_schema_path)
+
+    connector = component.electrical.connectors[0]
+    assert connector.ref == "J1"
+    assert connector.pins[0].pin == "1"
+    assert connector.pins[0].function == "24VDC supply"
+    assert connector.pins[0].wire_color == "brown"
+    # wire_color is only stated for pin 1 in the source -- pin 3's stays
+    # None, never guessed (ADR-0014: unanswered is omitted, not estimated).
+    assert connector.pins[1].wire_color is None
+
+
 def test_missing_required_source_is_rejected(tmp_path, component_schema_path):
     data = _minimal_component()
     del data["source"]

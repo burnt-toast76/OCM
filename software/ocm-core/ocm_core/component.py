@@ -46,14 +46,33 @@ class ComponentSupply:
 
 
 @dataclass(frozen=True)
+class ComponentPin:
+    """One pin in a connector's pinout, as the source states it."""
+
+    pin: str
+    function: str
+    wire_color: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ComponentPin":
+        return cls(pin=data["pin"], function=data["function"], wire_color=data.get("wire_color"))
+
+
+@dataclass(frozen=True)
 class ComponentConnector:
     ref: str | None = None
     type: str | None = None
     carries: str | None = None
+    pins: tuple[ComponentPin, ...] = ()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ComponentConnector":
-        return cls(ref=data.get("ref"), type=data.get("type"), carries=data.get("carries"))
+        return cls(
+            ref=data.get("ref"),
+            type=data.get("type"),
+            carries=data.get("carries"),
+            pins=tuple(ComponentPin.from_dict(p) for p in data.get("pins", [])),
+        )
 
 
 @dataclass(frozen=True)

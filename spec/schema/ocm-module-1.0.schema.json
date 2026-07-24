@@ -251,6 +251,31 @@
                   "safety",
                   "power+fieldbus"
                 ]
+              },
+              "pins": {
+                "type": "array",
+                "description": "This connector's own pinout, as the source states it.",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "pin",
+                    "function"
+                  ],
+                  "properties": {
+                    "pin": {
+                      "type": "string",
+                      "description": "Pin identifier as the datasheet labels it (e.g. '1', 'A', 'GND')."
+                    },
+                    "function": {
+                      "type": "string",
+                      "description": "What this pin is for, as the source states it (e.g. '24VDC supply', 'output_1 signal')."
+                    },
+                    "wire_color": {
+                      "type": "string"
+                    }
+                  }
+                }
               }
             }
           }
