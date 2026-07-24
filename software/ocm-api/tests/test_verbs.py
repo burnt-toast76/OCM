@@ -116,13 +116,14 @@ def test_create_module_draft_end_effector(api: OcmApi):
     assert e.data["draft"] is True
     assert e.data["revision"] == "0.1.0"
 
-    # Schema-valid out of the box, but not yet FULLY valid: the scaffold's
-    # collision mesh is an honest TODO placeholder that doesn't exist on
-    # disk yet (ADR-0011: agents never hand-write URDF -- generate_geometry_stub
-    # is the next step; see test_generate_geometry_stub below).
+    # ADR-0016 Decision 3: a fresh draft omits its geometry artifact claim
+    # rather than placeholder a collision path to a file that does not exist,
+    # so it reaches a definite done state -- the manifest is complete,
+    # artifacts are pending. validate_module is clean; publish_module is what
+    # later requires the geometry (see test_publish_requires_geometry).
     validated = api.validate_module("com.example.pickhead.pk100")
-    assert not validated.ok
-    assert any(r.code == Codes.NOT_FOUND and r.path == "mechanical.geometry.collision" for r in validated.refusals)
+    assert validated.ok, validated.refusals
+    assert "collision" not in api.describe_module("com.example.pickhead.pk100").data["manifest"]["mechanical"]["geometry"]
 
 
 def test_update_module_writes_and_validates(api: OcmApi):
@@ -207,6 +208,37 @@ def test_publish_module(api: OcmApi):
     assert e.ok
     assert e.data == {"id": "com.example.pickhead.pk104", "revision": "1.0.0", "draft": False, "published": True}
     assert api.describe_module("com.example.pickhead.pk104").data["draft"] is False
+
+
+def test_validate_module_resolves_connectivity(api: OcmApi):
+    # ADR-0016 Decision 1: validate_module runs the same connectivity
+    # resolution a cell would -- a module port wired to nothing is refused
+    # during authoring, not only later at cell resolution.
+    api.create_module_draft("com.example.fix.conn1", "fixture")
+    e = api.update_module(
+        "com.example.fix.conn1",
+        patch=[{"op": "add", "path": "/ports", "value": [{"id": "AIR_IN", "domain": "pneumatic", "thread": "G1/8", "function": "supply"}]}],
+    )
+    assert e.ok, e.refusals
+
+    validated = api.validate_module("com.example.fix.conn1")
+    assert not validated.ok
+    assert any(r.code == Codes.PORT_UNCONNECTED for r in validated.refusals), [(r.code, r.message) for r in validated.refusals]
+
+
+def test_publish_requires_geometry_a_draft_may_omit(api: OcmApi):
+    # ADR-0016 Decision 3: a fresh draft omits its geometry artifact claim and
+    # validates clean (a reachable done state); publish_module is what requires
+    # the geometry, and generate_geometry_stub supplies it.
+    api.create_module_draft("com.example.fix.pub1", "fixture")
+    assert api.validate_module("com.example.fix.pub1").ok  # draft: artifacts pending, still valid
+
+    refused = api.publish_module("com.example.fix.pub1", "1.0.0")
+    assert not refused.ok
+    assert any(r.code == Codes.NOT_FOUND and r.path == "mechanical.geometry.collision" for r in refused.refusals)
+
+    api.generate_geometry_stub("com.example.fix.pub1", (100.0, 100.0), 50.0)
+    assert api.publish_module("com.example.fix.pub1", "1.0.0").ok
 
 
 # ---------------------------------------------------------------------------

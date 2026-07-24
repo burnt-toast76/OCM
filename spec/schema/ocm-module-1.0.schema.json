@@ -133,9 +133,6 @@
         },
         "geometry": {
           "type": "object",
-          "required": [
-            "collision"
-          ],
           "properties": {
             "visual": {
               "type": "string",
@@ -143,7 +140,7 @@
             },
             "collision": {
               "type": "string",
-              "description": "Path to collision mesh. Convex hull or convex decomposition STRONGLY preferred \u2014 Tesseract's Bullet backend is far faster on convex geometry."
+              "description": "Path to collision mesh. Convex hull or convex decomposition STRONGLY preferred \u2014 Tesseract's Bullet backend is far faster on convex geometry. ADR-0016: a DRAFT (revision 0.x) may omit this artifact claim -- absence, not a placeholder path to a file that does not exist; publish_module requires it."
             },
             "urdf_fragment": {
               "type": "string",

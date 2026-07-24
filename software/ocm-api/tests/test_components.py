@@ -316,7 +316,14 @@ def _place_tool(api: OcmApi, cell_id: str, module_id: str, components: list[dict
     geom = api.generate_geometry_stub(module_id, (70.0, 70.0), 100.0)
     assert geom.ok, geom.refusals
     published = api.publish_module(module_id, "1.0.0")
-    assert published.ok, published.refusals
+    if not published.ok:
+        # ADR-0016: validate_module (and thus publish_module) now resolves the
+        # module's own components/connectivity -- a module a cell would refuse
+        # refuses here, at authoring, instead of only at place_instance. When
+        # that happens the refusal we're asserting has simply arrived earlier;
+        # surface it. (A module whose gap only shows at cell scope -- e.g. a
+        # draft component ref -- still publishes and is caught at placement.)
+        return published
     api.create_cell(cell_id, "com.accelsolutions.base.frame1200@2.0.0")
     return api.place_instance(cell_id, "tool1", f"{module_id}@1.0.0", {"pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}})
 

@@ -260,6 +260,25 @@ def _check_module_components(
     return resolved_by_refdes
 
 
+def resolve_module(module: Module, components_search_path: SearchPath | None = None) -> list[str]:
+    """Cross-check ONE module in isolation, exactly the way resolve_cell does
+    for each instance it loads: its `components:` list and signal `source`
+    provenance (ADR-0014) and its own nets/links/ports connectivity
+    (ADR-0015), against `components_search_path`. Returns every violation
+    found -- an empty list means the module is internally consistent.
+
+    This is the module-scoped slice of resolve_cell, for a caller (ocm-api's
+    `validate_module`, ADR-0016) that must see connectivity refusals while a
+    module is being authored, before any cell places it. It reuses the same
+    components-search-path plumbing `_check_module_components` already threads
+    -- there is no second path.
+    """
+    errors: list[str] = []
+    resolved_components = _check_module_components(module.id, module, components_search_path, errors)
+    check_module_connectivity(module.id, module, resolved_components, errors)
+    return errors
+
+
 def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: SearchPath | None = None) -> ResolvedCell:
     """Load every module a cell references, and cross-check its plan and
     mount chain against those manifests.

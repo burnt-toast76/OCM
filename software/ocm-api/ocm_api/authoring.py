@@ -17,11 +17,12 @@ from typing import Any
 import jsonpatch
 import jsonpointer
 
-from ocm_core import load_schema
+from ocm_core import Module, load_schema
 from ocm_core.loader import validate_module_dict
+from ocm_resolve import resolve_module
 
 from .envelope import Codes, Envelope, Refusal, single_refusal
-from .translate import schema_violation_to_refusal
+from .translate import resolve_error_to_refusal, schema_violation_to_refusal
 from .workspace import Workspace, is_draft_revision, read_yaml, write_yaml
 
 DRAFT_REVISION = "0.1.0"
@@ -59,7 +60,11 @@ def _skeleton_manifest(module_id: str, kind: str) -> dict[str, Any]:
         "mechanical": {
             "mount": {"interface": "custom", "footprint_mm": [100.0, 100.0]},
             "frames": {"origin": {"xyz_mm": [0.0, 0.0, 0.0], "note": "TODO: mounting datum"}},
-            "geometry": {"collision": "meshes/TODO_convex.stl"},
+            # ADR-0016 Decision 3: a draft omits its artifact claims rather
+            # than placeholder a `collision`/`urdf_fragment` path to a file
+            # that does not exist (ADR-0014: absence, not an assumed value).
+            # generate_geometry_stub fills these in; publish_module requires them.
+            "geometry": {},
             "mass_kg": 1.0,
         },
         "state_machine": {
@@ -89,7 +94,6 @@ def _skeleton_manifest(module_id: str, kind: str) -> dict[str, Any]:
         doc["comms"] = _todo_comms()
     elif kind == "robot":
         doc["mechanical"]["mount"]["interface"] = "ocm-base-grid-50"
-        doc["mechanical"]["geometry"]["urdf_fragment"] = "urdf/TODO.urdf.xacro"
         doc["comms"] = _todo_comms()
 
     return doc
@@ -204,13 +208,18 @@ def generate_geometry_stub(ws: Workspace, module_id: str, footprint_mm: tuple[fl
 
 
 def validate_module(ws: Workspace, module_id: str) -> Envelope:
-    """Full validation including cross-file checks schema validation alone
-    can't do -- does `geometry.collision` exist, does `geometry.urdf_fragment`
-    exist, does `comms.esi` exist, if declared. `collision` is schema-REQUIRED
-    for every module (not optional like the other two), so this fires on
-    every draft that hasn't run generate_geometry_stub yet -- by design:
-    the field is a claimed file path just like the other two, and a claim
-    nothing backs is exactly what this check exists to catch.
+    """Full validation -- schema, cross-file artifact existence, AND (ADR-0016
+    Decision 1) the connectivity resolution a cell would run. There is one
+    `validate_module` and it means validated: the checks an author can see are
+    the checks that decide, not a weaker subset that goes green on a module a
+    cell would later refuse.
+
+    ADR-0016 Decision 3: a DRAFT (revision 0.x) may omit its artifact claims
+    -- `mechanical.geometry.collision`, `urdf_fragment`, `comms.esi` -- which
+    gives an authoring agent a reachable done state (the manifest is complete;
+    artifacts are pending). A published revision must declare `collision`
+    (`publish_module` gates the same). Whatever IS declared must point at a
+    file that exists -- a claim nothing backs is exactly what this catches.
     """
     if not ws.module_exists(module_id):
         return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
@@ -222,6 +231,7 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
 
     module_dir = ws.module_dir(module_id)
     geometry = doc.get("mechanical", {}).get("geometry", {})
+    draft = is_draft_revision(str(doc.get("revision", "0.0.0")))
 
     collision = geometry.get("collision")
     if collision and not (module_dir / collision).is_file():
@@ -231,6 +241,16 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
                 path="mechanical.geometry.collision",
                 message=f"{collision!r} does not exist under {module_dir}",
                 hint="generate_geometry_stub(...) first, or point at a real collision mesh file.",
+            )
+        )
+    elif not collision and not draft:
+        # ADR-0016 Decision 3: a draft may omit this; a published module cannot.
+        refusals.append(
+            Refusal(
+                code=Codes.NOT_FOUND,
+                path="mechanical.geometry.collision",
+                message=f"a published module must declare mechanical.geometry.collision; {module_id!r} does not",
+                hint="generate_geometry_stub(...) before publishing, or keep it a 0.x draft.",
             )
         )
     urdf_fragment = geometry.get("urdf_fragment")
@@ -246,6 +266,19 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
     esi = doc.get("comms", {}).get("esi")
     if esi and not (module_dir / esi).is_file():
         refusals.append(Refusal(code=Codes.NOT_FOUND, path="comms.esi", message=f"{esi!r} does not exist under {module_dir}"))
+
+    # ADR-0016 Decision 1: resolve this module's nets/links/ports against the
+    # components they reference -- the same check resolve_cell runs per
+    # instance, off the components search path _check_module_components already
+    # threads (no second path). Only when the document is schema-clean, so a
+    # typed Module can be built; schema errors are reported above, not piled on.
+    if not errors:
+        try:
+            module = Module.from_dict(doc)
+        except Exception:
+            module = None
+        if module is not None:
+            refusals.extend(resolve_error_to_refusal(e) for e in resolve_module(module, ws.components_dir))
 
     if refusals:
         return Envelope.refuse(refusals)
@@ -270,6 +303,17 @@ def publish_module(ws: Workspace, module_id: str, revision: str) -> Envelope:
         return validation
 
     doc = read_yaml(ws.module_path(module_id)) or {}
+    # ADR-0016 Decision 3: a draft may omit its artifact claims, but publishing
+    # requires them -- a published module cannot claim (or lack) geometry it
+    # does not have. validate_module already proved any DECLARED collision's
+    # file exists; here we require it be declared at all.
+    if not doc.get("mechanical", {}).get("geometry", {}).get("collision"):
+        return single_refusal(
+            Codes.NOT_FOUND,
+            path="mechanical.geometry.collision",
+            message=f"cannot publish {module_id!r}: it declares no mechanical.geometry.collision",
+            hint="generate_geometry_stub(...) first, then publish.",
+        )
     doc["revision"] = revision
     write_yaml(ws.module_path(module_id), doc)
 

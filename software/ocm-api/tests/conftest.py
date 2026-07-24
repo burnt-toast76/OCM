@@ -50,13 +50,14 @@ def api(workspace_root: Path) -> OcmApi:
 # ALL genuinely exist on disk -- the one module in this pre-alpha repo
 # whose geometry isn't a placeholder (see modules/com.universal-robots.ur5e's
 # own NOTICE.md: "a real vendored-and-flattened UR5e"). Every other real
-# module's mechanical.geometry.collision is schema-REQUIRED but declared as
-# an honest "placeholder -- not authored yet" (frame1200, pneumatic-nest,
-# sf20, gocator) or simply unauthored without the comment (dh200, sd50) --
-# a real, pre-existing pre-alpha gap (CLAUDE.md: "no hardware built"), not
-# something to work around by weakening validate_module's own cross-file
-# checks. Useful whenever a test wants "a module that's simply, fully
-# valid" with no cross-file gaps at all.
+# module still DECLARES a mechanical.geometry.collision path (ADR-0016 makes
+# the claim schema-OPTIONAL for a draft, but these are published modules that
+# declare it) that is an honest "placeholder -- not authored yet" (frame1200,
+# pneumatic-nest, sf20, gocator) or simply unauthored without the comment
+# (dh200, sd50) -- a real, pre-existing pre-alpha gap (CLAUDE.md: "no hardware
+# built"), not something to work around by weakening validate_module's own
+# cross-file checks. Useful whenever a test wants "a module that's simply,
+# fully valid" with no cross-file gaps at all.
 CLEAN_MODULE_ID = "com.universal-robots.ur5e"
 
 
