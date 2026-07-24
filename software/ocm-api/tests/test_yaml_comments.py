@@ -159,3 +159,51 @@ def test_adr0015_connectivity_patch_preserves_comments_and_round_trips(api: OcmA
     e2 = api.update_module("com.example.fixture.connectivity", manifest=manifest)
     assert e2.ok, e2.refusals
     assert path.read_text(encoding="utf-8") == after_first_write
+
+
+def test_ocm_fmt_output_is_byte_identical_to_the_gui_write_paths(tmp_path: Path, workspace_root: Path, api: OcmApi):
+    # ocm_generator.cli.cmd_fmt and ocm_api.workspace.write_yaml both call
+    # ocm_core.new_yaml_rt directly now (a shared ocm-core function, not a
+    # private copy each) specifically so they can't quietly drift apart --
+    # this is the test that actually pins that down: canonicalizing the
+    # SAME non-canonical bytes through `ocm fmt`'s own code (no API, no
+    # Workspace) and through a real update_module write (the GUI/agent
+    # path) must produce byte-identical output.
+    import yaml
+
+    from ocm_core import new_yaml_rt
+    from ocm_generator.cli import _canonicalize
+
+    non_canonical = (
+        "ocm_version: '1.1'\n"
+        "id: com.example.fixture.byteidentical\n"
+        "revision: 0.1.0\n"
+        "kind: fixture\n"
+        "electrical:\n"
+        "  supplies:\n"
+        "    - rail: 24VDC\n"  # sequence=4/offset=2 -- this repo's own non-canonical style
+        "      current_nominal_a: 2.0\n"
+    )
+
+    # Path 1: `ocm fmt` -- a bare file, no OcmApi/Workspace involved at all.
+    fmt_copy = tmp_path / "module.yaml"
+    fmt_copy.write_text(non_canonical, encoding="utf-8")
+    fmt_output = _canonicalize(new_yaml_rt(), fmt_copy)
+
+    # Path 2: the real GUI/agent write path -- inject the SAME non-canonical
+    # bytes directly (same technique test_targeted_patch_produces_a_minimal_diff
+    # uses), then a genuine no-op update_module (identical data back)
+    # triggers write_yaml's own reformat.
+    api.create_module_draft("com.example.fixture.byteidentical", "fixture")
+    api_path = workspace_root / "modules" / "com.example.fixture.byteidentical" / "module.yaml"
+    api_path.write_text(non_canonical, encoding="utf-8")
+    manifest = yaml.safe_load(non_canonical)
+    # update_module always writes, even when the manifest is schema-invalid
+    # (validation gates publishing, not saving) -- `non_canonical` above is
+    # deliberately minimal/incomplete, so this write IS refused, but the
+    # reformat this test cares about happens regardless.
+    api.update_module("com.example.fixture.byteidentical", manifest=manifest)
+    write_path_output = api_path.read_text(encoding="utf-8")
+
+    assert fmt_output == write_path_output
+    assert "    - rail: 24VDC" not in fmt_output  # sanity: a real reformat actually happened, not a no-op comparison

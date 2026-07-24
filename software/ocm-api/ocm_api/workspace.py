@@ -34,6 +34,14 @@ meaningful YAML syntax any round-trip library models as preservable state;
 re-serializing such a file re-flows it to single-space `key: value` even
 on an untouched line. Files written by this package's own dumps (and
 these tests' own fixtures) never used that style, so it doesn't recur.
+
+The actual ruamel `YAML(typ="rt")` configuration (`_new_yaml_rt`, imported
+here as `ocm_core.new_yaml_rt`) lives in ocm-core, not here -- ocm-core is
+the dependency floor (no sibling-package imports at all), so the
+standalone `ocm fmt` CLI (ocm_generator.cli.cmd_fmt) can canonicalize a
+manifest to exactly what THIS write path would have produced without
+importing ocm_api itself (and, transitively, fastapi/anthropic/mcp/
+ocm_generator.scene/ocm_resolve) just to format YAML.
 """
 
 from __future__ import annotations
@@ -49,27 +57,9 @@ from pathlib import Path
 from typing import Any
 
 import jsonpatch
+from ocm_core import new_yaml_rt as _new_yaml_rt
 from ocm_core.loader import DEFAULT_COMPONENT_SCHEMA_PATH, DEFAULT_SCHEMA_PATH, _read_yaml  # noqa: F401 -- see module docstring
-from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
-
-def _new_yaml_rt() -> YAML:
-    # A fresh instance per call, not a module-level singleton: ruamel's
-    # YAML object is stateful (its emitter/parser carry position and
-    # anchor state across a load/dump), and isn't safe for concurrent use
-    # -- two threads round-tripping *different* files through one shared
-    # instance at the same time corrupted output with errors like
-    # "EmitterError: expected NodeEvent, but got DocumentStartEvent()"
-    # even though the per-path lock below fully serializes writes to any
-    # single file. The per-path lock stays -- it's still needed for the
-    # read-merge-write sequence to be atomic with respect to itself --
-    # but the YAML instance doing the actual parsing/emitting must not be
-    # shared across files.
-    yaml_rt = YAML(typ="rt")
-    yaml_rt.preserve_quotes = True
-    yaml_rt.width = 100_000  # never line-wrap -- wrapping would show up as diff noise unrelated to the actual change
-    yaml_rt.indent(mapping=2, sequence=2, offset=0)  # this repo's own convention: block sequences flush with their parent key
-    return yaml_rt
 
 
 # FastAPI runs sync route handlers (every verb in http_app.py) in a

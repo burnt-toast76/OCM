@@ -1,21 +1,18 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""`ocm fmt` -- see cmd_fmt in ocm_generator/cli.py. Needs ocm-api installed
-(it reuses ocm_api.workspace._new_yaml_rt so the CLI canonicalizes to
-EXACTLY what the GUI/agent write path would have produced) -- this whole
-file skips cleanly, not just individual tests, wherever ocm-api isn't in
-the current environment, so it doesn't fail test_cli.py's own unrelated
-validate/resolve/scene/plan coverage.
+"""`ocm fmt` -- see cmd_fmt in ocm_generator/cli.py. Needs nothing beyond
+ocm-core (it calls ocm_core.new_yaml_rt, the same function
+ocm_api.workspace.write_yaml -- the GUI/agent write path -- calls, so the
+CLI canonicalizes to EXACTLY what that write path would have produced)
+-- no importorskip needed here: ocm-core is already a structural
+dependency of this whole test module (test_cli.py's own validate/resolve/
+scene/plan coverage needs it too), never something that might be absent.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-pytest.importorskip("ocm_api")
-
-from ocm_generator.cli import main  # noqa: E402 -- after the importorskip, deliberately
+from ocm_generator.cli import main
 
 
 NON_CANONICAL = (
@@ -149,7 +146,7 @@ def test_fmt_defaults_to_modules_components_cells_under_the_cwd(monkeypatch, tmp
 def test_fmt_on_the_real_repo_manifests_only_reflows_formatting(repo_root: Path, tmp_path: Path):
     # The actual regression this command exists to fix: dh200/sd50 (and
     # most of the rest) were hand-authored at sequence=4/offset=2, which
-    # _new_yaml_rt's global sequence=2/offset=0 config silently reformats
+    # new_yaml_rt's global sequence=2/offset=0 config silently reformats
     # on ANY write. A round trip through `fmt` must be a no-op the SECOND
     # time (idempotent) and must never change parsed content, on the real
     # files this was found on -- not just a synthetic fixture.

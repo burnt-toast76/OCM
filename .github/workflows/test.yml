@@ -54,10 +54,10 @@ jobs:
       # No `tesseract` extra: every --collision/plan-dependent test file
       # already does `pytest.importorskip("tesseract_robotics")` at module
       # level, so this job just skips them instead of installing a heavy
-      # compiled robotics dependency to run them. No ocm-api either --
-      # `ocm fmt`'s own tests (test_cli_fmt.py) do the same importorskip
-      # for the exact same reason (ocm-api is a much heavier dependency
-      # graph than anything else this package's own pipeline needs).
+      # compiled robotics dependency to run them. No ocm-api needed at all
+      # -- `ocm fmt` (test_cli_fmt.py) calls ocm_core.new_yaml_rt directly,
+      # not ocm_api.workspace, so its tests run for real here rather than
+      # skipping.
       - name: Install ocm-core, ocm-resolve (siblings), ocm-generator[test]
         run: |
           pip install -e software/ocm-core

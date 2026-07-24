@@ -356,7 +356,7 @@ python -m ocm_generator resolve cells/bracket-asm-01/cell.yaml --modules modules
 python -m ocm_generator scene cells/bracket-asm-01/cell.yaml --modules modules --view /tmp/cell.html
 python -m ocm_generator scene cells/bracket-asm-01/cell.yaml --modules modules --collision
 python -m ocm_generator plan  cells/bracket-asm-01/cell.yaml --modules modules --emit-urscript /tmp/out.script --view-animation /tmp/anim.html
-ocm fmt --check   # needs ocm-api installed too, see below
+ocm fmt --check   # needs nothing beyond ocm-core above, see below
 ```
 
 Five subcommands: `validate` (a module manifest against the schema),
@@ -372,9 +372,10 @@ one refusal) on failure, matching the libraries underneath -- see
 ### `ocm fmt` -- canonicalize manifest formatting
 
 ```
-pip install -e ../ocm-api  # in addition to ocm-core above -- fmt reuses
-                            # ocm_api.workspace._new_yaml_rt directly, not
-                            # a second copy of its indent config
+# no extra install beyond ocm-core above -- fmt calls ocm_core.new_yaml_rt
+# directly, the same function ocm_api.workspace.write_yaml (the GUI/agent
+# write path) calls, so it never needs ocm-api/fastapi/anthropic/mcp, nor
+# ocm-resolve, just to format YAML.
 
 ocm fmt                        # reformat ./modules ./components ./cells in place
 ocm fmt path/to/module.yaml    # or specific files/directories
@@ -383,10 +384,12 @@ ocm fmt --check                # exit 1 and list anything not already canonical 
 
 `ocm_api.workspace.write_yaml` (the GUI/agent write path) round-trips a
 manifest through a ruamel `YAML(typ="rt")` instance configured with this
-repo's own `sequence=2, offset=0` block-sequence indent. That config is
-global to the YAML instance, not per-file -- so a manifest hand-authored
-at a different indent (several of this repo's own were originally written
-at `sequence=4, offset=2`) gets silently reformatted the moment anything
+repo's own `sequence=2, offset=0` block-sequence indent (`ocm_core.new_yaml_rt`
+-- ocm-core is the dependency floor, so both callers share one definition
+with no sibling-package import needed to reach it). That config is global
+to the YAML instance, not per-file -- so a manifest hand-authored at a
+different indent (several of this repo's own were originally written at
+`sequence=4, offset=2`) gets silently reformatted the moment anything
 writes it back, even a genuine no-op save. `ocm fmt` does the same
 round-trip deliberately and up front, so that reformat happens as its own
 reviewable, formatting-only commit instead of hiding inside an unrelated

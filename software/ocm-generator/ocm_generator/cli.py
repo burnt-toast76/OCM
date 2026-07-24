@@ -18,7 +18,8 @@ success, 1 if that stage reported errors.
 `--collision` and `plan` need the `tesseract` extra (pip install
 ocm-generator[tesseract]); nothing else here does -- see
 ocm_generator/scene/collision.py and ocm_generator/planner/ik.py. `fmt`
-needs `ocm-api` installed (pip install -e ../ocm-api) -- see cmd_fmt below.
+needs `ocm-core` installed (pip install -e ../ocm-core), same as
+validate/resolve/scene/plan already do -- see cmd_fmt below.
 
 This is a developer/trial tool, not the agent layer (see ROADMAP Step 6 --
 "the agent is a thin tool-calling wrapper over a generator that already
@@ -246,13 +247,15 @@ def _canonicalize(yaml_rt, path: Path) -> str:
 
 
 def cmd_fmt(args: argparse.Namespace) -> int:
-    # ocm_api.workspace._new_yaml_rt is private-but-stable (same convention
-    # that module itself uses to reuse ocm_core.loader._read_yaml) -- `fmt`
-    # exists specifically so a manifest is canonicalized to EXACTLY what
-    # the GUI/agent write path (ocm_api.workspace.write_yaml) would have
+    # ocm_core.new_yaml_rt is the SAME function ocm_api.workspace.write_yaml
+    # (the GUI/agent write path) uses -- `fmt` exists specifically so a
+    # manifest is canonicalized to EXACTLY what that write path would have
     # produced, so importing anything other than that literal function
-    # would risk the two silently drifting apart again.
-    from ocm_api.workspace import _new_yaml_rt
+    # would risk the two silently drifting apart again. Imported from
+    # ocm_core, not ocm_api: ocm-core is the dependency floor (no
+    # sibling-package imports), so this needs nothing beyond it -- not
+    # fastapi/anthropic/mcp, not ocm_generator.scene, not ocm_resolve.
+    from ocm_core import new_yaml_rt
 
     paths = args.paths if args.paths else DEFAULT_FMT_PATHS
     manifests = _discover_manifests(paths)
@@ -264,10 +267,10 @@ def cmd_fmt(args: argparse.Namespace) -> int:
     changed: list[Path] = []
     for path in manifests:
         # A fresh YAML() per file, not reused across the loop -- see
-        # _new_yaml_rt's own docstring: its emitter/parser carry position
+        # new_yaml_rt's own docstring: its emitter/parser carry position
         # and anchor state across a load/dump that isn't safe to reuse
         # even across successive, non-concurrent round-trips.
-        canonical = _canonicalize(_new_yaml_rt(), path)
+        canonical = _canonicalize(new_yaml_rt(), path)
         original = path.read_text(encoding="utf-8")
         if canonical == original:
             continue

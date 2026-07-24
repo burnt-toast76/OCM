@@ -64,6 +64,7 @@ from .module import (
     WearItem,
 )
 from .parameter import Frame, Parameter
+from .yaml_rt import new_yaml_rt
 
 __all__ = [
     "Base",
@@ -124,6 +125,7 @@ __all__ = [
     "load_component",
     "load_module",
     "load_schema",
+    "new_yaml_rt",
     "validate_cell_dict",
     "validate_module_dict",
 ]

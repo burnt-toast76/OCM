@@ -8,6 +8,12 @@ license = { text = "AGPL-3.0-or-later" }
 dependencies = [
     "PyYAML>=6.0",
     "jsonschema>=4.18",
+    # ocm_core.yaml_rt.new_yaml_rt -- the one canonical round-trip config
+    # every manifest writer shares (ocm_api.workspace.write_yaml, `ocm
+    # fmt`). Small and pure-Python, unlike the genuinely optional
+    # tesseract-robotics/cascadio extras elsewhere in this monorepo -- a
+    # real, always-installable dependency, not one that should degrade.
+    "ruamel.yaml>=0.18",
 ]
 
 [project.optional-dependencies]
