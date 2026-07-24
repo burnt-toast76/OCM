@@ -152,18 +152,18 @@ nets:
     - id: N_24V
       endpoints:
         - {port: PWR_IN, pin: '1'}
-        - {refdes: PS1, connector: electrical, pin: '1'}
+        - {refdes: PS1, ref: electrical, pin: '1'}
   pneumatic:
     - id: C_SUPPLY
       pressure: 6
       pressure_units: bar
       endpoints:
         - {port: AIR_IN}
-        - {refdes: DP1, connector: air_in}
+        - {refdes: DP1, ref: air_in}
 
 links:
   - {id: L_EC_1, protocol: ethercat,
-     a: {port: NET_IN}, b: {refdes: DP1, connector: X1}}
+     a: {port: NET_IN}, b: {refdes: DP1, ref: X1}}
 ```
 
 `nets` and `links` are optional. A module that declares neither stays valid, the same way a

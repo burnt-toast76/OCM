@@ -52,6 +52,16 @@ class Codes:
     INVALID_SOURCE = "INVALID_SOURCE"  # ADR-0014: a signal's source: provenance doesn't check out
     TOOL_SLOT_OCCUPIED = "TOOL_SLOT_OCCUPIED"  # place_instance onto a mount.on flange that's already carrying an instance
     AGENT_UNAVAILABLE = "AGENT_UNAVAILABLE"  # /agent/chat with no ANTHROPIC_API_KEY configured
+    # ADR-0015: a module's nets/links/ports connectivity, one stable code per
+    # refusal in the ADR's "implementable against the current schema" table.
+    NET_TOO_FEW_ENDPOINTS = "NET_TOO_FEW_ENDPOINTS"  # a net with fewer than 2 endpoints
+    PIN_ON_MULTIPLE_NETS = "PIN_ON_MULTIPLE_NETS"  # one pin claimed by more than one net
+    UNRESOLVED_ENDPOINT = "UNRESOLVED_ENDPOINT"  # endpoint names an unknown refdes/ref/pin/port
+    COMPONENT_HAS_NO_CONNECTORS = "COMPONENT_HAS_NO_CONNECTORS"  # wired instance whose component declares none
+    PORT_UNCONNECTED = "PORT_UNCONNECTED"  # module port declared but on no net or link
+    LINK_NON_COMMUNICATION_PORT = "LINK_NON_COMMUNICATION_PORT"  # link endpoint on an electrical/pneumatic port
+    LINK_PROTOCOL_MISMATCH = "LINK_PROTOCOL_MISMATCH"  # a link's two ends speak different protocols
+    ETHERCAT_CHAIN_BROKEN = "ETHERCAT_CHAIN_BROKEN"  # chain reaches no master, loops, or leaves slaves unreached
 
 
 @dataclass(frozen=True)

@@ -14,13 +14,17 @@ finds rather than raising on the first one.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ocm_core import Capability, Cell, Module, ModuleInstance, Parameter
 
+from .connectivity import check_module_connectivity
 from .errors import CellResolutionError
 from .plan_walk import iter_op_steps
 from .search import SearchPath, find_component, find_module
+
+if TYPE_CHECKING:
+    from ocm_core import Component
 
 
 @dataclass(frozen=True)
@@ -185,7 +189,7 @@ def _check_module_components(
     module: Module,
     components_search_path: SearchPath | None,
     errors: list[str],
-) -> None:
+) -> "dict[str, Component]":
     """ADR-0014: a module's own `components:` list, and its signals'
     `source` provenance into that list, are cross-file references exactly
     like a cell's module refs and mount chain -- checked here, once, the
@@ -193,11 +197,16 @@ def _check_module_components(
     `source` naming a signal the referenced component doesn't declare are
     all refused; a module with no `components:` list is untouched (ADR-0014:
     "a module with no components list stays valid").
-    """
-    if not module.components:
-        return
 
+    Returns the refdes -> resolved Component map it built along the way, so
+    ADR-0015's connectivity check can reuse it (same components search path,
+    each component resolved exactly once) rather than resolving a second
+    time. A declared refdes that failed to resolve is simply absent.
+    """
     resolved_by_refdes: dict[str, Component] = {}
+    if not module.components:
+        return resolved_by_refdes
+
     seen_refdes: set[str] = set()
     for mc in module.components:
         if mc.refdes in seen_refdes:
@@ -219,7 +228,7 @@ def _check_module_components(
             resolved_by_refdes[mc.refdes] = component
 
     if module.comms is None:
-        return
+        return resolved_by_refdes
 
     for signal in module.comms.signals:
         if signal.source is None:
@@ -248,6 +257,8 @@ def _check_module_components(
                 f"(known signals: {known})"
             )
 
+    return resolved_by_refdes
+
 
 def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: SearchPath | None = None) -> ResolvedCell:
     """Load every module a cell references, and cross-check its plan and
@@ -257,14 +268,17 @@ def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: Se
     referenced module can't be found, any plan step names an unknown op or
     an out-of-bounds/undeclared param, any mount.on chain is dangling, or
     (ADR-0014) any module's own `components:` list/signal `source`
-    provenance doesn't check out against `components_search_path`.
+    provenance doesn't check out against `components_search_path`, or
+    (ADR-0015) any module's own nets/links/ports connectivity doesn't
+    resolve against those components' transcribed connectors/pins.
     """
     errors: list[str] = []
 
     base_module, base_errors = find_module(cell.base.module, search_path)
     errors.extend(base_errors)
     if base_module is not None:
-        _check_module_components("base", base_module, components_search_path, errors)
+        resolved_components = _check_module_components("base", base_module, components_search_path, errors)
+        check_module_connectivity("base", base_module, resolved_components, errors)
 
     loaded: dict[str, ResolvedModuleInstance] = {}
     for mi in cell.modules:
@@ -272,7 +286,8 @@ def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: Se
         errors.extend(mod_errors)
         if module is not None:
             loaded[mi.instance] = ResolvedModuleInstance(instance=mi, module=module)
-            _check_module_components(mi.instance, module, components_search_path, errors)
+            resolved_components = _check_module_components(mi.instance, module, components_search_path, errors)
+            check_module_connectivity(mi.instance, module, resolved_components, errors)
 
     resolved = _resolve_mounts(loaded, errors)
 

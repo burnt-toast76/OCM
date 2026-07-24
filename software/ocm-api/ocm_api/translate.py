@@ -134,6 +134,29 @@ _RE_UNKNOWN_SIGNAL_SOURCE = re.compile(
     r"references unknown signal '(?P<devsig>[^']+)' on component (?P<component_id>\S+) \(known signals: (?P<known>\[.*\])\)$"
 )
 
+# ADR-0015: a module's nets/links/ports connectivity, checked by
+# ocm_resolve.check_module_connectivity the same way ADR-0014's components:
+# list is -- one stable code per refusal in the "implementable" table. Every
+# message shares the `module <loc> (<id>): ` stem the resolver stamps on all
+# of its cross-file violations.
+_CONN = r"^module (?P<loc>\S+) \((?P<module_id>[^)]+)\): "
+_RE_NET_TOO_FEW = re.compile(_CONN + r"(?P<domain>\w+) net '(?P<net>[^']+)' has \d+ endpoint\(s\); a net needs at least 2$")
+_RE_PIN_MULTI_NET = re.compile(_CONN + r"pin .+ appears on more than one net \(.+\)$")
+_RE_NO_CONNECTORS = re.compile(_CONN + r".+ references refdes '(?P<refdes>[^']+)' \([^)]+\), which declares no connectors")
+_RE_PORT_UNCONNECTED = re.compile(_CONN + r"port '(?P<port>[^']+)' is declared but connected to no net or link$")
+_RE_LINK_NON_COMM_PORT = re.compile(
+    _CONN + r"link '(?P<link>[^']+)' endpoint (?P<end>[ab]) references port '(?P<port>[^']+)' \(domain [^)]*\), which is not a communication port$"
+)
+_RE_LINK_PROTOCOL_MISMATCH = re.compile(_CONN + r"link '(?P<link>[^']+)' connects mismatched protocols \(.+\)$")
+_RE_ETHERCAT_CHAIN = re.compile(_CONN + r"EtherCAT chain .+$")
+# Broad endpoint-resolution catch-all -- must be tried AFTER the more
+# specific connectivity patterns above (a "no connectors" message also
+# contains "references refdes", so order matters).
+_RE_UNRESOLVED_ENDPOINT = re.compile(
+    _CONN + r".+ references (?:unknown refdes|unknown port|unknown connector|pin '[^']*' not on connector|"
+    r"pin '[^']*' on comms connector|refdes '[^']*' \([^)]*\) without naming|neither a port)"
+)
+
 
 def _parse_pylist(text: str) -> list[str]:
     # `known ops: ['a', 'b']`-style Python repr of a list of strings --
@@ -243,6 +266,65 @@ def resolve_error_to_refusal(error: str) -> Refusal:
             message=error,
             allowed={"values": _parse_pylist(m["known"])},
             hint=f"Use one of {m['component_id']}'s own declared comms.signals names.",
+        )
+
+    # ADR-0015: nets/links/ports connectivity. Specific patterns first; the
+    # broad "endpoint doesn't resolve" catch-all is tried last.
+    if m := _RE_NET_TOO_FEW.match(error):
+        return Refusal(
+            code=Codes.NET_TOO_FEW_ENDPOINTS,
+            path=f"modules['{m['loc']}'].nets.{m['domain']}['{m['net']}']",
+            message=error,
+            hint="A net models a shared node -- give it at least two endpoints, or delete it.",
+        )
+    if m := _RE_PIN_MULTI_NET.match(error):
+        return Refusal(
+            code=Codes.PIN_ON_MULTIPLE_NETS,
+            path=f"modules['{m['loc']}'].nets",
+            message=error,
+            hint="A pin sits on exactly one node -- move it to a single net (two nets on one pin is a short).",
+        )
+    if m := _RE_NO_CONNECTORS.match(error):
+        return Refusal(
+            code=Codes.COMPONENT_HAS_NO_CONNECTORS,
+            path=f"modules['{m['loc']}'].components['{m['refdes']}']",
+            message=error,
+            hint=f"Transcribe {m['refdes']}'s pinout onto its component definition -- the wiring UI can't create a pin (ADR-0015 Decision 4).",
+        )
+    if m := _RE_PORT_UNCONNECTED.match(error):
+        return Refusal(
+            code=Codes.PORT_UNCONNECTED,
+            path=f"modules['{m['loc']}'].ports['{m['port']}']",
+            message=error,
+            hint=f"Wire {m['port']} into a net or link, or remove it from ports:.",
+        )
+    if m := _RE_LINK_NON_COMM_PORT.match(error):
+        return Refusal(
+            code=Codes.LINK_NON_COMMUNICATION_PORT,
+            path=f"modules['{m['loc']}'].links['{m['link']}'].{m['end']}",
+            message=error,
+            hint=f"A link is communication only -- point endpoint {m['end']} at a communication port, or model this as a net.",
+        )
+    if m := _RE_LINK_PROTOCOL_MISMATCH.match(error):
+        return Refusal(
+            code=Codes.LINK_PROTOCOL_MISMATCH,
+            path=f"modules['{m['loc']}'].links['{m['link']}']",
+            message=error,
+            hint="Both ends of a link must speak the same protocol.",
+        )
+    if m := _RE_ETHERCAT_CHAIN.match(error):
+        return Refusal(
+            code=Codes.ETHERCAT_CHAIN_BROKEN,
+            path=f"modules['{m['loc']}'].links",
+            message=error,
+            hint="Walk the IN->OUT cabling: anchor the chain to a master (or slave_in port), remove the loop, or cable the dangling slave_out onward.",
+        )
+    if m := _RE_UNRESOLVED_ENDPOINT.match(error):
+        return Refusal(
+            code=Codes.UNRESOLVED_ENDPOINT,
+            path=f"modules['{m['loc']}']",
+            message=error,
+            hint="An endpoint may only name an existing port, or a refdes/ref/pin the placed component itself declares (ADR-0015).",
         )
 
     return Refusal(code=Codes.CELL_INVALID, path="$", message=error)
