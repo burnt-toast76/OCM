@@ -455,6 +455,117 @@ class ModuleComponent:
 
 
 @dataclass(frozen=True)
+class Endpoint:
+    """ADR-0015: one end of a net or link. References EXISTING field names
+    only, no renaming or alias layer -- `port` is a `Port.id`, `refdes` is a
+    `ModuleComponent.refdes`, `ref`/`pin` are exactly what the referenced
+    component's own connector/pin calls itself (`ComponentConnector.ref`,
+    `ComponentPin.pin` -- ocm_core.component). Whether a given combination
+    is actually valid for its domain (an unknown refdes, a pin that
+    connector doesn't have) is a resolve-time concern -- not checked here.
+    """
+
+    port: str | None = None
+    refdes: str | None = None
+    ref: str | None = None
+    pin: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Endpoint":
+        return cls(port=data.get("port"), refdes=data.get("refdes"), ref=data.get("ref"), pin=data.get("pin"))
+
+
+@dataclass(frozen=True)
+class Net:
+    """ADR-0015: N unordered endpoints on a common node (a rail, a shared
+    supply line) -- electrical or pneumatic connectivity. `pressure`/
+    `pressure_units` apply to a pneumatic net's own single operating point
+    (a module-layer DESIGN choice, ADR-0014); a component's own pneumatic
+    range stays a range and is never narrowed here.
+    """
+
+    id: str
+    endpoints: tuple[Endpoint, ...] = ()
+    pressure: float | None = None
+    pressure_units: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Net":
+        return cls(
+            id=data["id"],
+            endpoints=tuple(Endpoint.from_dict(e) for e in data.get("endpoints", [])),
+            pressure=data.get("pressure"),
+            pressure_units=data.get("pressure_units"),
+        )
+
+
+@dataclass(frozen=True)
+class Nets:
+    """A module's `nets:` block -- electrical and pneumatic connectivity,
+    each its own list of `Net`. Communication connectivity is `links:`
+    instead (see `Link`), never a net: an EtherCAT chain's order can't be
+    expressed by an unordered set of endpoints.
+    """
+
+    electrical: tuple[Net, ...] = ()
+    pneumatic: tuple[Net, ...] = ()
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Nets":
+        return cls(
+            electrical=tuple(Net.from_dict(n) for n in data.get("electrical", [])),
+            pneumatic=tuple(Net.from_dict(n) for n in data.get("pneumatic", [])),
+        )
+
+
+@dataclass(frozen=True)
+class Port:
+    """ADR-0015: one entry in a module's own external interface
+    (`ports:`) -- what a net/link `Endpoint.port` references. A port is
+    authored, never derived from a component: choosing to present one 24V
+    feed rather than three is module-layer DESIGN (ADR-0014).
+    """
+
+    id: str
+    domain: str
+    type: str | None = None
+    thread: str | None = None
+    function: str | None = None
+    protocol: str | None = None
+    role: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Port":
+        return cls(
+            id=data["id"],
+            domain=data["domain"],
+            type=data.get("type"),
+            thread=data.get("thread"),
+            function=data.get("function"),
+            protocol=data.get("protocol"),
+            role=data.get("role"),
+        )
+
+
+@dataclass(frozen=True)
+class Link:
+    """ADR-0015: communication connectivity -- exactly two endpoints (a
+    cable between two ports), never an unordered net. Chain order
+    (master/slave sequence) is DERIVED by walking a/b at resolve time,
+    never authored or stored here.
+    """
+
+    id: str
+    a: Endpoint
+    b: Endpoint
+    protocol: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Link":
+        return cls(id=data["id"], a=Endpoint.from_dict(data["a"]), b=Endpoint.from_dict(data["b"]), protocol=data.get("protocol"))
+
+
+@dataclass(frozen=True)
 class Module:
     """A validated OCM module manifest. Construct via ocm_core.load_module, not directly."""
 
@@ -476,6 +587,9 @@ class Module:
     safety: Safety | None = None
     maintenance: Maintenance | None = None
     components: tuple[ModuleComponent, ...] = ()
+    ports: tuple[Port, ...] = ()
+    nets: Nets | None = None
+    links: tuple[Link, ...] = ()
 
     @property
     def is_abort_safe(self) -> bool:
@@ -513,4 +627,7 @@ class Module:
             safety=Safety.from_dict(safety) if safety else None,
             maintenance=Maintenance.from_dict(maintenance) if maintenance else None,
             components=tuple(ModuleComponent.from_dict(c) for c in data.get("components", [])),
+            ports=tuple(Port.from_dict(p) for p in data.get("ports", [])),
+            nets=Nets.from_dict(data["nets"]) if data.get("nets") else None,
+            links=tuple(Link.from_dict(l) for l in data.get("links", [])),
         )

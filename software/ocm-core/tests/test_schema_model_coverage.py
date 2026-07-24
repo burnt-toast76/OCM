@@ -21,7 +21,7 @@ from dataclasses import is_dataclass
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
 from ocm_core.component import Component
-from ocm_core.module import Module
+from ocm_core.module import Endpoint, Module, Net
 
 # Every optional field in ocm_core is written `X | None` (PEP 604), which
 # get_type_hints resolves to types.UnionType, NOT typing.Union -- but check
@@ -107,3 +107,25 @@ def test_module_schema_fields_all_have_a_matching_dataclass_field(schema_path):
     errors: list[str] = []
     _check_node(schema, schema, Module, "module", errors)
     assert not errors, "schema field(s) silently dropped by ocm_core.module's object model:\n" + "\n".join(errors)
+
+
+def test_module_connectivity_types_are_covered(schema_path):
+    """ADR-0015's ports/nets/links, on top of the same generic walker the
+    ComponentPin fix (b70f357) built -- the whole-module test above already
+    walks these for free (no code change was needed to cover them), but
+    this pins that down explicitly and scopes it to just the new types, so
+    it can't quietly regress even if the bigger test's own shape changes
+    later. $defs/endpoint is checked directly too: it's reused from THREE
+    call sites (nets.electrical[].endpoints[], nets.pneumatic[].endpoints[],
+    links[].a/b) and every one of them must independently resolve to the
+    real Endpoint dataclass, not just the first.
+    """
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    field_types = get_type_hints(Module)
+    errors: list[str] = []
+    _check_node(schema, schema["$defs"]["endpoint"], Endpoint, "$defs.endpoint", errors)
+    _check_node(schema, schema["$defs"]["net"], Net, "$defs.net", errors)
+    _check_node(schema, schema["properties"]["ports"], field_types["ports"], "module.ports", errors)
+    _check_node(schema, schema["properties"]["nets"], field_types["nets"], "module.nets", errors)
+    _check_node(schema, schema["properties"]["links"], field_types["links"], "module.links", errors)
+    assert not errors, "ADR-0015 connectivity field(s) silently dropped:\n" + "\n".join(errors)

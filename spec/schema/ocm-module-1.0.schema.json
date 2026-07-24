@@ -766,6 +766,110 @@
           }
         }
       }
+    },
+    "ports": {
+      "type": "array",
+      "description": "ADR-0015: this module's own external interface, one entry per connection it exposes. A module declaring none stays valid. Choosing to present one 24V feed rather than three, or one air inlet rather than a manifold, is module-layer DESIGN (ADR-0014) -- a port is authored, never derived from a component.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "domain"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "This port's own name -- what a net/link endpoint's `port` field references."
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "electrical",
+              "pneumatic",
+              "communication"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "description": "Electrical connector type, e.g. 'M12-A-4P'."
+          },
+          "thread": {
+            "type": "string",
+            "description": "Pneumatic thread, e.g. 'G1/8'."
+          },
+          "function": {
+            "type": "string",
+            "enum": [
+              "supply",
+              "exhaust",
+              "work"
+            ],
+            "description": "Pneumatic port function."
+          },
+          "protocol": {
+            "type": "string",
+            "description": "Communication protocol, e.g. 'ethercat'."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "master",
+              "slave_in",
+              "slave_out",
+              "port"
+            ],
+            "description": "Communication role, as the datasheet/design labels it -- 'IN'/'OUT' on an EtherCAT slave map to slave_in/slave_out."
+          }
+        }
+      }
+    },
+    "nets": {
+      "type": "object",
+      "description": "ADR-0015: electrical and pneumatic connectivity as NETS -- N unordered endpoints sharing one common node (a rail, a shared supply line). Optional; a module declaring neither key stays valid. Topology for communication is a LINK instead (below), not a net -- an EtherCAT chain's order can't be expressed by an unordered set.",
+      "additionalProperties": false,
+      "properties": {
+        "electrical": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/net"
+          }
+        },
+        "pneumatic": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/net"
+          }
+        }
+      }
+    },
+    "links": {
+      "type": "array",
+      "description": "ADR-0015: communication connectivity as LINKS -- exactly two endpoints (a cable between two ports), never an unordered net (order is what lets an EtherCAT chain's master/slave sequence be derived by walking a/b, later, at resolve time -- never stored here). Optional; a module declaring none stays valid.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "a",
+          "b"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "protocol": {
+            "type": "string",
+            "description": "e.g. 'ethercat'."
+          },
+          "a": {
+            "$ref": "#/$defs/endpoint"
+          },
+          "b": {
+            "$ref": "#/$defs/endpoint"
+          }
+        }
+      }
     }
   },
   "allOf": [
@@ -899,6 +1003,56 @@
         },
         "note": {
           "type": "string"
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "description": "ADR-0015: one end of a net or link. References EXISTING field names only, no renaming or alias layer -- `port` is a ports[].id, `refdes` is a components[].refdes, `ref`/`pin` are exactly what the referenced component's own connector/pin calls itself (ComponentConnector.ref, ComponentPin.pin -- see ocm-component-1.0.schema.json). Whether a given combination is actually valid for its domain (e.g. an unknown refdes, or a pin that connector doesn't have) is a resolve-time concern, not schema-enforced here.",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "type": "string",
+          "description": "References this module's own ports[].id."
+        },
+        "refdes": {
+          "type": "string",
+          "description": "References this module's own components[].refdes."
+        },
+        "ref": {
+          "type": "string",
+          "description": "The referenced component's own connector name, exactly as its electrical.connectors[].ref or comms.connectors[].ref names it."
+        },
+        "pin": {
+          "type": "string",
+          "description": "Exactly as the connector's own pins[].pin names it."
+        }
+      }
+    },
+    "net": {
+      "type": "object",
+      "description": "ADR-0015: N unordered endpoints on a common node. `pressure`/`pressure_units` apply to a pneumatic net's own single operating point -- a module-layer DESIGN choice (ADR-0014); a component's own pneumatic range stays a range.",
+      "required": [
+        "id",
+        "endpoints"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/endpoint"
+          }
+        },
+        "pressure": {
+          "type": "number"
+        },
+        "pressure_units": {
+          "type": "string",
+          "description": "Verbatim, e.g. 'bar' -- never convert."
         }
       }
     },
