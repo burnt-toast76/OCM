@@ -142,7 +142,12 @@ _RE_UNKNOWN_SIGNAL_SOURCE = re.compile(
 _CONN = r"^module (?P<loc>\S+) \((?P<module_id>[^)]+)\): "
 _RE_NET_TOO_FEW = re.compile(_CONN + r"(?P<domain>\w+) net '(?P<net>[^']+)' has \d+ endpoint\(s\); a net needs at least 2$")
 _RE_PIN_MULTI_NET = re.compile(_CONN + r"pin .+ appears on more than one net \(.+\)$")
-_RE_NO_CONNECTORS = re.compile(_CONN + r".+ references refdes '(?P<refdes>[^']+)' \([^)]+\), which declares no connectors")
+# "declares no connectors -- its pinout is missing" (electrical/comms) or,
+# per ADR-0015 Erratum 1 Correction D, "declares no pneumatic ports" on a
+# pneumatic net -- both are the same COMPONENT_HAS_NO_CONNECTORS refusal.
+_RE_NO_CONNECTORS = re.compile(
+    _CONN + r".+ references refdes '(?P<refdes>[^']+)' \([^)]+\), which declares no (?:connectors|pneumatic ports)"
+)
 _RE_PORT_UNCONNECTED = re.compile(_CONN + r"port '(?P<port>[^']+)' is declared but connected to no net or link$")
 _RE_LINK_NON_COMM_PORT = re.compile(
     _CONN + r"link '(?P<link>[^']+)' endpoint (?P<end>[ab]) references port '(?P<port>[^']+)' \(domain [^)]*\), which is not a communication port$"
@@ -153,8 +158,9 @@ _RE_ETHERCAT_CHAIN = re.compile(_CONN + r"EtherCAT chain .+$")
 # specific connectivity patterns above (a "no connectors" message also
 # contains "references refdes", so order matters).
 _RE_UNRESOLVED_ENDPOINT = re.compile(
-    _CONN + r".+ references (?:unknown refdes|unknown port|unknown connector|pin '[^']*' not on connector|"
-    r"pin '[^']*' on comms connector|refdes '[^']*' \([^)]*\) without naming|neither a port)"
+    _CONN + r".+ references (?:unknown refdes|unknown port|unknown connector|unknown pneumatic port|"
+    r"pin '[^']*' not on connector|pin '[^']*' on comms connector|"
+    r"refdes '[^']*' \([^)]*\) without naming|neither a port)"
 )
 
 

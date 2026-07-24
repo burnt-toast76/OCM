@@ -86,6 +86,18 @@ def _bare() -> dict[str, Any]:
     }
 
 
+def _valve() -> dict[str, Any]:
+    return {
+        "ocm_version": "1.1",
+        "id": "com.example.valve.demo1",
+        "revision": "1.0.0",
+        "kind": "valve_island",
+        "vendor": "Example Co",
+        "source": {"kind": "datasheet", "ref": "demo"},
+        "pneumatic": {"ports": [{"port": "P", "thread": "G1/8", "function": "supply"}, {"port": "A", "thread": "G1/8", "function": "work"}]},
+    }
+
+
 def _module(**blocks: Any) -> dict[str, Any]:
     m: dict[str, Any] = {
         "ocm_version": "1.1",
@@ -205,3 +217,22 @@ def test_ethercat_chain_broken_code(tmp_path: Path):
         links=[{"id": "L", "protocol": "ethercat", "a": {"refdes": "DP1", "ref": "X2"}, "b": {"refdes": "DP2", "ref": "X1"}}],
     )
     assert Codes.ETHERCAT_CHAIN_BROKEN in _codes_for(tmp_path, module, [_slave()])
+
+
+# ADR-0015 Erratum 1: pneumatic endpoint refusals keep their stable codes.
+def test_pneumatic_two_ports_without_ref_code(tmp_path: Path):
+    module = _module(
+        components=[{"refdes": "V1", "ref": "com.example.valve.demo1@1.0.0"}],
+        ports=[{"id": "AIR", "domain": "pneumatic", "thread": "G1/8", "function": "supply"}],
+        nets={"pneumatic": [{"id": "C", "endpoints": [{"port": "AIR"}, {"refdes": "V1"}]}]},
+    )
+    assert Codes.UNRESOLVED_ENDPOINT in _codes_for(tmp_path, module, [_valve()])
+
+
+def test_pneumatic_unknown_port_code(tmp_path: Path):
+    module = _module(
+        components=[{"refdes": "V1", "ref": "com.example.valve.demo1@1.0.0"}],
+        ports=[{"id": "AIR", "domain": "pneumatic", "thread": "G1/8", "function": "supply"}],
+        nets={"pneumatic": [{"id": "C", "endpoints": [{"port": "AIR"}, {"refdes": "V1", "ref": "Z"}]}]},
+    )
+    assert Codes.UNRESOLVED_ENDPOINT in _codes_for(tmp_path, module, [_valve()])

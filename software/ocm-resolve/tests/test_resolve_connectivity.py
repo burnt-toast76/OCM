@@ -84,6 +84,45 @@ def bare_component() -> dict[str, Any]:
     }
 
 
+def dispenser_component() -> dict[str, Any]:
+    """Shaped like the real com.nordson-kline.dispenser.dp8: EtherCAT
+    protocol with signals but NO comms connectors, a 24 VDC supply rail (not a
+    connector), and exactly ONE pneumatic supply port with no `port` label --
+    nothing to transcribe. ADR-0015 Erratum 1: this component DOES declare
+    connectivity (its pneumatic port), so it must not be refused "pinout
+    missing", and a bare pneumatic endpoint resolves to its sole port."""
+    return {
+        "ocm_version": "1.1",
+        "id": "com.example.dispenser.demo1",
+        "revision": "1.0.0",
+        "kind": "dispenser",
+        "vendor": "Example Co",
+        "source": {"kind": "datasheet", "ref": "fictional demo datasheet, worked-example only"},
+        "comms": {"protocol": "ethercat", "signals": [{"name": "volume", "direction_device": "output", "type": "real"}]},
+        "electrical": {"supplies": [{"rail": "24VDC"}]},
+        "pneumatic": {"pressure_min": 4, "pressure_max": 6, "pressure_units": "bar", "ports": [{"thread": "G1/8", "function": "supply"}]},
+    }
+
+
+def valve_component() -> dict[str, Any]:
+    """A manifold declaring MORE than one pneumatic port, each labelled --
+    so a bare {refdes} is ambiguous and `ref` must name a declared port."""
+    return {
+        "ocm_version": "1.1",
+        "id": "com.example.valve.demo1",
+        "revision": "1.0.0",
+        "kind": "valve_island",
+        "vendor": "Example Co",
+        "source": {"kind": "datasheet", "ref": "fictional demo datasheet, worked-example only"},
+        "pneumatic": {
+            "ports": [
+                {"port": "P", "thread": "G1/8", "function": "supply"},
+                {"port": "A", "thread": "G1/8", "function": "work"},
+            ]
+        },
+    }
+
+
 # --------------------------------------------------------------------------
 # module + cell plumbing
 # --------------------------------------------------------------------------
@@ -442,3 +481,69 @@ def test_connectivity_needs_the_components_search_path(tmp_path: Path):
     errors = exc.value.errors
     assert any("no components search path was given" in e for e in errors), errors
     assert not any("unknown connector" in e for e in errors), errors
+
+
+# --------------------------------------------------------------------------
+# ADR-0015 Erratum 1 -- pneumatic endpoints resolve against pneumatic.ports
+# --------------------------------------------------------------------------
+
+
+def test_pneumatic_net_to_a_sole_port_component_resolves(tmp_path: Path):
+    # Correction B: a component declaring exactly one pneumatic port is
+    # referenceable by a bare {refdes} -- the port is unlabelled, so there is
+    # no `ref` to cite, and demanding one would be unsatisfiable.
+    module = conn_module(
+        components=[{"refdes": "DISP1", "ref": "com.example.dispenser.demo1@1.0.0"}],
+        ports=[{"id": "AIR_IN", "domain": "pneumatic", "thread": "G1/8", "function": "supply"}],
+        nets={"pneumatic": [{"id": "C_AIR", "pressure": 5, "pressure_units": "bar", "endpoints": [{"port": "AIR_IN"}, {"refdes": "DISP1"}]}]},
+    )
+    assert resolve_errors(tmp_path, module, [dispenser_component()]) == []
+
+
+def test_dispenser_with_only_a_pneumatic_port_is_not_pinout_missing(tmp_path: Path):
+    # Correction C: a dp8-shaped part (24 VDC rail + one G1/8 supply port, no
+    # connectors) used to report declares_any=False and be refused
+    # "its pinout is missing". It now declares connectivity and resolves.
+    module = conn_module(
+        components=[{"refdes": "DP1", "ref": "com.example.dispenser.demo1@1.0.0"}],
+        ports=[{"id": "AIR_IN", "domain": "pneumatic", "thread": "G1/8", "function": "supply"}],
+        nets={"pneumatic": [{"id": "C_AIR", "endpoints": [{"port": "AIR_IN"}, {"refdes": "DP1"}]}]},
+    )
+    errors = resolve_errors(tmp_path, module, [dispenser_component()])
+    assert errors == [], errors
+    assert not any("pinout" in e for e in errors), errors
+
+
+def test_pneumatic_two_port_component_without_ref_is_refused(tmp_path: Path):
+    # Correction B: more than one port -> a bare {refdes} is ambiguous, `ref`
+    # is required and must name a declared port.
+    module = conn_module(
+        components=[{"refdes": "V1", "ref": "com.example.valve.demo1@1.0.0"}],
+        ports=[{"id": "AIR_IN", "domain": "pneumatic", "thread": "G1/8", "function": "supply"}],
+        nets={"pneumatic": [{"id": "C_AIR", "endpoints": [{"port": "AIR_IN"}, {"refdes": "V1"}]}]},
+    )
+    errors = resolve_errors(tmp_path, module, [valve_component()])
+    assert any(
+        "references refdes 'V1'" in e and "without naming a pneumatic port `ref`" in e and "'P'" in e and "'A'" in e
+        for e in errors
+    ), errors
+
+
+def test_pneumatic_ref_naming_a_declared_port_resolves(tmp_path: Path):
+    # Correction A: `ref` names a pneumatic.ports[].port, exactly as declared.
+    module = conn_module(
+        components=[{"refdes": "V1", "ref": "com.example.valve.demo1@1.0.0"}],
+        ports=[{"id": "AIR_IN", "domain": "pneumatic", "thread": "G1/8", "function": "supply"}],
+        nets={"pneumatic": [{"id": "C_AIR", "endpoints": [{"port": "AIR_IN"}, {"refdes": "V1", "ref": "P"}]}]},
+    )
+    assert resolve_errors(tmp_path, module, [valve_component()]) == []
+
+
+def test_pneumatic_ref_naming_an_undeclared_port_is_refused(tmp_path: Path):
+    module = conn_module(
+        components=[{"refdes": "V1", "ref": "com.example.valve.demo1@1.0.0"}],
+        ports=[{"id": "AIR_IN", "domain": "pneumatic", "thread": "G1/8", "function": "supply"}],
+        nets={"pneumatic": [{"id": "C_AIR", "endpoints": [{"port": "AIR_IN"}, {"refdes": "V1", "ref": "Z"}]}]},
+    )
+    errors = resolve_errors(tmp_path, module, [valve_component()])
+    assert any("references unknown pneumatic port 'Z' on refdes 'V1'" in e for e in errors), errors

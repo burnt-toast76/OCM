@@ -71,39 +71,47 @@ class _Terminal:
         return ("comp", self.refdes, self.ref, self.pin)
 
 
-def _connectors_of(component: "Component") -> tuple[dict[str, set[str]], dict[str, object], bool]:
-    """A component's endpoint-referenceable connectors, keyed by `ref`.
+def _connectors_of(component: "Component") -> tuple[dict[str, set[str]], dict[str, object], tuple, bool]:
+    """A component's endpoint-referenceable connectors and pneumatic ports.
 
-    Returns (electrical, comms, declares_any):
-    - electrical: connector ref -> the pins it declares (schema endpoint
-      doc: a net/link `ref` names an `electrical.connectors[].ref` ...).
-    - comms: connector ref -> the ComponentCommsConnector (... or a
-      `comms.connectors[].ref`); these carry no pins.
-    - declares_any: whether the component declares ANY connector at all --
-      the basis for ADR-0015's "instance whose component declares no
-      connectors" refusal. A connector with no `ref` can't be endpoint-named
-      but still counts as "declares a connector" here.
+    Returns (electrical, comms, pneumatic, declares_any):
+    - electrical: connector ref -> the pins it declares.
+    - comms: connector ref -> the ComponentCommsConnector (no pins).
+    - pneumatic: the component's `pneumatic.ports`, in declaration order. A
+      port carries `thread`/`function` and an OPTIONAL `port` label (ADR-0015
+      Erratum 1 Correction A: `endpoint.ref` names `pneumatic.ports[].port`,
+      the third thing a `ref` can resolve against -- one key, one meaning).
+    - declares_any: whether the component declares ANY connector OR pneumatic
+      port. ADR-0015 Erratum 1 Correction C: a component declaring only
+      pneumatic ports (e.g. dp8's G1/8 supply) DOES declare connectivity --
+      it must not report False and be refused "its pinout is missing". A
+      connector/port with no `ref`/`port` label can't be endpoint-*named* but
+      still counts as declared here.
     """
     electrical: dict[str, set[str]] = {}
     comms: dict[str, object] = {}
-    declares_any = False
     if component.electrical and component.electrical.connectors:
-        declares_any = True
         for c in component.electrical.connectors:
             if c.ref is not None:
                 electrical[c.ref] = {p.pin for p in c.pins}
     if component.comms and component.comms.connectors:
-        declares_any = True
         for c in component.comms.connectors:
             if c.ref is not None:
                 comms[c.ref] = c
-    return electrical, comms, declares_any
+    pneumatic = tuple(component.pneumatic.ports) if component.pneumatic and component.pneumatic.ports else ()
+    declares_any = bool(
+        (component.electrical and component.electrical.connectors)
+        or (component.comms and component.comms.connectors)
+        or pneumatic
+    )
+    return electrical, comms, pneumatic, declares_any
 
 
 def _resolve_endpoint(
     location: str,
     module: "Module",
     where: str,
+    domain: str,
     endpoint: "Endpoint",
     ports_by_id: dict[str, "Port"],
     declared_refdes: list[str],
@@ -113,7 +121,9 @@ def _resolve_endpoint(
     """Resolve one endpoint to a `_Terminal`, appending a refusal (and
     returning None) if it doesn't resolve. `where` names the endpoint's
     home ("electrical net 'N_24V'", "link 'L1' endpoint a") so every
-    message names the exact place the bad reference lives.
+    message names the exact place the bad reference lives; `domain`
+    ("electrical" | "pneumatic" | "communication") is what a component
+    endpoint's `ref` resolves against (ADR-0015 Erratum 1 Correction A).
     """
     prefix = f"module {location} ({module.id}): {where}"
 
@@ -147,7 +157,15 @@ def _resolve_endpoint(
             # _check_module_components -- don't pile a second refusal on it.
             return None
 
-        electrical, comms, declares_any = _connectors_of(component)
+        electrical, comms, pneumatic, declares_any = _connectors_of(component)
+
+        # ADR-0015 Erratum 1: a pneumatic net endpoint names a
+        # `pneumatic.ports[].port` -- a separate shape from the electrical/
+        # comms connectors, with its own sole-port rule (Corrections A/B/D).
+        if domain == "pneumatic":
+            return _resolve_pneumatic_endpoint(prefix, endpoint, component, pneumatic, errors)
+
+        # electrical / communication: the endpoint names a connector by `ref`.
         if not declares_any:
             errors.append(
                 f"{prefix} references refdes {endpoint.refdes!r} ({component.id}), "
@@ -209,6 +227,58 @@ def _resolve_endpoint(
         return None
 
     errors.append(f"{prefix} references neither a port nor a component refdes")
+    return None
+
+
+def _resolve_pneumatic_endpoint(
+    prefix: str,
+    endpoint: "Endpoint",
+    component: "Component",
+    pneumatic: tuple,
+    errors: list[str],
+) -> _Terminal | None:
+    """ADR-0015 Erratum 1: resolve a pneumatic net endpoint against the
+    component's `pneumatic.ports`.
+
+    - Correction B: a component declaring exactly ONE pneumatic port is
+      referenceable by a bare `{refdes}` (that port may be unlabelled -- dp8
+      and eps25 both declare a single port with no `port` label, and there is
+      nothing to transcribe). With more than one port, `ref` is required and
+      must name a declared `port`.
+    - Correction A: when `ref` is given it names `pneumatic.ports[].port`.
+    - Correction D: a component with no pneumatic port is refused by naming
+      what is absent for THIS domain -- a pneumatic port -- never a "pinout".
+    """
+    labels = sorted(p.port for p in pneumatic if p.port is not None)
+
+    def terminal(ref: str | None) -> _Terminal:
+        return _Terminal(
+            port_id=None, domain=None, refdes=endpoint.refdes, ref=ref,
+            pin=None, role=None, protocol=None, is_comms=False,
+        )
+
+    if endpoint.ref is not None:
+        if any(p.port == endpoint.ref for p in pneumatic):
+            return terminal(endpoint.ref)
+        errors.append(
+            f"{prefix} references unknown pneumatic port {endpoint.ref!r} on refdes "
+            f"{endpoint.refdes!r} ({component.id}) (declared ports: {labels})"
+        )
+        return None
+
+    # Bare `{refdes}`, no `ref`.
+    if len(pneumatic) == 1:
+        return terminal(pneumatic[0].port)  # may be None -- a sole unlabelled port
+    if not pneumatic:
+        errors.append(
+            f"{prefix} references refdes {endpoint.refdes!r} ({component.id}), "
+            "which declares no pneumatic ports (ADR-0015)"
+        )
+        return None
+    errors.append(
+        f"{prefix} references refdes {endpoint.refdes!r} ({component.id}) without naming a "
+        f"pneumatic port `ref` (it declares {len(pneumatic)}: {labels})"
+    )
     return None
 
 
@@ -361,7 +431,7 @@ def check_module_connectivity(
             for endpoint in net.endpoints:
                 where = f"{domain} net {net.id!r}"
                 term = _resolve_endpoint(
-                    location, module, where, endpoint, ports_by_id, declared_refdes, resolved_by_refdes, errors
+                    location, module, where, domain, endpoint, ports_by_id, declared_refdes, resolved_by_refdes, errors
                 )
                 note_usage(term)
                 if term is not None and term.pin_key is not None:
@@ -380,10 +450,10 @@ def check_module_connectivity(
     link_terminals: list[tuple[str, _Terminal, _Terminal]] = []
     for link in module.links:
         ta = _resolve_endpoint(
-            location, module, f"link {link.id!r} endpoint a", link.a, ports_by_id, declared_refdes, resolved_by_refdes, errors
+            location, module, f"link {link.id!r} endpoint a", "communication", link.a, ports_by_id, declared_refdes, resolved_by_refdes, errors
         )
         tb = _resolve_endpoint(
-            location, module, f"link {link.id!r} endpoint b", link.b, ports_by_id, declared_refdes, resolved_by_refdes, errors
+            location, module, f"link {link.id!r} endpoint b", "communication", link.b, ports_by_id, declared_refdes, resolved_by_refdes, errors
         )
         note_usage(ta)
         note_usage(tb)
