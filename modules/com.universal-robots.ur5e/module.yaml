@@ -16,12 +16,12 @@
 # (NOTICE.md), independent of this manifest's `license:` field below.
 # ─────────────────────────────────────────────────────────────────────
 ocm_version: "1.0"
-id:       com.universal-robots.ur5e
+id: com.universal-robots.ur5e
 revision: "3.1.0"
-name:     "UR5e"
-vendor:   "Universal Robots A/S"
-license:  LicenseRef-Proprietary
-kind:     robot
+name: "UR5e"
+vendor: "Universal Robots A/S"
+license: LicenseRef-Proprietary
+kind: robot
 description: >
   6-axis collaborative arm. 5 kg payload, 850 mm reach. Programmed over
   URScript, a raw TCP socket (port 30002) -- see cell.yaml's `address.ip`.
@@ -37,10 +37,10 @@ mechanical:
   frames:
     origin:
       xyz_mm: [0, 0, 0]
-      note:   "Base mounting face. Per-instance placement comes from cell.yaml's mount.pose."
+      note: "Base mounting face. Per-instance placement comes from cell.yaml's mount.pose."
 
   geometry:
-    collision:     meshes/collision/base.stl    # representative single mesh; urdf_fragment carries the real per-link set
+    collision: meshes/collision/base.stl        # representative single mesh; urdf_fragment carries the real per-link set
     urdf_fragment: urdf/ur5e.urdf.xacro         # vendored + flattened from Universal_Robots_ROS2_Description -- see NOTICE.md
 
   mass_kg: 20.6
@@ -53,25 +53,25 @@ comms:
     # spec/08 handshake contract. offset = RTDE general-purpose int register index.
     # Direction is from the COORDINATOR's point of view (schema convention):
     #   the robot WRITES at_step/heartbeat -> coordinator reads them -> 'input'.
-    - { name: hs_at_step,    direction: input,  type: int32, offset: 0, role: handshake_at_step }
-    - { name: hs_heartbeat,  direction: input,  type: int32, offset: 1, role: handshake_heartbeat }
-    - { name: hs_done_step,  direction: output, type: int32, offset: 0, role: handshake_done_step }
-    - { name: hs_abort,      direction: output, type: int32, offset: 1, role: handshake_abort }
+  - {name: hs_at_step, direction: input, type: int32, offset: 0, role: handshake_at_step}
+  - {name: hs_heartbeat, direction: input, type: int32, offset: 1, role: handshake_heartbeat}
+  - {name: hs_done_step, direction: output, type: int32, offset: 0, role: handshake_done_step}
+  - {name: hs_abort, direction: output, type: int32, offset: 1, role: handshake_abort}
 
 state_machine:
   model: packml
   implements:
-    - idle
-    - starting
-    - execute
-    - completing
-    - complete
-    - resetting
-    - aborting
-    - aborted
-    - clearing
-    - stopping
-    - stopped
+  - idle
+  - starting
+  - execute
+  - completing
+  - complete
+  - resetting
+  - aborting
+  - aborted
+  - clearing
+  - stopping
+  - stopped
   # Protective stop decelerates the arm without damaging it or (typically)
   # a held part. Whether that's actually safe for a GIVEN op is the
   # capability's own abort_safe concern (e.g. sd50's drive_screw is not).
@@ -83,3 +83,15 @@ safety:
   sto_required: true
   guarding: interlocked
   safe_state: "Category 0/1 stop per configured safety I/O; joints hold position under brake."
+components:
+- refdes: PS1
+  ref: com.automation-direct.eps25-100wc-1001@1.0.0
+  pose:
+    xyz_mm:
+    - 0
+    - 0
+    - 0
+    rpy_deg:
+    - 90
+    - 0
+    - 0
