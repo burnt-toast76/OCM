@@ -1,0 +1,89 @@
+name: test
+
+# pytest across all four Python packages, alongside the existing fmt-check
+# workflow. Each job installs only that package's own `test` extra plus
+# whatever sibling packages it structurally needs to even import (see each
+# pyproject.toml's own comment on this) -- NOT the heavier, genuinely
+# optional runtime extras (`tesseract` -> tesseract-robotics for
+# --collision/plan; `cad` -> cascadio/trimesh for STEP->GLB conversion).
+# Those degrade gracefully by design: every test that needs
+# tesseract_robotics already calls pytest.importorskip("tesseract_robotics")
+# at module level, and attachments.py's cascadio/trimesh usage is guarded
+# (`cascadio is None or trimesh is None`) with tests that exercise both the
+# present and absent case via monkeypatch regardless of what's actually
+# installed. So a suite lacking one of these extras SKIPS the tests that
+# need it, with a clear reason (`-ra` surfaces the reason in the log), it
+# doesn't fail or error at collection.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ocm-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "software/ocm-core[test]"
+      - run: pytest -ra software/ocm-core/tests
+
+  ocm-resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ocm-core (sibling), ocm-resolve[test]
+        run: |
+          pip install -e software/ocm-core
+          pip install -e "software/ocm-resolve[test]"
+      - run: pytest -ra software/ocm-resolve/tests
+
+  ocm-generator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # No `tesseract` extra: every --collision/plan-dependent test file
+      # already does `pytest.importorskip("tesseract_robotics")` at module
+      # level, so this job just skips them instead of installing a heavy
+      # compiled robotics dependency to run them. No ocm-api either --
+      # `ocm fmt`'s own tests (test_cli_fmt.py) do the same importorskip
+      # for the exact same reason (ocm-api is a much heavier dependency
+      # graph than anything else this package's own pipeline needs).
+      - name: Install ocm-core, ocm-resolve (siblings), ocm-generator[test]
+        run: |
+          pip install -e software/ocm-core
+          pip install -e software/ocm-resolve
+          pip install -e "software/ocm-generator[test]"
+      - run: pytest -ra software/ocm-generator/tests
+
+  ocm-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # ocm-generator is a structural dependency here (ocm_api/composition.py,
+      # discovery.py, and generation.py import from it at module level), not
+      # an optional extra -- but its OWN `tesseract` extra stays uninstalled
+      # for the same reason as the ocm-generator job: every test that needs
+      # it already importorskips tesseract_robotics. No `cad` extra either
+      # -- attachments.py's cascadio/trimesh usage is guarded and every test
+      # that cares about a specific outcome monkeypatches its own fakes in,
+      # regardless of what's actually installed.
+      - name: Install ocm-core, ocm-resolve, ocm-generator (siblings), ocm-api[test]
+        run: |
+          pip install -e software/ocm-core
+          pip install -e software/ocm-resolve
+          pip install -e software/ocm-generator
+          pip install -e "software/ocm-api[test]"
+      - run: pytest -ra software/ocm-api/tests

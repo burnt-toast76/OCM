@@ -126,6 +126,13 @@ def test_step_upload_returns_before_a_slow_conversion_finishes(directory: Path, 
             Path(glb_path).write_bytes(b"pretend glb bytes")
 
     monkeypatch.setattr(attachments_module, "cascadio", _SlowCascadio())
+    # _convert_step_to_glb short-circuits before ever calling cascadio if
+    # EITHER dependency is None -- on a machine without trimesh installed,
+    # leaving the real (None) value in place would skip the conversion
+    # entirely and `started` would never fire. This test is about the
+    # threading, not about trimesh, so it only needs to stay non-None;
+    # nothing here asserts on the measured envelope.
+    monkeypatch.setattr(attachments_module, "trimesh", object())
 
     result = attachments_module.save_attachment(directory, "part.step", _FAKE_STEP_BYTES)
 
