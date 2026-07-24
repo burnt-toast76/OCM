@@ -1,0 +1,34 @@
+name: fmt-check
+
+# `ocm fmt --check` (software/ocm-generator/ocm_generator/cli.py) fails if
+# any modules/*/module.yaml, components/*/component.yaml, or
+# cells/*/cell.yaml isn't already byte-identical to what
+# ocm_api.workspace._new_yaml_rt() would round-trip it to -- the same
+# ruamel config the GUI/agent write path uses. Catches a manifest that was
+# hand-edited (or generated some other way) with formatting the write path
+# would silently reflow on its very next save.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  fmt-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Editable, no extras -- fmt only needs ocm_api.workspace, not
+      # fastapi's serve/cad extras.
+      - name: Install ocm-core, ocm-api, ocm-generator
+        run: |
+          pip install -e software/ocm-core
+          pip install -e software/ocm-api
+          pip install -e software/ocm-generator
+
+      - run: ocm fmt --check

@@ -8,6 +8,7 @@
     ocm plan     <cell.yaml> [--modules DIR] --emit-urscript FILE.script
                              [--collision-margin-mm MM] [--path-samples N]
                              [--view-animation FILE.html]
+    ocm fmt      [PATH ...] [--check]
 
 Each stage's collected-violations error (ManifestValidationError,
 CellResolutionError, SceneBuildError) is printed in full, not just the
@@ -16,7 +17,8 @@ success, 1 if that stage reported errors.
 
 `--collision` and `plan` need the `tesseract` extra (pip install
 ocm-generator[tesseract]); nothing else here does -- see
-ocm_generator/scene/collision.py and ocm_generator/planner/ik.py.
+ocm_generator/scene/collision.py and ocm_generator/planner/ik.py. `fmt`
+needs `ocm-api` installed (pip install -e ../ocm-api) -- see cmd_fmt below.
 
 This is a developer/trial tool, not the agent layer (see ROADMAP Step 6 --
 "the agent is a thin tool-calling wrapper over a generator that already
@@ -26,6 +28,7 @@ works," and this is how you check it already works).
 from __future__ import annotations
 
 import argparse
+import io
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -215,6 +218,84 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+# module.yaml / component.yaml / cell.yaml -- the three manifest filenames
+# ocm_api.workspace.Workspace globs for (module_dir/module.yaml etc.).
+# Matched by filename rather than by directory-naming convention so a bare
+# path to any of the three trees (or a single file) works the same way.
+MANIFEST_FILENAMES = {"module.yaml", "component.yaml", "cell.yaml"}
+
+DEFAULT_FMT_PATHS = [Path("modules"), Path("components"), Path("cells")]
+
+
+def _discover_manifests(paths: list[Path]) -> list[Path]:
+    found: set[Path] = set()
+    for p in paths:
+        if p.is_file():
+            found.add(p)
+        elif p.is_dir():
+            found.update(f for f in p.rglob("*.yaml") if f.name in MANIFEST_FILENAMES)
+    return sorted(found)
+
+
+def _canonicalize(yaml_rt, path: Path) -> str:
+    with path.open("r", encoding="utf-8") as f:
+        doc = yaml_rt.load(f)
+    buf = io.StringIO()
+    yaml_rt.dump(doc, buf)
+    return buf.getvalue()
+
+
+def cmd_fmt(args: argparse.Namespace) -> int:
+    # ocm_api.workspace._new_yaml_rt is private-but-stable (same convention
+    # that module itself uses to reuse ocm_core.loader._read_yaml) -- `fmt`
+    # exists specifically so a manifest is canonicalized to EXACTLY what
+    # the GUI/agent write path (ocm_api.workspace.write_yaml) would have
+    # produced, so importing anything other than that literal function
+    # would risk the two silently drifting apart again.
+    from ocm_api.workspace import _new_yaml_rt
+
+    paths = args.paths if args.paths else DEFAULT_FMT_PATHS
+    manifests = _discover_manifests(paths)
+    if not manifests:
+        print("No manifests found (module.yaml / component.yaml / cell.yaml).", file=sys.stderr)
+        return 0
+
+    not_canonical: list[Path] = []
+    changed: list[Path] = []
+    for path in manifests:
+        # A fresh YAML() per file, not reused across the loop -- see
+        # _new_yaml_rt's own docstring: its emitter/parser carry position
+        # and anchor state across a load/dump that isn't safe to reuse
+        # even across successive, non-concurrent round-trips.
+        canonical = _canonicalize(_new_yaml_rt(), path)
+        original = path.read_text(encoding="utf-8")
+        if canonical == original:
+            continue
+        if args.check:
+            not_canonical.append(path)
+        else:
+            path.write_text(canonical, encoding="utf-8")
+            changed.append(path)
+
+    if args.check:
+        if not_canonical:
+            print(f"FAILED: {len(not_canonical)} of {len(manifests)} manifest(s) not canonically formatted:", file=sys.stderr)
+            for p in not_canonical:
+                print(f"  - {p}", file=sys.stderr)
+            print("Run `ocm fmt` to fix.", file=sys.stderr)
+            return 1
+        print(f"OK: {len(manifests)} manifest(s) already canonical")
+        return 0
+
+    if changed:
+        print(f"Reformatted {len(changed)} of {len(manifests)} manifest(s):")
+        for p in changed:
+            print(f"  - {p}")
+    else:
+        print(f"OK: {len(manifests)} manifest(s) already canonical, nothing to do")
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ocm", description="Run and trial the OCM generator pipeline.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -288,6 +369,26 @@ def _build_parser() -> argparse.ArgumentParser:
         "joint states already collision-checked; does not recompute or retime the motion.",
     )
     p_plan.set_defaults(func=cmd_plan)
+
+    p_fmt = subparsers.add_parser(
+        "fmt",
+        help="Canonicalize manifest YAML formatting via the same ruamel round-trip config the GUI/agent write path uses.",
+    )
+    p_fmt.add_argument(
+        "paths",
+        nargs="*",
+        type=Path,
+        default=[],
+        metavar="PATH",
+        help="Files or directories to format (directories are searched recursively for "
+        "module.yaml/component.yaml/cell.yaml). Default: ./modules ./components ./cells",
+    )
+    p_fmt.add_argument(
+        "--check",
+        action="store_true",
+        help="Don't write anything -- exit 1 and list every manifest that isn't already canonical.",
+    )
+    p_fmt.set_defaults(func=cmd_fmt)
 
     return parser
 
