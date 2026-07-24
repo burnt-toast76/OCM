@@ -6,12 +6,12 @@
 # force_n: 120.
 # ─────────────────────────────────────────────────────────────────────
 ocm_version: "1.0"
-id:       com.accelsolutions.fixture.pneumatic-nest
+id: com.accelsolutions.fixture.pneumatic-nest
 revision: "1.1.0"
-name:     "Pneumatic Nest Fixture"
-vendor:   "Accel Solutions LLC"
-license:  CERN-OHL-S-2.0
-kind:     fixture
+name: "Pneumatic Nest Fixture"
+vendor: "Accel Solutions LLC"
+license: CERN-OHL-S-2.0
+kind: fixture
 description: >
   Two-jaw pneumatic nest. Locates and clamps the part for the fasten and
   dispense stations. Clamp force is closed-loop via regulator feedback,
@@ -24,12 +24,12 @@ mechanical:
   frames:
     origin:
       xyz_mm: [0, 0, 0]
-      note:   "Nest base, per cell.yaml's mount.pose."
+      note: "Nest base, per cell.yaml's mount.pose."
     part_datum:
-      xyz_mm:  [0, 0, 60]
-      note:    "Where a correctly seated part's own origin lands. What cam1's locate_part corrects against."
+      xyz_mm: [0, 0, 60]
+      note: "Where a correctly seated part's own origin lands. What cam1's locate_part corrects against."
   geometry:
-    collision:     meshes/pneumatic-nest_convex.stl   # placeholder -- not authored yet
+    collision: meshes/pneumatic-nest_convex.stl       # placeholder -- not authored yet
     urdf_fragment: urdf/pneumatic-nest.urdf.xacro
   mass_kg: 6.5
 
@@ -42,54 +42,54 @@ electrical:
 comms:
   protocol: ethercat
   signals:
-    - { name: packml_cmd,   direction: output, type: uint16, role: packml_cmd }
-    - { name: packml_state, direction: input,  type: uint16, role: packml_state }
-    - { name: fault_code,   direction: input,  type: uint16, role: fault_code }
-    - { name: heartbeat,    direction: input,  type: bool,   role: heartbeat }
-    - { name: target_force, direction: output, type: real,   unit: "N", role: process_param }
-    - { name: clamped,      direction: input,  type: bool }
-    - { name: force_actual, direction: input,  type: real,   unit: "N", role: process_result }
+  - {name: packml_cmd, direction: output, type: uint16, role: packml_cmd}
+  - {name: packml_state, direction: input, type: uint16, role: packml_state}
+  - {name: fault_code, direction: input, type: uint16, role: fault_code}
+  - {name: heartbeat, direction: input, type: bool, role: heartbeat}
+  - {name: target_force, direction: output, type: real, unit: "N", role: process_param}
+  - {name: clamped, direction: input, type: bool}
+  - {name: force_actual, direction: input, type: real, unit: "N", role: process_result}
 
 capabilities:
-  - name: clamp
-    summary: "Close both jaws and hold the part at a target force."
-    parameters:
-      force_n:
-        type: number
-        unit: "N"
-        min: 20.0
-        max: 300.0
-        summary: "Target clamp force. Too low: part walks under drive torque. Too high: marks a soft part."
-    preconditions:
-      - clamped == false
-    postconditions:
-      - clamped == true
-    results:
-      force_achieved: { type: number, unit: "N" }
-    nominal_duration_s: 0.6
+- name: clamp
+  summary: "Close both jaws and hold the part at a target force."
+  parameters:
+    force_n:
+      type: number
+      unit: "N"
+      min: 20.0
+      max: 300.0
+      summary: "Target clamp force. Too low: part walks under drive torque. Too high: marks a soft part."
+  preconditions:
+  - clamped == false
+  postconditions:
+  - clamped == true
+  results:
+    force_achieved: {type: number, unit: "N"}
+  nominal_duration_s: 0.6
 
-  - name: unclamp
-    summary: "Open both jaws and release the part."
-    preconditions:
-      - clamped == true
-    postconditions:
-      - clamped == false
-    nominal_duration_s: 0.4
+- name: unclamp
+  summary: "Open both jaws and release the part."
+  preconditions:
+  - clamped == true
+  postconditions:
+  - clamped == false
+  nominal_duration_s: 0.4
 
 state_machine:
   model: packml
   implements:
-    - idle
-    - starting
-    - execute
-    - completing
-    - complete
-    - resetting
-    - aborting
-    - aborted
-    - clearing
-    - stopping
-    - stopped
+  - idle
+  - starting
+  - execute
+  - completing
+  - complete
+  - resetting
+  - aborting
+  - aborted
+  - clearing
+  - stopping
+  - stopped
   # A part clamped mid-cycle stays clamped on abort -- dropping it is worse
   # than holding it. Recovery is a human opening the jaws deliberately.
   abort_safe: false

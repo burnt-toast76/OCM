@@ -6,12 +6,12 @@
 # planner needs, and it's why `motion.hold_still: false` exists.
 # ─────────────────────────────────────────────────────────────────────
 ocm_version: "1.0"
-id:       com.accelsolutions.dispense.dh200
+id: com.accelsolutions.dispense.dh200
 revision: "0.9.1"
-name:     "DH200 Heated Dispense Head"
-vendor:   "Accel Solutions LLC"
-license:  CERN-OHL-S-2.0
-kind:     process
+name: "DH200 Heated Dispense Head"
+vendor: "Accel Solutions LLC"
+license: CERN-OHL-S-2.0
+kind: process
 description: >
   Progressive-cavity heated dispense head for 1K adhesives and RTV.
   Closed-loop flow with volumetric feedback. Jetting mode for dots,
@@ -34,18 +34,18 @@ mechanical:
       note: "Cartridge axis. Robot must not tilt beyond 45 deg from vertical here or the cartridge starves."
 
   geometry:
-    visual:        meshes/dh200.glb
-    collision:     meshes/dh200_convex.stl
+    visual: meshes/dh200.glb
+    collision: meshes/dh200_convex.stl
     urdf_fragment: urdf/dh200.urdf.xacro
 
   mass_kg: 3.60          # heavier than it looks; a full 300 ml cartridge is ~0.4 kg of that
-  com_mm:  [0, 22, 61]
+  com_mm: [0, 22, 61]
 
 electrical:
   supplies:
-    - rail: 24VDC
-      current_nominal_a: 2.0
-      current_peak_a: 6.5          # heater duty
+  - rail: 24VDC
+    current_nominal_a: 2.0
+    current_peak_a: 6.5            # heater duty
   pneumatic:
     pressure_bar: 6.0
     flow_nl_min: 15
@@ -55,22 +55,22 @@ comms:
   protocol: ethercat
   esi: esi/AccelSolutions_DH200.xml
   signals:
-    - { name: packml_cmd,      direction: output, type: uint16, role: packml_cmd }
-    - { name: packml_state,    direction: input,  type: uint16, role: packml_state }
-    - { name: fault_code,      direction: input,  type: uint16, role: fault_code }
-    - { name: heartbeat,       direction: input,  type: bool,   role: heartbeat }
+  - {name: packml_cmd, direction: output, type: uint16, role: packml_cmd}
+  - {name: packml_state, direction: input, type: uint16, role: packml_state}
+  - {name: fault_code, direction: input, type: uint16, role: fault_code}
+  - {name: heartbeat, direction: input, type: bool, role: heartbeat}
 
-    - { name: flow_setpoint,   direction: output, type: real, unit: "ml/min", role: process_param }
-    - { name: temp_setpoint,   direction: output, type: real, unit: degC,     role: process_param }
-    - { name: valve_open,      direction: output, type: bool }
+  - {name: flow_setpoint, direction: output, type: real, unit: "ml/min", role: process_param}
+  - {name: temp_setpoint, direction: output, type: real, unit: degC, role: process_param}
+  - {name: valve_open, direction: output, type: bool}
 
-    - { name: temp_actual,     direction: input,  type: real, unit: degC }
-    - { name: temp_ready,      direction: input,  type: bool }
-    - { name: flow_actual,     direction: input,  type: real, unit: "ml/min", role: process_result }
-    - { name: volume_dispensed,direction: input,  type: real, unit: ml,       role: process_result }
-    - { name: cartridge_level, direction: input,  type: real, unit: "%" }
-    - { name: cartridge_low,   direction: input,  type: bool }
-    - { name: pressure_fault,  direction: input,  type: bool }   # nozzle clog → back-pressure spike
+  - {name: temp_actual, direction: input, type: real, unit: degC}
+  - {name: temp_ready, direction: input, type: bool}
+  - {name: flow_actual, direction: input, type: real, unit: "ml/min", role: process_result}
+  - {name: volume_dispensed, direction: input, type: real, unit: ml, role: process_result}
+  - {name: cartridge_level, direction: input, type: real, unit: "%"}
+  - {name: cartridge_low, direction: input, type: bool}
+  - {name: pressure_fault, direction: input, type: bool}         # nozzle clog → back-pressure spike
 
 # ── Recipe parameters: set ONCE PER PART, not per operation. ──
 # This distinction matters. Nozzle and material don't change between beads
@@ -102,134 +102,134 @@ process:
 
 capabilities:
 
-  - name: purge
-    summary: "Expel skinned material into the purge cup. Restores a clean tip."
-    parameters:
-      volume_ml:
-        type: number
-        unit: ml
-        min: 0.1
-        max: 5.0
-        default: 0.5
-    motion:
-      frame: tcp
-      hold_still: true
-    preconditions:
-      - temp_ready == true
-    postconditions:
-      - flow_actual > 0
-    nominal_duration_s: 3.0
-    consumes: [adhesive]
+- name: purge
+  summary: "Expel skinned material into the purge cup. Restores a clean tip."
+  parameters:
+    volume_ml:
+      type: number
+      unit: ml
+      min: 0.1
+      max: 5.0
+      default: 0.5
+  motion:
+    frame: tcp
+    hold_still: true
+  preconditions:
+  - temp_ready == true
+  postconditions:
+  - flow_actual > 0
+  nominal_duration_s: 3.0
+  consumes: [adhesive]
 
-  - name: dispense_bead
-    summary: "Lay a continuous bead along a path while the robot moves."
-    parameters:
-      bead_width_mm:
-        type: number
-        unit: mm
-        min: 0.5
-        max: 6.0
-        summary: "Target bead width. Together with speed, this determines flow rate."
-      flow_ml_min:
-        type: number
-        unit: "ml/min"
-        min: 0.5
-        max: 40.0
-      standoff_mm:
-        type: number
-        unit: mm
-        min: 0.5
-        max: 8.0
-        default: 2.0
-        summary: "Nozzle tip to substrate. Held constant along the whole path — this is a planner constraint, not a suggestion."
-      lead_in_mm:
-        type: number
-        unit: mm
-        default: 3.0
-        required: false
-        summary: "Valve opens this far BEFORE the path start, so the bead is at full width when it reaches the part."
-      lead_out_mm:
-        type: number
-        unit: mm
-        default: 2.0
-        required: false
-        summary: "Valve closes this far before path end. Suck-back handles the rest."
+- name: dispense_bead
+  summary: "Lay a continuous bead along a path while the robot moves."
+  parameters:
+    bead_width_mm:
+      type: number
+      unit: mm
+      min: 0.5
+      max: 6.0
+      summary: "Target bead width. Together with speed, this determines flow rate."
+    flow_ml_min:
+      type: number
+      unit: "ml/min"
+      min: 0.5
+      max: 40.0
+    standoff_mm:
+      type: number
+      unit: mm
+      min: 0.5
+      max: 8.0
+      default: 2.0
+      summary: "Nozzle tip to substrate. Held constant along the whole path — this is a planner constraint, not a suggestion."
+    lead_in_mm:
+      type: number
+      unit: mm
+      default: 3.0
+      required: false
+      summary: "Valve opens this far BEFORE the path start, so the bead is at full width when it reaches the part."
+    lead_out_mm:
+      type: number
+      unit: mm
+      default: 2.0
+      required: false
+      summary: "Valve closes this far before path end. Suck-back handles the rest."
 
-    motion:
-      frame: tcp
-      approach_vec: [0, 0, 1]
-      approach_mm: 15.0
-      approach_speed_mm_s: 30.0
-      retract_vec: [0, 0, -1]
-      retract_mm: 20.0
-      clearance_mm: 3.0
+  motion:
+    frame: tcp
+    approach_vec: [0, 0, 1]
+    approach_mm: 15.0
+    approach_speed_mm_s: 30.0
+    retract_vec: [0, 0, -1]
+    retract_mm: 20.0
+    clearance_mm: 3.0
 
-      hold_still: false          # ← THE KEY LINE. The process runs along a path.
-      path:
-        speed_mm_s:
-          type: number
-          unit: "mm/s"
-          min: 5.0
-          max: 250.0
-          summary: "Path speed. Bead width = f(flow, speed). The generator solves for one given the other."
-        max_accel_mm_s2: 500
-        corner_radius_mm: 2.0    # ← A bead cannot survive a sharp corner at speed. The
+    hold_still: false            # ← THE KEY LINE. The process runs along a path.
+    path:
+      speed_mm_s:
+        type: number
+        unit: "mm/s"
+        min: 5.0
+        max: 250.0
+        summary: "Path speed. Bead width = f(flow, speed). The generator solves for one given the other."
+      max_accel_mm_s2: 500
+      corner_radius_mm: 2.0      # ← A bead cannot survive a sharp corner at speed. The
                                  #   planner MUST blend corners to at least this radius,
                                  #   or slow down through them. This constraint is invisible
                                  #   to a generic motion planner and is exactly the kind of
                                  #   process knowledge that normally lives in one engineer's head.
-        orientation: normal_to_surface
+      orientation: normal_to_surface
 
-    preconditions:
-      - temp_ready == true
-      - cartridge_low == false
-      - pressure_fault == false
-    postconditions:
-      - volume_dispensed > 0
+  preconditions:
+  - temp_ready == true
+  - cartridge_low == false
+  - pressure_fault == false
+  postconditions:
+  - volume_dispensed > 0
 
-    results:
-      volume_dispensed: { type: number, unit: ml }
-      flow_deviation:   { type: number, unit: "%", summary: "Max deviation from setpoint along the path. >10% means a bad bead." }
+  results:
+    volume_dispensed: {type: number, unit: ml}
+    flow_deviation: {type: number, unit: "%", summary: "Max deviation from setpoint along the path. >10% means a bad bead."}
 
-    consumes: [adhesive]
+  consumes: [adhesive]
 
-  - name: dispense_dot
-    summary: "Jet a single dot. Robot stationary."
-    parameters:
-      volume_ul:
-        type: number
-        unit: uL
-        min: 1.0
-        max: 500.0
-    motion:
-      frame: tcp
-      approach_vec: [0, 0, 1]
-      approach_mm: 10.0
-      hold_still: true
-    preconditions:
-      - temp_ready == true
-      - cartridge_low == false
-    nominal_duration_s: 0.4
-    consumes: [adhesive]
+- name: dispense_dot
+  summary: "Jet a single dot. Robot stationary."
+  parameters:
+    volume_ul:
+      type: number
+      unit: uL
+      min: 1.0
+      max: 500.0
+  motion:
+    frame: tcp
+    approach_vec: [0, 0, 1]
+    approach_mm: 10.0
+    hold_still: true
+  preconditions:
+  - temp_ready == true
+  - cartridge_low == false
+  nominal_duration_s: 0.4
+  consumes: [adhesive]
 
 state_machine:
   model: packml
   modes: [production, maintenance]
   implements:
-    - idle
-    - starting          # ← heater warmup lives here. 420 s of it.
-    - execute
-    - completing
-    - complete
-    - resetting
-    - holding
-    - held              # ← IS interruptible mid-bead... but see below
-    - unholding
-    - aborting
-    - aborted
-    - clearing
-    - stopping
-    - stopped
+  - idle
+  - starting            # ← heater warmup lives here. 420 s of it.
+  - execute
+  - completing
+  - complete
+  - resetting
+  - holding
+  - held                # ← IS interruptible mid-bead... but see below
+  - unholding
+  - aborting
+  - aborted
+  - clearing
+  - stopping
+  - stopped
   # Abort-safe in the narrow sense that stopping won't damage the head.
   # But the PART is scrapped — a half-laid bead cannot be resumed. The cell
   # coordinator must route the part to reject, not back into the flow.
@@ -250,9 +250,9 @@ safety:
 
 maintenance:
   wear_items:
-    - name: "Nozzle, 0.8 mm"
-      part_number: DH200-N-0.8
-      interval_cycles: 20000
-    - name: "Cartridge seal"
-      part_number: DH200-SEAL
-      interval_hours: 250
+  - name: "Nozzle, 0.8 mm"
+    part_number: DH200-N-0.8
+    interval_cycles: 20000
+  - name: "Cartridge seal"
+    part_number: DH200-SEAL
+    interval_hours: 250

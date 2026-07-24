@@ -5,9 +5,7 @@ name: Acme VG-25 Vacuum Gripper
 vendor: Acme
 license: CERN-OHL-S-2.0
 kind: end_effector
-description: "Integrated venturi vacuum gripper with a PNP part-present switch and\
-  \ a blow-off assist. Pick force is set by supply-pressure regulation over the Acme\
-  \ ASL serial link. No moving jaws \u2014 it grips a flat, sealable face."
+description: "Integrated venturi vacuum gripper with a PNP part-present switch and a blow-off assist. Pick force is set by supply-pressure regulation over the Acme ASL serial link. No moving jaws — it grips a flat, sealable face."
 mechanical:
   mount:
     interface: iso-9409-1-a50
@@ -90,8 +88,7 @@ capabilities:
       unit: N
       min: 10.0
       max: 120.0
-      summary: "Pick force, realized via supply-pressure/vacuum regulation. Hard datasheet\
-        \ limits \u2014 the generator rejects anything outside."
+      summary: "Pick force, realized via supply-pressure/vacuum regulation. Hard datasheet limits — the generator rejects anything outside."
   motion:
     frame: tcp
     approach_vec:
@@ -138,8 +135,7 @@ capabilities:
   - part_present == false
   nominal_duration_s: 0.3
 - name: blow_off
-  summary: Positive air pulse to shed a part that clings to the cup after venting.
-    Recovery op.
+  summary: Positive air pulse to shed a part that clings to the cup after venting. Recovery op.
   preconditions:
   - part_present == true
   postconditions:
@@ -167,9 +163,7 @@ safety:
   required_performance_level: PLc
   sto_required: false
   guarding: interlocked
-  safe_state: "On loss of air or control power the venturi stops and vacuum decays;\
-    \ a held part is released and will drop. This gripper is NOT fail-hold \u2014\
-    \ the cell coordinator must not rely on grip retention through a power/air loss."
+  safe_state: "On loss of air or control power the venturi stops and vacuum decays; a held part is released and will drop. This gripper is NOT fail-hold — the cell coordinator must not rely on grip retention through a power/air loss."
 maintenance:
   wear_items:
   - name: Suction cup

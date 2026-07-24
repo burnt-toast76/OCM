@@ -16,12 +16,12 @@
 # covers ur-rtde and ethercat).
 # ─────────────────────────────────────────────────────────────────────
 ocm_version: "1.1"
-id:       com.lmi.gocator.2350
+id: com.lmi.gocator.2350
 revision: "1.0.0"
-name:     "Gocator 2350"
-vendor:   "LMI Technologies"
-license:  LicenseRef-Proprietary
-kind:     sensor
+name: "Gocator 2350"
+vendor: "LMI Technologies"
+license: LicenseRef-Proprietary
+kind: sensor
 description: >
   3D snapshot laser profiler. Locates the part against nest1's part_datum
   and returns a correction transform that every downstream frame in the
@@ -34,35 +34,35 @@ mechanical:
   frames:
     origin:
       xyz_mm: [0, 0, 0]
-      note:   "Sensor housing mount face, per cell.yaml's mount.pose (looking straight down at the nest)."
+      note: "Sensor housing mount face, per cell.yaml's mount.pose (looking straight down at the nest)."
   geometry:
-    collision:     meshes/gocator-2350_convex.stl   # placeholder -- not authored yet
+    collision: meshes/gocator-2350_convex.stl       # placeholder -- not authored yet
     urdf_fragment: urdf/gocator-2350.urdf.xacro
   mass_kg: 0.9
 
 comms:
   protocol: x-gocator-gsdk
   signals:
-    - { name: packml_cmd,   direction: output, type: uint16, role: packml_cmd }
-    - { name: packml_state, direction: input,  type: uint16, role: packml_state }
-    - { name: part_pose,    direction: input,  type: pose6d, frame: nest1.part_datum, role: process_result }
-    - { name: confidence,   direction: input,  type: real,   unit: "%",              role: process_result }
+  - {name: packml_cmd, direction: output, type: uint16, role: packml_cmd}
+  - {name: packml_state, direction: input, type: uint16, role: packml_state}
+  - {name: part_pose, direction: input, type: pose6d, frame: nest1.part_datum, role: process_result}
+  - {name: confidence, direction: input, type: real, unit: "%", role: process_result}
 
 capabilities:
-  - name: locate_part
-    summary: "Snapshot the part in the nest and return its pose correction relative to nest1's part_datum."
-    motion:
-      hold_still: true   # the robot isn't involved; this runs off nest1's fixed camera
-    results:
-      part_pose:
-        type: pose6d
-        frame: nest1.part_datum
-        summary: "Measured part pose correction, expressed in the nest's part_datum frame. Consumed by the plan's `binds:` to transform every downstream feature."
-      confidence:
-        type: number
-        unit: "%"
-        summary: "Match confidence. The coordinator should gate on this before releasing downstream steps."
-    nominal_duration_s: 0.3
+- name: locate_part
+  summary: "Snapshot the part in the nest and return its pose correction relative to nest1's part_datum."
+  motion:
+    hold_still: true     # the robot isn't involved; this runs off nest1's fixed camera
+  results:
+    part_pose:
+      type: pose6d
+      frame: nest1.part_datum
+      summary: "Measured part pose correction, expressed in the nest's part_datum frame. Consumed by the plan's `binds:` to transform every downstream feature."
+    confidence:
+      type: number
+      unit: "%"
+      summary: "Match confidence. The coordinator should gate on this before releasing downstream steps."
+  nominal_duration_s: 0.3
 
 state_machine:
   model: packml

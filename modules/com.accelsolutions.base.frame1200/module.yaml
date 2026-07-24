@@ -6,12 +6,12 @@
 # footprint here as provisional, not load-bearing on that decision.
 # ─────────────────────────────────────────────────────────────────────
 ocm_version: "1.0"
-id:       com.accelsolutions.base.frame1200
+id: com.accelsolutions.base.frame1200
 revision: "2.0.0"
-name:     "Frame1200 Cell Base"
-vendor:   "Accel Solutions LLC"
-license:  CERN-OHL-S-2.0
-kind:     base
+name: "Frame1200 Cell Base"
+vendor: "Accel Solutions LLC"
+license: CERN-OHL-S-2.0
+kind: base
 description: >
   Bolted tab-and-slot base frame, 1200 mm working envelope (ADR-0005).
   Carries the datum plate every module's `mount.pose` is measured from.
@@ -23,9 +23,9 @@ mechanical:
   frames:
     origin:
       xyz_mm: [0, 0, 0]
-      note:   "cell_origin. Every module's mount.pose in cell.yaml is relative to this."
+      note: "cell_origin. Every module's mount.pose in cell.yaml is relative to this."
   geometry:
-    collision:     meshes/frame1200_convex.stl   # placeholder -- not authored yet
+    collision: meshes/frame1200_convex.stl       # placeholder -- not authored yet
     urdf_fragment: urdf/frame1200.urdf.xacro
   mass_kg: 85.0
 
