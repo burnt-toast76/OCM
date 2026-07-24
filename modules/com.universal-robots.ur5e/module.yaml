@@ -83,15 +83,3 @@ safety:
   sto_required: true
   guarding: interlocked
   safe_state: "Category 0/1 stop per configured safety I/O; joints hold position under brake."
-components:
-- refdes: PS1
-  ref: com.automation-direct.eps25-100wc-1001@1.0.0
-  pose:
-    xyz_mm:
-    - 0
-    - 0
-    - 0
-    rpy_deg:
-    - 90
-    - 0
-    - 0
