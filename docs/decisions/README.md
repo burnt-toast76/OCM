@@ -20,3 +20,8 @@ context was.
 | [0009](0009-spec-the-profile-not-the-part.md) | Spec CiA 402, publish a tested list. Never a part number. | Accepted |
 | [0010](0010-generator-before-hardware.md) | Build the generator first. The frame is step 4. | Accepted |
 | [0011](0011-mount-grid.md) | Bolt grid: own 50 mm pattern vs. ride 8020? | **OPEN** |
+| [0012](0012-api-before-pixels.md) | **API before pixels.** One refusal engine, three clients. | Accepted |
+| [0013](0013-generated-hmis.md) | Operator & engineer HMIs are generated from manifests | Accepted |
+| [0014](0014-components-vs-modules.md) | Components are transcribed; modules are designed | Accepted |
+| [0015](0015-module-connectivity.md) | Module connectivity: nets + links; pins are transcribed | Accepted (Erratum 1) |
+| [0016](0016-one-validation-surface.md) | One validation surface: authoring sees what resolution sees | Accepted |
