@@ -4,11 +4,22 @@
 // protruding from its right edge, each labeled with that pin's number and
 // function. Purely DERIVED from data the component definition already has
 // (vendor, part_number, electrical.connectors[].pins[]) -- no new fields,
-// nothing stored. This is the preview only; the future module-authoring
-// "wire components together" tool this is meant to feed is a separate,
-// later piece of work.
+// nothing stored.
+//
+// Takes `component` as a prop rather than reading useComponentsStore
+// directly (same generalization AttachmentsList/ChecklistPanel went
+// through) so the Modules page's own wiring canvas (WiringCanvas.tsx) can
+// reuse this exact component to render EVERY placed instance's connectors,
+// not just "whatever's open on the Components page." The optional
+// onPinClick/isPinSelected/isPinHighlighted/dataFieldPrefix props exist
+// ONLY for that wiring use case -- the Components page's own read-only
+// preview passes none of them and renders byte-identical to before.
+//
+// ADR-0015 Decision 4 (hard constraint): this component provides NO path
+// to create, rename, or add a pin. Every pin rendered here comes from
+// `component`'s own already-transcribed data; onPinClick fires with the
+// pin/connector exactly as transcribed, never a value the caller invented.
 
-import { useComponentsStore } from "../../store/componentsStore";
 import type { ComponentDoc } from "../../api/types";
 
 interface ConnectorPin {
@@ -39,6 +50,13 @@ function extractPins(connector: ConnectorData): ConnectorPin[] {
   return Array.isArray(connector.pins) ? connector.pins.filter((p): p is ConnectorPin => !!p && typeof p === "object") : [];
 }
 
+// Exported so the wiring canvas can tell "no connectors transcribed yet"
+// apart from "connectors exist but this doc hasn't loaded" without
+// re-implementing electrical.connectors' own defensive extraction.
+export function hasConnectors(component: ComponentDoc): boolean {
+  return extractConnectors(component).length > 0;
+}
+
 const BOX_WIDTH = 130;
 const ROW_HEIGHT = 22;
 const MIN_BOX_HEIGHT = 60;
@@ -46,7 +64,29 @@ const LINE_LENGTH = 36;
 const LABEL_WIDTH = 200;
 const PADDING = 12;
 
-function ConnectorSymbol({ vendor, partNumber, connector }: { vendor: string; partNumber: string; connector: ConnectorData }) {
+export interface ConnectorSymbolsProps {
+  component: ComponentDoc;
+  /** Fires with (connector.ref, pin.pin) exactly as transcribed -- never invented. Omit for the read-only preview. */
+  onPinClick?: (connectorRef: string, pin: string) => void;
+  isPinSelected?: (connectorRef: string, pin: string) => boolean;
+  isPinHighlighted?: (connectorRef: string, pin: string) => boolean;
+  /** e.g. "PS1" -- each pin gets data-field="pin:PS1:<connectorRef>:<pin>" for ChecklistPanel's focusField. */
+  dataFieldPrefix?: string;
+}
+
+function ConnectorSymbol({
+  vendor,
+  partNumber,
+  connector,
+  onPinClick,
+  isPinSelected,
+  isPinHighlighted,
+  dataFieldPrefix,
+}: {
+  vendor: string;
+  partNumber: string;
+  connector: ConnectorData;
+} & Pick<ConnectorSymbolsProps, "onPinClick" | "isPinSelected" | "isPinHighlighted" | "dataFieldPrefix">) {
   const pins = extractPins(connector);
   const rowCount = Math.max(pins.length, 1);
   const boxHeight = Math.max(MIN_BOX_HEIGHT, rowCount * ROW_HEIGHT + PADDING);
@@ -56,6 +96,8 @@ function ConnectorSymbol({ vendor, partNumber, connector }: { vendor: string; pa
   const boxTop = PADDING;
   const boxRight = boxLeft + BOX_WIDTH;
   const caption = connector.type || connector.ref;
+  const connectorRef = connector.ref ?? "";
+  const interactive = !!onPinClick;
 
   return (
     <svg
@@ -86,8 +128,27 @@ function ConnectorSymbol({ vendor, partNumber, connector }: { vendor: string; pa
         pins.map((p, i) => {
           const y = boxTop + PADDING / 2 + ROW_HEIGHT * i + ROW_HEIGHT / 2;
           const lineEnd = boxRight + LINE_LENGTH;
+          const pinId = p.pin;
+          const selected = pinId !== undefined && isPinSelected?.(connectorRef, pinId);
+          const highlighted = pinId !== undefined && isPinHighlighted?.(connectorRef, pinId);
+          const classes = [
+            "connector-symbol__pin",
+            interactive && pinId !== undefined && "connector-symbol__pin--clickable",
+            selected && "connector-symbol__pin--selected",
+            highlighted && "connector-symbol__pin--highlighted",
+          ]
+            .filter(Boolean)
+            .join(" ");
           return (
-            <g key={i}>
+            <g
+              key={i}
+              className={classes}
+              data-field={dataFieldPrefix && pinId !== undefined ? `pin:${dataFieldPrefix}:${connectorRef}:${pinId}` : undefined}
+              onClick={interactive && pinId !== undefined ? () => onPinClick(connectorRef, pinId) : undefined}
+              role={interactive && pinId !== undefined ? "button" : undefined}
+              aria-label={interactive && pinId !== undefined ? `Pin ${pinId} (${p.function ?? "?"})` : undefined}
+              tabIndex={interactive && pinId !== undefined ? 0 : undefined}
+            >
               <line x1={boxRight} y1={y} x2={lineEnd} y2={y} className="connector-symbol__pin-line" />
               <text x={boxRight + 4} y={y - 3} className="connector-symbol__pin-number">
                 {p.pin ?? "?"}
@@ -104,22 +165,28 @@ function ConnectorSymbol({ vendor, partNumber, connector }: { vendor: string; pa
   );
 }
 
-export function ConnectorSymbols() {
-  const detail = useComponentsStore((s) => s.detail);
-  if (!detail) return null;
-
-  const connectors = extractConnectors(detail.component);
+export function ConnectorSymbols({ component, onPinClick, isPinSelected, isPinHighlighted, dataFieldPrefix }: ConnectorSymbolsProps) {
+  const connectors = extractConnectors(component);
   if (connectors.length === 0) return null;
 
-  const vendor = typeof detail.component.vendor === "string" ? detail.component.vendor : "";
-  const partNumber = typeof detail.component.part_number === "string" ? detail.component.part_number : "";
+  const vendor = typeof component.vendor === "string" ? component.vendor : "";
+  const partNumber = typeof component.part_number === "string" ? component.part_number : "";
 
   return (
     <div className="connector-symbols">
       <h2>Connectors</h2>
       <div className="connector-symbols__row">
         {connectors.map((connector, i) => (
-          <ConnectorSymbol key={connector.ref ?? i} vendor={vendor} partNumber={partNumber} connector={connector} />
+          <ConnectorSymbol
+            key={connector.ref ?? i}
+            vendor={vendor}
+            partNumber={partNumber}
+            connector={connector}
+            onPinClick={onPinClick}
+            isPinSelected={isPinSelected}
+            isPinHighlighted={isPinHighlighted}
+            dataFieldPrefix={dataFieldPrefix}
+          />
         ))}
       </div>
     </div>

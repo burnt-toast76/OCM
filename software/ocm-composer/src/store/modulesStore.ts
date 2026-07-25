@@ -11,7 +11,17 @@
 import { create } from "zustand";
 import * as api from "../api/client";
 import { ApiTransportError } from "../api/client";
-import type { AttachmentRow, ComponentSummary, DescribeModuleData, ModuleSummary, Pose6d } from "../api/types";
+import type {
+  AttachmentRow,
+  ComponentDoc,
+  ComponentSummary,
+  DescribeModuleData,
+  ModuleLinkRow,
+  ModuleNetRow,
+  ModuleSummary,
+  Pose6d,
+  Refusal,
+} from "../api/types";
 
 interface ModulesState {
   modules: ModuleSummary[];
@@ -24,6 +34,12 @@ interface ModulesState {
   // not per render) -- absent entirely for a component with no converted
   // GLB yet, which ComponentInstance treats as "nothing to render".
   componentGlbUrls: Record<string, string>;
+  // componentId -> that component's own full definition (electrical.
+  // connectors[].pins[], etc.) -- the wiring canvas's only source of pin
+  // data; never mutated locally, only ever replaced wholesale by a fresh
+  // describe_component read (ADR-0015 Decision 4: no path to invent a pin).
+  componentDocs: Record<string, ComponentDoc>;
+  checklist: Refusal[]; // validate_module's own refusals -- ADR-0016: the same checks resolve_cell would run
   selectedRefdes: string | null; // which placed instance the rotate side-panel (next pass) edits
   dragging: boolean; // mirrors store.ts's own dragging flag -- ModuleSceneCanvas's OrbitControls enabled prop
   placementError: string | null; // a refusal/error message, rendered verbatim, never reinterpreted
@@ -35,12 +51,23 @@ interface ModulesState {
   createDraft: (id: string, kind: string) => Promise<void>;
   publish: (revision: string) => Promise<void>;
   refreshAttachments: () => Promise<void>;
+  refreshChecklist: () => Promise<void>;
+  refreshComponentDocs: () => Promise<void>;
   uploadStepAttachment: (file: File) => Promise<void>;
   setDragging: (dragging: boolean) => void;
   selectComponentInstance: (refdes: string | null) => void;
   placeComponentInstance: (refdes: string, ref: string, pose: Pose6d) => Promise<void>;
   moveComponentInstance: (refdes: string, pose: Pose6d) => Promise<void>;
   removeComponentInstance: (refdes: string) => Promise<void>;
+  // ADR-0015: nets/links editing -- same round-trip as
+  // placeComponentInstance/moveComponentInstance (edit the array locally,
+  // send the WHOLE thing via update_module, re-read the server-confirmed
+  // manifest), never a nested incremental patch. Domain-scoped
+  // (setElectricalNets only ever touches nets.electrical) rather than one
+  // "setNets" that could clobber a pneumatic array this UI doesn't even
+  // show yet.
+  setElectricalNets: (nets: ModuleNetRow[]) => Promise<void>;
+  setLinks: (links: ModuleLinkRow[]) => Promise<void>;
   clearError: () => void;
   clearPlacementError: () => void;
 }
@@ -61,6 +88,8 @@ export const useModulesStore = create<ModulesState>((set, get) => ({
   attachments: [],
   componentOptions: [],
   componentGlbUrls: {},
+  componentDocs: {},
+  checklist: [],
   selectedRefdes: null,
   dragging: false,
   placementError: null,
@@ -82,6 +111,7 @@ export const useModulesStore = create<ModulesState>((set, get) => ({
       selectedModuleId: id,
       detail: null,
       attachments: [],
+      checklist: [],
       selectedRefdes: null,
       placementError: null,
       error: null,
@@ -118,8 +148,9 @@ export const useModulesStore = create<ModulesState>((set, get) => ({
         const componentGlbUrls = Object.fromEntries(glbEntries.filter((e): e is [string, string] => e !== null));
         set(() => ({ componentGlbUrls }));
       }
-      const [detailEnv] = await Promise.all([api.describeModule(id), get().refreshAttachments()]);
+      const [detailEnv] = await Promise.all([api.describeModule(id), get().refreshAttachments(), get().refreshChecklist()]);
       if (detailEnv.data) set(() => ({ detail: detailEnv.data }));
+      await get().refreshComponentDocs();
     } catch (e) {
       set(() => ({ error: e instanceof Error ? e.message : String(e) }));
     }
@@ -188,6 +219,42 @@ export const useModulesStore = create<ModulesState>((set, get) => ({
     }
   },
 
+  refreshChecklist: async () => {
+    const { selectedModuleId } = get();
+    if (!selectedModuleId) return;
+    try {
+      const env = await api.validateModule(selectedModuleId);
+      const refusals = env.ok ? [] : env.refusals;
+      set(() => ({ checklist: refusals }));
+    } catch (e) {
+      set(() => ({ error: e instanceof Error ? e.message : String(e) }));
+    }
+  },
+
+  refreshComponentDocs: async () => {
+    const { detail, componentDocs } = get();
+    if (!detail) return;
+    const ids = Array.from(new Set((detail.manifest.components ?? []).map((c) => c.ref.split("@")[0])));
+    const missing = ids.filter((id) => !(id in componentDocs));
+    if (missing.length === 0) return;
+    try {
+      const entries = await Promise.all(
+        missing.map(async (id): Promise<[string, ComponentDoc] | null> => {
+          try {
+            const env = await api.describeComponent(id);
+            return env.data ? [id, env.data.component] : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      const newDocs = Object.fromEntries(entries.filter((e): e is [string, ComponentDoc] => e !== null));
+      set((state) => ({ componentDocs: { ...state.componentDocs, ...newDocs } }));
+    } catch (e) {
+      set(() => ({ error: e instanceof Error ? e.message : String(e) }));
+    }
+  },
+
   setDragging: (dragging: boolean) => set(() => ({ dragging })),
 
   selectComponentInstance: (refdes: string | null) => set(() => ({ selectedRefdes: refdes })),
@@ -210,6 +277,7 @@ export const useModulesStore = create<ModulesState>((set, get) => ({
       set(() => ({ placementError: null }));
       const detailEnv = await api.describeModule(selectedModuleId);
       if (detailEnv.data) set(() => ({ detail: detailEnv.data }));
+      await Promise.all([get().refreshChecklist(), get().refreshComponentDocs()]);
     } catch (e) {
       set(() => ({ placementError: e instanceof Error ? e.message : String(e) }));
     }
@@ -231,6 +299,7 @@ export const useModulesStore = create<ModulesState>((set, get) => ({
       set(() => ({ placementError: null }));
       const detailEnv = await api.describeModule(selectedModuleId);
       if (detailEnv.data) set(() => ({ detail: detailEnv.data }));
+      await get().refreshChecklist();
     } catch (e) {
       set(() => ({ placementError: e instanceof Error ? e.message : String(e) }));
     }
@@ -252,6 +321,58 @@ export const useModulesStore = create<ModulesState>((set, get) => ({
       set((state) => ({ placementError: null, selectedRefdes: state.selectedRefdes === refdes ? null : state.selectedRefdes }));
       const detailEnv = await api.describeModule(selectedModuleId);
       if (detailEnv.data) set(() => ({ detail: detailEnv.data }));
+      await get().refreshChecklist();
+    } catch (e) {
+      set(() => ({ placementError: e instanceof Error ? e.message : String(e) }));
+    }
+  },
+
+  setElectricalNets: async (nets: ModuleNetRow[]) => {
+    const { selectedModuleId, detail } = get();
+    if (!selectedModuleId || !detail) return;
+    // Whole-object replace at /nets, not a nested /nets/electrical patch:
+    // RFC-6902 "add"/"replace" at a nested path requires the parent to
+    // already exist, and /nets may not -- same reasoning
+    // placeComponentInstance applies to /components. Preserves whatever
+    // pneumatic nets already exist (this UI doesn't edit them yet).
+    const existingNets = detail.manifest.nets;
+    const nextNets = { ...existingNets, electrical: nets };
+    try {
+      const env = await api.updateModule(selectedModuleId, {
+        patch: [{ op: existingNets ? "replace" : "add", path: "/nets", value: nextNets }],
+      });
+      if (!env.ok) {
+        set(() => ({ placementError: env.refusals[0]?.message ?? "update_module was refused" }));
+        return;
+      }
+      set(() => ({ placementError: null }));
+      const detailEnv = await api.describeModule(selectedModuleId);
+      if (detailEnv.data) set(() => ({ detail: detailEnv.data }));
+      await get().refreshChecklist();
+    } catch (e) {
+      set(() => ({ placementError: e instanceof Error ? e.message : String(e) }));
+    }
+  },
+
+  setLinks: async (links: ModuleLinkRow[]) => {
+    const { selectedModuleId, detail } = get();
+    if (!selectedModuleId || !detail) return;
+    const existingLinks = detail.manifest.links ?? [];
+    try {
+      // Same top-level-array-replace shape as /components -- no nested
+      // parent-existence concern here since links is a flat array, not an
+      // object with domain-keyed sub-arrays like nets.
+      const env = await api.updateModule(selectedModuleId, {
+        patch: [{ op: existingLinks.length > 0 ? "replace" : "add", path: "/links", value: links }],
+      });
+      if (!env.ok) {
+        set(() => ({ placementError: env.refusals[0]?.message ?? "update_module was refused" }));
+        return;
+      }
+      set(() => ({ placementError: null }));
+      const detailEnv = await api.describeModule(selectedModuleId);
+      if (detailEnv.data) set(() => ({ detail: detailEnv.data }));
+      await get().refreshChecklist();
     } catch (e) {
       set(() => ({ placementError: e instanceof Error ? e.message : String(e) }));
     }

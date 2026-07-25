@@ -123,6 +123,50 @@ export interface ModuleComponentRow {
   pose?: Pose6d;
 }
 
+// ADR-0015: module connectivity. Mirrors ocm_core.module's Endpoint/Net/
+// Nets/Port/Link dataclasses field-for-field -- no renaming, no alias
+// layer, same rule the schema/dataclasses themselves follow. `port` is a
+// ModulePort.id; `refdes` is a ModuleComponentRow.refdes; `ref`/`pin` are
+// exactly what the referenced component's own connector/pin calls itself
+// (ComponentConnector.ref / ComponentPin.pin, ocm-core's component side).
+export interface ModuleEndpoint {
+  port?: string;
+  refdes?: string;
+  ref?: string;
+  pin?: string;
+}
+
+export interface ModuleNetRow {
+  id: string;
+  endpoints: ModuleEndpoint[];
+  pressure?: number; // pneumatic nets only, in practice
+  pressure_units?: string;
+}
+
+export interface ModuleNets {
+  electrical?: ModuleNetRow[];
+  pneumatic?: ModuleNetRow[];
+}
+
+export type ModulePortDomain = "electrical" | "pneumatic" | "communication";
+
+export interface ModulePortRow {
+  id: string;
+  domain: ModulePortDomain;
+  type?: string; // electrical
+  thread?: string; // pneumatic
+  function?: "supply" | "exhaust" | "work"; // pneumatic
+  protocol?: string; // communication
+  role?: "master" | "slave_in" | "slave_out" | "port"; // communication
+}
+
+export interface ModuleLinkRow {
+  id: string;
+  a: ModuleEndpoint;
+  b: ModuleEndpoint;
+  protocol?: string;
+}
+
 export interface ModuleManifest {
   id: string;
   revision: string;
@@ -135,6 +179,9 @@ export interface ModuleManifest {
   };
   capabilities?: ModuleCapability[];
   components?: ModuleComponentRow[];
+  ports?: ModulePortRow[];
+  nets?: ModuleNets;
+  links?: ModuleLinkRow[];
   [key: string]: unknown;
 }
 

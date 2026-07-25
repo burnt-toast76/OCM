@@ -684,6 +684,202 @@
   font-style: italic;
 }
 
+.connector-symbol__pin--clickable {
+  cursor: pointer;
+}
+
+.connector-symbol__pin--clickable .connector-symbol__pin-line {
+  stroke-width: 2.5;
+}
+
+.connector-symbol__pin--selected .connector-symbol__pin-line {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+.connector-symbol__pin--selected .connector-symbol__pin-number {
+  fill: var(--accent);
+}
+
+.connector-symbol__pin--highlighted .connector-symbol__pin-line {
+  stroke: var(--danger);
+}
+
+.connector-symbol__pin--highlighted .connector-symbol__pin-number {
+  fill: var(--danger);
+}
+
+/* -- Wiring canvas -- */
+
+.wiring-canvas {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+.wiring-canvas--placeholder {
+  color: var(--text-dim);
+  padding: 24px 0;
+}
+
+.wiring-canvas__main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.wiring-canvas__rails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.wiring-canvas__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  color: inherit;
+  cursor: pointer;
+  min-width: 64px;
+}
+
+.wiring-canvas__rail:hover {
+  border-color: var(--accent);
+}
+
+.wiring-canvas__rail--pending {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.wiring-canvas__rail--wired {
+  border-style: solid;
+}
+
+.wiring-canvas__rail-id {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wiring-canvas__rail-type,
+.wiring-canvas__rail-net {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.wiring-canvas__cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.wiring-canvas__empty {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.wiring-canvas__card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.wiring-canvas__card h3 {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.wiring-canvas__card-ref {
+  color: var(--text-dim);
+  font-weight: normal;
+  font-size: 11px;
+}
+
+.wiring-canvas__card--missing {
+  max-width: 280px;
+}
+
+.wiring-canvas__card-missing-message {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.wiring-canvas__card-refusal {
+  color: var(--danger);
+  font-size: 11px;
+}
+
+.wiring-canvas__side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wiring-canvas__net-list h2 {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.wiring-canvas__net-list-empty {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.wiring-canvas__net-list-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.wiring-canvas__net-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.wiring-canvas__net-name {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.wiring-canvas__net-rename {
+  flex: 1;
+  min-width: 0;
+}
+
+.wiring-canvas__net-count {
+  flex: 1;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.wiring-canvas__net-delete {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 11px;
+  cursor: pointer;
+}
+
 /* -- Schema-driven form -- */
 
 .component-form__section {
@@ -1224,6 +1420,32 @@
   font-size: 1.1em;
   cursor: pointer;
   line-height: 1;
+}
+
+.module-detail__tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.module-detail__tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.module-detail__tab:hover {
+  color: var(--text);
+}
+
+.module-detail__tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
 .module-scene-canvas {

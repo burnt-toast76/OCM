@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-import { useState } from "react";
 import { CellPicker } from "./ui/CellPicker";
 import { Sidebar } from "./ui/Sidebar";
 import { Inspector } from "./ui/Inspector";
@@ -13,9 +12,9 @@ import { ModulesPage } from "./ui/components/ModulesPage";
 import { NavMenu } from "./ui/NavMenu";
 import type { NavPage } from "./ui/NavMenu";
 import { useComposerStore } from "./store/store";
+import { useNavStore } from "./store/navStore";
+import type { View } from "./store/navStore";
 import "./App.css";
-
-type View = "cell" | "components" | "modules";
 
 // One list, in menu order -- add a page here and it shows up in the
 // hamburger menu with no other wiring.
@@ -30,7 +29,10 @@ function App() {
   // No router (ADR-0012's minimal-surface house style already does view
   // switching this way for cellId itself) -- top-level pages in a
   // single-user local tool don't need URL-addressable routes to be useful.
-  const [view, setView] = useState<View>("cell");
+  // Lives in navStore, not local state, so a deeply-nested component (the
+  // wiring canvas's "go fix this component" link) can switch pages too.
+  const view = useNavStore((s) => s.view);
+  const setView = useNavStore((s) => s.setView);
 
   return (
     <div className="app">

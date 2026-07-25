@@ -4,15 +4,26 @@ import type { FormEvent } from "react";
 import { moduleAttachmentDownloadUrl } from "../../api/client";
 import { useModulesStore } from "../../store/modulesStore";
 import { AttachmentsList } from "./AttachmentsList";
+import { WiringCanvas } from "./WiringCanvas";
 import { ModuleSceneCanvas } from "../../scene/ModuleSceneCanvas";
 
 const ACCEPTED_EXTENSIONS = [".step", ".stp"];
+
+type Tab = "assembly" | "electrical" | "pneumatic" | "communication";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "assembly", label: "Assembly" },
+  { id: "electrical", label: "Electrical" },
+  { id: "pneumatic", label: "Pneumatic" },
+  { id: "communication", label: "Communication" },
+];
 
 // Non-3D shell first (list/detail wired to the store, publish flow, placed-
 // components table, attachments panel) -- the scene canvas and placement
 // picker land in later passes on top of this same component, per the
 // approved plan's own sequencing (each is its own checkpoint).
 export function ModuleDetail() {
+  const [activeTab, setActiveTab] = useState<Tab>("assembly");
   const selectedModuleId = useModulesStore((s) => s.selectedModuleId);
   const detail = useModulesStore((s) => s.detail);
   const attachments = useModulesStore((s) => s.attachments);
@@ -120,134 +131,159 @@ export function ModuleDetail() {
         </div>
       )}
 
-      <ModuleSceneCanvas />
-
-      {selected && (
-        <div className="module-detail__pose-panel">
-          <h2>
-            {selected.refdes} <span className="module-detail__pose-panel-ref">{selected.ref}</span>
-            <button type="button" className="module-detail__pose-panel-close" onClick={() => selectComponentInstance(null)} aria-label="Deselect">
-              ×
-            </button>
-          </h2>
-          <div className="module-detail__pose-panel-fields">
-            {(["x", "y", "z"] as const).map((axis) => (
-              <label key={axis}>
-                {axis} (mm)
-                <input
-                  type="number"
-                  value={poseFields[axis]}
-                  onChange={(e) => setPoseFields((prev) => ({ ...prev, [axis]: e.target.value }))}
-                />
-              </label>
-            ))}
-            {(["roll", "pitch", "yaw"] as const).map((axis) => (
-              <label key={axis}>
-                {axis} (deg)
-                <input
-                  type="number"
-                  value={poseFields[axis]}
-                  onChange={(e) => setPoseFields((prev) => ({ ...prev, [axis]: e.target.value }))}
-                />
-              </label>
-            ))}
-          </div>
-          <button type="button" onClick={handleApplyPose}>
-            Apply
+      <div className="module-detail__tabs" role="tablist">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={
+              activeTab === tab.id ? "module-detail__tab module-detail__tab--active" : "module-detail__tab"
+            }
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
           </button>
-        </div>
+        ))}
+      </div>
+
+      {activeTab === "assembly" && (
+        <>
+          <ModuleSceneCanvas />
+
+          {selected && (
+            <div className="module-detail__pose-panel">
+              <h2>
+                {selected.refdes} <span className="module-detail__pose-panel-ref">{selected.ref}</span>
+                <button type="button" className="module-detail__pose-panel-close" onClick={() => selectComponentInstance(null)} aria-label="Deselect">
+                  ×
+                </button>
+              </h2>
+              <div className="module-detail__pose-panel-fields">
+                {(["x", "y", "z"] as const).map((axis) => (
+                  <label key={axis}>
+                    {axis} (mm)
+                    <input
+                      type="number"
+                      value={poseFields[axis]}
+                      onChange={(e) => setPoseFields((prev) => ({ ...prev, [axis]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+                {(["roll", "pitch", "yaw"] as const).map((axis) => (
+                  <label key={axis}>
+                    {axis} (deg)
+                    <input
+                      type="number"
+                      value={poseFields[axis]}
+                      onChange={(e) => setPoseFields((prev) => ({ ...prev, [axis]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+              </div>
+              <button type="button" onClick={handleApplyPose}>
+                Apply
+              </button>
+            </div>
+          )}
+
+          <div className="module-detail__body">
+            <div className="module-detail__backdrop-upload">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_EXTENSIONS.join(",")}
+                className="module-detail__file-input"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) void uploadStepAttachment(file);
+                }}
+              />
+              <button type="button" className="module-detail__attach" onClick={() => fileInputRef.current?.click()}>
+                📎 Upload STEP file (optional visual backdrop -- not sliced or clickable, just a reference)
+              </button>
+            </div>
+
+            <AttachmentsList
+              attachments={attachments}
+              downloadUrl={(filename) => moduleAttachmentDownloadUrl(selectedModuleId, filename)}
+            />
+
+            <div className="module-detail__components">
+              <h2>Placed components</h2>
+
+              <form className="module-detail__place-form" onSubmit={(e) => void handlePlace(e)}>
+                <select
+                  value={placeComponentId}
+                  onChange={(e) => setPlaceComponentId(e.target.value)}
+                  aria-label="Component to place"
+                >
+                  <option value="">Choose a published component…</option>
+                  {componentOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.id} ({c.vendor ?? "—"})
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={placeRefdes}
+                  onChange={(e) => setPlaceRefdes(e.target.value)}
+                  placeholder="Refdes, e.g. VG1"
+                  aria-label="New instance reference designator"
+                />
+                <button type="submit" disabled={!placeComponentId || !placeRefdes.trim() || placing}>
+                  Place
+                </button>
+              </form>
+
+              {components.length === 0 ? (
+                <p className="module-detail__components-empty">No components placed yet.</p>
+              ) : (
+                <ul className="module-detail__components-list">
+                  {components.map((c) => (
+                    <li
+                      key={c.refdes}
+                      className={
+                        c.refdes === selectedRefdes
+                          ? "module-detail__components-row module-detail__components-row--selected"
+                          : "module-detail__components-row"
+                      }
+                    >
+                      <button
+                        type="button"
+                        className="module-detail__components-refdes"
+                        disabled={!c.pose}
+                        onClick={() => selectComponentInstance(c.refdes)}
+                      >
+                        {c.refdes}
+                      </button>
+                      <span className="module-detail__components-ref">{c.ref}</span>
+                      <span className="module-detail__components-pose">
+                        {c.pose ? c.pose.xyz_mm.map((v) => v.toFixed(1)).join(", ") + " mm" : "unplaced"}
+                      </span>
+                      <button
+                        type="button"
+                        className="module-detail__components-remove"
+                        onClick={() => void removeComponentInstance(c.refdes)}
+                        aria-label={`Remove ${c.refdes}`}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
-      <div className="module-detail__body">
-        <div className="module-detail__backdrop-upload">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED_EXTENSIONS.join(",")}
-            className="module-detail__file-input"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) void uploadStepAttachment(file);
-            }}
-          />
-          <button type="button" className="module-detail__attach" onClick={() => fileInputRef.current?.click()}>
-            📎 Upload STEP file (optional visual backdrop -- not sliced or clickable, just a reference)
-          </button>
-        </div>
-
-        <AttachmentsList
-          attachments={attachments}
-          downloadUrl={(filename) => moduleAttachmentDownloadUrl(selectedModuleId, filename)}
-        />
-
-        <div className="module-detail__components">
-          <h2>Placed components</h2>
-
-          <form className="module-detail__place-form" onSubmit={(e) => void handlePlace(e)}>
-            <select
-              value={placeComponentId}
-              onChange={(e) => setPlaceComponentId(e.target.value)}
-              aria-label="Component to place"
-            >
-              <option value="">Choose a published component…</option>
-              {componentOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.id} ({c.vendor ?? "—"})
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              value={placeRefdes}
-              onChange={(e) => setPlaceRefdes(e.target.value)}
-              placeholder="Refdes, e.g. VG1"
-              aria-label="New instance reference designator"
-            />
-            <button type="submit" disabled={!placeComponentId || !placeRefdes.trim() || placing}>
-              Place
-            </button>
-          </form>
-
-          {components.length === 0 ? (
-            <p className="module-detail__components-empty">No components placed yet.</p>
-          ) : (
-            <ul className="module-detail__components-list">
-              {components.map((c) => (
-                <li
-                  key={c.refdes}
-                  className={
-                    c.refdes === selectedRefdes
-                      ? "module-detail__components-row module-detail__components-row--selected"
-                      : "module-detail__components-row"
-                  }
-                >
-                  <button
-                    type="button"
-                    className="module-detail__components-refdes"
-                    disabled={!c.pose}
-                    onClick={() => selectComponentInstance(c.refdes)}
-                  >
-                    {c.refdes}
-                  </button>
-                  <span className="module-detail__components-ref">{c.ref}</span>
-                  <span className="module-detail__components-pose">
-                    {c.pose ? c.pose.xyz_mm.map((v) => v.toFixed(1)).join(", ") + " mm" : "unplaced"}
-                  </span>
-                  <button
-                    type="button"
-                    className="module-detail__components-remove"
-                    onClick={() => void removeComponentInstance(c.refdes)}
-                    aria-label={`Remove ${c.refdes}`}
-                  >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
+      {activeTab === "electrical" && <WiringCanvas domain="electrical" />}
+      {activeTab === "pneumatic" && <WiringCanvas domain="pneumatic" />}
+      {activeTab === "communication" && <WiringCanvas domain="communication" />}
     </div>
   );
 }

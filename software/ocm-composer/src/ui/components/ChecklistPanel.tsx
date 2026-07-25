@@ -1,11 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// Live validate_component refusals as a task list (spec/10: "the
-// completion list"). Publish is enabled only once the list is empty --
-// the button is a UX nicety, not enforcement; publish_component gates on
-// validity itself regardless of what this panel shows.
+// Live validate_component/validate_module refusals as a task list (spec/10:
+// "the completion list"). Publish is enabled only once the list is empty --
+// the button is a UX nicety, not enforcement; publish_component/
+// publish_module gate on validity itself regardless of what this panel shows.
+//
+// Takes checklist/canPublish/onPublish/fieldKeyOf as props (same
+// generalization AttachmentsList/ConnectorSymbols went through) so the
+// Modules page's own wiring canvas can reuse this exact component for
+// validate_module's connectivity refusals -- which have a different path
+// shape than validate_component's (a module path looks like
+// "modules['id'].nets.electrical['NET_ID']", not "electrical.supplies[0].
+// current_nominal_a"), hence fieldKeyOf is pluggable rather than the
+// hardcoded refusalFieldKey. The Components page passes none of the new
+// props and renders byte-identical to before.
 
 import { useState } from "react";
-import { useComponentsStore } from "../../store/componentsStore";
+import type { Refusal } from "../../api/types";
 import { refusalFieldKey } from "./refusalField";
 
 function focusField(fieldKey: string | null): void {
@@ -17,10 +27,15 @@ function focusField(fieldKey: string | null): void {
   window.setTimeout(() => el.classList.remove("component-form__section--focused"), 1500);
 }
 
-export function ChecklistPanel() {
-  const checklist = useComponentsStore((s) => s.checklist);
-  const detail = useComponentsStore((s) => s.detail);
-  const publish = useComponentsStore((s) => s.publish);
+export interface ChecklistPanelProps {
+  checklist: Refusal[];
+  canPublish: boolean;
+  onPublish: (revision: string) => void;
+  /** Defaults to refusalFieldKey (component-schema paths). The wiring canvas passes its own module-path extractor. */
+  fieldKeyOf?: (refusal: Refusal) => string | null;
+}
+
+export function ChecklistPanel({ checklist, canPublish, onPublish, fieldKeyOf = refusalFieldKey }: ChecklistPanelProps) {
   const [revision, setRevision] = useState("1.0.0");
 
   const clean = checklist.length === 0;
@@ -34,7 +49,7 @@ export function ChecklistPanel() {
         <ul className="checklist-panel__list">
           {checklist.map((r, i) => (
             <li key={i}>
-              <button type="button" className="checklist-panel__item" onClick={() => focusField(refusalFieldKey(r))}>
+              <button type="button" className="checklist-panel__item" onClick={() => focusField(fieldKeyOf(r))}>
                 <span className="checklist-panel__code">{r.code}</span>
                 <span className="checklist-panel__message">{r.message}</span>
                 {r.hint && <span className="checklist-panel__hint">{r.hint}</span>}
@@ -53,7 +68,7 @@ export function ChecklistPanel() {
           disabled={!clean}
           aria-label="Publish revision"
         />
-        <button type="button" disabled={!clean || !detail} onClick={() => void publish(revision)}>
+        <button type="button" disabled={!clean || !canPublish} onClick={() => onPublish(revision)}>
           Publish
         </button>
       </div>

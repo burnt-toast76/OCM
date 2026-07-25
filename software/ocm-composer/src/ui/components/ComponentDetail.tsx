@@ -14,6 +14,8 @@ export function ComponentDetail() {
   const detail = useComponentsStore((s) => s.detail);
   const attachments = useComponentsStore((s) => s.attachments);
   const deleteComponent = useComponentsStore((s) => s.deleteComponent);
+  const checklist = useComponentsStore((s) => s.checklist);
+  const publish = useComponentsStore((s) => s.publish);
 
   // Any attachment with a converted GLB sibling -- typically the one STEP
   // file a draft has, but this doesn't assume there's exactly one.
@@ -50,12 +52,12 @@ export function ComponentDetail() {
       </header>
 
       {glbFilename && <GlbViewer url={attachmentDownloadUrl(selectedComponentId, glbFilename)} />}
-      <ConnectorSymbols />
+      {detail && <ConnectorSymbols component={detail.component} />}
 
       <div className="component-detail__body">
         <ComponentForm />
         <div className="component-detail__side">
-          <ChecklistPanel />
+          <ChecklistPanel checklist={checklist} canPublish={!!detail} onPublish={(revision) => void publish(revision)} />
           <AttachmentsList attachments={attachments} downloadUrl={(filename) => attachmentDownloadUrl(selectedComponentId, filename)} />
           <ChatPanel />
         </div>
