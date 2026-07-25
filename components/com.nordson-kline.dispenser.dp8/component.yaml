@@ -9,9 +9,9 @@ geometry:
   units: kg
   mass: 4.2
   envelope:
-    length: 120.0
-    width: 160.0
-    height: 210.0
+    length: 120
+    width: 160
+    height: 210
     units: mm
 name: Nordson-Kline DP-8 Precision Dot Dispenser
 pneumatic:
@@ -46,6 +46,17 @@ electrical:
   - rail: 24VDC
     current_peak_a: 3.5
     note: heater supply
+  connectors:
+  - type: 4-pin M12 quick-disconnect
+    pins:
+    - pin: '1'
+      function: 24V DC power
+      wire_color: Brown
+    - pin: '2'
+      function: Neutral
+      wire_color: Blue
+    ref: electrical
+    carries: power
 hazards:
 - burn_hot
 - aerosol
