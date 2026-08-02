@@ -10,7 +10,10 @@ dependencies = [
     "ruamel.yaml>=0.18",
     "jsonschema>=4.18",
     "jsonpatch>=1.33",
-    "mcp>=1.2.0",
+    # Upper bound is load-bearing: mcp 2.0.0 removed mcp.server.fastmcp
+    # (FastMCP -> MCPServer in mcp.server.mcpserver). Migrating is its own
+    # task; until then an unbounded >= silently breaks CI on upstream release.
+    "mcp>=1.2.0,<2",
     "fastapi>=0.110",
     # /agent/chat's Anthropic Messages API tool-use loop. Always a real
     # dependency -- the degraded case is a missing ANTHROPIC_API_KEY
