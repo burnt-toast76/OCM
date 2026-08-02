@@ -1,0 +1,53 @@
+version: 2
+
+# Turns "silent break on a random push" into "an isolated, CI-gated PR you
+# choose to merge." The pip entry watches ci/requirements.txt (the CI
+# dependency lock, applied via `pip install -c`), so each bump is tested by the
+# full test/fmt-check suites before it can land -- the containment the
+# unbounded `>=` installs lacked (see ci/requirements.txt).
+
+updates:
+  # Python: the CI lock. Fast-moving / import-surface packages (the class that
+  # broke on mcp 2.0.0) get their OWN PR each; the rest are grouped to cut noise.
+  - package-ecosystem: pip
+    directory: /ci
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      python-stable:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - anthropic
+          - fastapi
+          - starlette
+          - pydantic
+          - mcp
+          - numpy
+          - httpx
+    ignore:
+      # mcp 2.0 removed mcp.server.fastmcp; held at 1.x by ocm-api's `mcp<2`
+      # bound until the FastMCP -> MCPServer migration lands (its own task).
+      # A major-bump PR here would just go red; skip it until we're ready.
+      - dependency-name: mcp
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions: so checkout / setup-python (and any future action) bumps
+  # arrive as PRs instead of silent Node-deprecation warnings on every run --
+  # the manual bump this task just did, automated from here on.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # The web composer (Cellwright's GUI).
+  - package-ecosystem: npm
+    directory: /software/ocm-composer
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      npm-all:
+        patterns:
+          - "*"
