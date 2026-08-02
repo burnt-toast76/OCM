@@ -30,3 +30,4 @@ context was.
 | [0019](0019-cell-interconnect.md) | Cells interconnect by discrete I/O, not by fieldbus | Accepted |
 | [0020](0020-carrier-identity.md) | Unit identity travels on the carrier | Accepted |
 | [0021](0021-record-journal.md) | The journal is the write; the store is declared | Accepted |
+| [0022](0022-lifecycle-and-agent-authority.md) | Lifecycle governs write authority; the agent edits manifests only | Accepted |
