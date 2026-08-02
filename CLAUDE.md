@@ -18,8 +18,17 @@ blind.
 
 ## Current state
 
-Pre-alpha. Schema validates; generator does not exist; no hardware built.
-Next: freeze the bolt grid (ADR-0011, still open), then build the generator (ROADMAP step 1).
+Pre-alpha, but the software chain is real. `ocm-core` validates component/module/cell
+manifests; `ocm-resolve` + `ocm-api` + `ocm-generator` turn a resolved cell into a Tesseract
+collision scene, a collision-checked joint-space plan (IK needs the Tesseract extra), a
+URScript program, a cycle-time estimate, and a PackML coordinator running the spec/08
+handshake on **simulated** I/O. `ocm-composer` is a working web composer under active
+development. `ocm-agent`/`ocm-runtime`/`ocm-viewer` are empty `.gitkeep` placeholders. The
+PLCopen-XML emitter is not built. Registries hold 2 components, 8 modules, 1 cell.
+
+No hardware has been built (every `hardware/` subtree is a placeholder) and nothing has run
+on a physical machine. Next: the PLC-sequence emitter, real fieldbus I/O to replace the
+simulated coordinator, and first hardware. The bolt grid (ADR-0011) is still open.
 
 ## Conventions
 

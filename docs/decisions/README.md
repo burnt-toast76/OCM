@@ -25,3 +25,5 @@ context was.
 | [0014](0014-components-vs-modules.md) | Components are transcribed; modules are designed | Accepted |
 | [0015](0015-module-connectivity.md) | Module connectivity: nets + links; pins are transcribed | Accepted (Erratum 1) |
 | [0016](0016-one-validation-surface.md) | One validation surface: authoring sees what resolution sees | Accepted |
+| [0017](0017-context-is-layered.md) | Context is layered — component, module, cell | Accepted |
+| [0018](0018-ocm-standard-cellwright-product.md) | OCM is the standard, Cellwright is the product | Accepted |
