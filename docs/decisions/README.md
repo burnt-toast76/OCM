@@ -27,3 +27,6 @@ context was.
 | [0016](0016-one-validation-surface.md) | One validation surface: authoring sees what resolution sees | Accepted |
 | [0017](0017-context-is-layered.md) | Context is layered — component, module, cell | Accepted |
 | [0018](0018-ocm-standard-cellwright-product.md) | OCM is the standard, Cellwright is the product | Accepted |
+| [0019](0019-cell-interconnect.md) | Cells interconnect by discrete I/O, not by fieldbus | Accepted |
+| [0020](0020-carrier-identity.md) | Unit identity travels on the carrier | Accepted |
+| [0021](0021-record-journal.md) | The journal is the write; the store is declared | Accepted |
