@@ -24,8 +24,8 @@ jobs:
   ocm-core:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install -e "software/ocm-core[test]"
@@ -34,8 +34,8 @@ jobs:
   ocm-resolve:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install ocm-core (sibling), ocm-resolve[test]
@@ -47,8 +47,8 @@ jobs:
   ocm-generator:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       # No `tesseract` extra: every --collision/plan-dependent test file
@@ -68,8 +68,8 @@ jobs:
   ocm-api:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       # ocm-generator is a structural dependency here (ocm_api/composition.py,
