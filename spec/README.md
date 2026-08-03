@@ -2,9 +2,13 @@
 
 CC BY-SA 4.0. The standard, independently implementable.
 
+**Parsing rule for every manifest:** YAML 1.2 core schema — bare `on`/`off`/`yes`/`no` are
+strings, never booleans. A 1.1-resolving parser silently corrupts valid manifests
+(`mount.on` becomes the key `True`). Normative statement in [00-overview.md](00-overview.md).
+
 | | |
 |---|---|
-| [00-overview.md](00-overview.md) | The three layers |
+| [00-overview.md](00-overview.md) | The three layers — and the YAML 1.2 parsing rule |
 | [02-mechanical-interface.md](02-mechanical-interface.md) | 🔴 **NOT FROZEN** — the bolt grid |
 | [03-electrical-interface.md](03-electrical-interface.md) | ✅ M12 pinout, PNP, IO-Link |
 | [04-fieldbus.md](04-fieldbus.md) | ✅ EtherCAT + IO-Link, pneumatics, vacuum |
