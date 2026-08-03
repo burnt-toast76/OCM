@@ -31,7 +31,18 @@ _REVISION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 def _todo_capability() -> dict[str, Any]:
-    return {"name": "todo_op", "summary": "TODO: describe what this capability does (the agent-facing surface)."}
+    # ADR-0023: timeout_s and on_timeout are required on every capability.
+    # Placeholdered like mass_kg (a scalar design value the author will set),
+    # not omitted -- ADR-0016 Decision 3's omit-rather-than-fake rule is for
+    # geometry artifact PATHS to files that don't exist, not scalar facts.
+    # on_timeout is "abort" to match the skeleton's abort_safe: false
+    # (a "hold" there would be a TIMEOUT_DISPOSITION_CONFLICT).
+    return {
+        "name": "todo_op",
+        "summary": "TODO: describe what this capability does (the agent-facing surface).",
+        "timeout_s": 1.0,
+        "on_timeout": "abort",
+    }
 
 
 def _todo_comms() -> dict[str, Any]:

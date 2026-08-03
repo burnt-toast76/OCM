@@ -112,6 +112,8 @@ capabilities:
     gripped:
       type: boolean
   nominal_duration_s: 0.5
+  timeout_s: 2.5               # ADR-0023 default (~5x nominal, the clamp anchor's ratio); pending owner calibration
+  on_timeout: abort            # a pick that won't confirm vacuum drops the part; not abort-safe (see state_machine)
 - name: release
   summary: Vent the cup to atmosphere and set the part down.
   motion:
@@ -134,6 +136,8 @@ capabilities:
   postconditions:
   - part_present == false
   nominal_duration_s: 0.3
+  timeout_s: 1.5               # ADR-0023 default (~5x nominal, the clamp anchor's ratio); pending owner calibration
+  on_timeout: abort            # a release that won't vent leaves the part stuck; not abort-safe (see state_machine)
 - name: blow_off
   summary: Positive air pulse to shed a part that clings to the cup after venting. Recovery op.
   preconditions:
@@ -141,6 +145,8 @@ capabilities:
   postconditions:
   - part_present == false
   nominal_duration_s: 0.4
+  timeout_s: 2.0               # ADR-0023 default (~5x nominal, the clamp anchor's ratio); pending owner calibration
+  on_timeout: abort            # a blow-off that won't shed the part needs a human; not abort-safe (see state_machine)
 state_machine:
   model: packml
   implements:

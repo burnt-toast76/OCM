@@ -89,6 +89,8 @@ capabilities:
   postconditions:
   - screw_present == true
   nominal_duration_s: 0.9
+  timeout_s: 4.5               # ADR-0023 default (~5x nominal, the clamp anchor's ratio); pending owner calibration
+  on_timeout: abort            # a feed that won't load leaves the bit empty; not abort-safe (see state_machine)
   consumes: [screw]
     # No 'motion' block: the robot doesn't have to be anywhere in particular.
     # The generator is free to overlap this with the robot's move to the next hole.
@@ -123,6 +125,14 @@ capabilities:
       default: torque_control
       required: false
 
+  # ADR-0023 Decision 4: sd50 is a general-purpose screwdriver and cannot
+  # name the peer that holds the part -- it declares the abstract fact it
+  # needs, and the cell binds it (bracket-asm-01: nest1.clamped).
+  requires:
+    workpiece_secured:
+      type: bool
+      summary: "Something holds the part against drive torque. The cell says what."
+
   motion:
     frame: tcp
     approach_vec: [0, 0, 1]            # drive along +Z, into the work
@@ -135,6 +145,7 @@ capabilities:
 
   preconditions:
   - screw_present == true              # → generator emits a real interlock, not a comment
+  - workpiece_secured == true          # ADR-0023: do not apply torque to an unheld part (cell binds this)
   postconditions:
   - screw_present == false
   - result_ok == true
@@ -145,6 +156,8 @@ capabilities:
     ok: {type: boolean}
 
   nominal_duration_s: 1.8
+  timeout_s: 6.0                       # ADR-0023
+  on_timeout: abort                    # a screw stalled mid-drive is not resumable
 
 - name: eject_screw
   summary: "Blow off a screw stuck on the bit after a failed drive. Recovery op."
@@ -153,6 +166,8 @@ capabilities:
   postconditions:
   - screw_present == false
   nominal_duration_s: 0.5
+  timeout_s: 2.5               # ADR-0023 default (~5x nominal, the clamp anchor's ratio); pending owner calibration
+  on_timeout: abort            # a screw that won't eject needs a human; not abort-safe (see state_machine)
 
 state_machine:
   model: packml

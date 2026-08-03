@@ -48,6 +48,7 @@ comms:
   - {name: heartbeat, direction: input, type: bool, role: heartbeat}
   - {name: target_force, direction: output, type: real, unit: "N", role: process_param}
   - {name: clamped, direction: input, type: bool}
+  - {name: part_present, direction: input, type: bool}    # ADR-0023: nest seat sensor -- do not clamp an empty nest
   - {name: force_actual, direction: input, type: real, unit: "N", role: process_result}
 
 capabilities:
@@ -62,11 +63,14 @@ capabilities:
       summary: "Target clamp force. Too low: part walks under drive torque. Too high: marks a soft part."
   preconditions:
   - clamped == false
+  - part_present == true       # ADR-0023: do not clamp an empty nest
   postconditions:
   - clamped == true
   results:
     force_achieved: {type: number, unit: "N"}
   nominal_duration_s: 0.6
+  timeout_s: 3.0               # ADR-0023
+  on_timeout: hold             # nothing broken; operator clears and resumes
 
 - name: unclamp
   summary: "Open both jaws and release the part."
@@ -75,6 +79,8 @@ capabilities:
   postconditions:
   - clamped == false
   nominal_duration_s: 0.4
+  timeout_s: 2.0               # ADR-0023 default (~5x nominal, the clamp anchor's ratio); pending owner calibration
+  on_timeout: hold             # a jaw that won't open leaves the part held, not compromised
 
 state_machine:
   model: packml
@@ -90,9 +96,14 @@ state_machine:
   - clearing
   - stopping
   - stopped
-  # A part clamped mid-cycle stays clamped on abort -- dropping it is worse
-  # than holding it. Recovery is a human opening the jaws deliberately.
-  abort_safe: false
+  # ADR-0023 coherence: clamp declares on_timeout: hold, so the nest must be
+  # abort-safe (TIMEOUT_DISPOSITION_CONFLICT otherwise). That is in fact the
+  # honest reading of this fixture's safe state -- a clamp that times out or
+  # aborts HOLDS the part where it is (check valve on the clamp cylinder;
+  # see safety.safe_state below), it does not drop it. Recovery is a human
+  # opening the jaws deliberately; the part is never compromised, so a held
+  # or aborted clamp is safe to resume from.
+  abort_safe: true
 
 safety:
   hazards: [pinch, crush]

@@ -138,8 +138,20 @@ class OcmApi:
         return composition.create_cell(self.workspace, id, base_module)
 
     @_never_raise
-    def place_instance(self, cell: str, instance: str, module: str, mount: dict[str, Any]) -> Envelope:
-        return composition.place_instance(self.workspace, cell, instance, module, mount)
+    def place_instance(
+        self,
+        cell: str,
+        instance: str,
+        module: str,
+        mount: dict[str, Any],
+        requires: dict[str, str] | None = None,
+    ) -> Envelope:
+        # ADR-0023 Decision 4: a module may declare abstract `requires:`; the
+        # cell binds each to a concrete `instance.signal`. This is where a cell
+        # composed through the API expresses that binding -- without it, an
+        # instance carrying a requires-capable capability (e.g. sd50's
+        # drive_screw) would resolve straight to REQUIREMENT_UNBOUND.
+        return composition.place_instance(self.workspace, cell, instance, module, mount, requires=requires)
 
     @_never_raise
     def move_instance(self, cell: str, instance: str, mount: dict[str, Any]) -> Envelope:

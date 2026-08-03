@@ -34,6 +34,8 @@ from .errors import (
     DriverNotRegisteredError,
     HandshakeBindingError,
     HeartbeatStaleError,
+    OpTimeoutError,
+    PostconditionError,
     PreconditionError,
 )
 from .packml import PackMLCommand, PackMLState
@@ -52,8 +54,10 @@ __all__ = [
     "DriverRegistry",
     "HandshakeBindingError",
     "HeartbeatStaleError",
+    "OpTimeoutError",
     "PackMLCommand",
     "PackMLState",
+    "PostconditionError",
     "PreconditionError",
     "RobotAborted",
     "RobotEvent",

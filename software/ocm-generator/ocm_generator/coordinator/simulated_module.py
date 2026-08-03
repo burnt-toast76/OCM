@@ -1,10 +1,22 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """SimulatedPackMLModule -- a stand-in for a real EtherCAT slave's
 firmware in the loopback proof: watches `packml_cmd` for a start request
-and, after a short simulated processing delay, produces whatever signals
-the requested op's own manifest declares as `postconditions`/results (for
-sd50: `load_screw` sets `screw_present`; `drive_screw` clears it and
-reports `torque_achieved`/`angle_achieved`/`result_ok`).
+and, after a short simulated processing delay, runs an explicit per-op
+*recipe* that writes concrete signal values (for sd50: `load_screw` sets
+`screw_present`; `drive_screw` clears it and reports
+`torque_achieved`/`angle_achieved`/`result_ok`).
+
+## Recipes are explicit, NOT derived from the manifest's postconditions
+
+ADR-0023 Decision 2 turns a capability's postconditions into a check the
+*coordinator* runs after Complete -- so this simulated firmware must be
+able to lie: report Complete while a postcondition reads false, exactly as
+a real misbehaving device would. If a recipe were generated *from* the
+postconditions it could never produce that mismatch, and the coordinator's
+post-Complete verification would be untestable. So each recipe is written
+out by hand (`make_drive_screw_recipe(clear_screw_present=False)` is the
+fixture that leaves `screw_present` true after reporting Complete), and the
+coordinator's belief in Complete is the thing under test, not an identity.
 
 This is intentionally where the "simulated screwdriver" domain knowledge
 lives, not in `.program` -- the coordinator only ever reads/writes signals
@@ -42,6 +54,7 @@ def make_drive_screw_recipe(
     result_ok_for: Callable[[str], bool] = lambda hole_id: True,
     torque_achieved: float = 2.4,
     angle_achieved: float = 45.0,
+    clear_screw_present: bool = True,
 ) -> OpRecipe:
     """A `drive_screw` recipe. `result_ok_for` lets a test force a
     specific hole's result to fail (the abort proof) without the
@@ -49,10 +62,16 @@ def make_drive_screw_recipe(
     sd50's own declared postconditions: `screw_present == false`,
     `result_ok == true` (the happy path; `result_ok_for` can say
     otherwise).
+
+    `clear_screw_present=False` is the ADR-0023 Decision 2 fixture: the
+    recipe reports Complete (result_ok true) while deliberately leaving
+    `screw_present` true, so the capability's `screw_present == false`
+    postcondition reads false against the live bus. The coordinator must
+    catch that and fault the cell rather than believe Complete.
     """
 
     async def recipe(bus: SignalBus, instance: str, hole_id: str) -> None:
-        await bus.write(instance, "screw_present", False)
+        await bus.write(instance, "screw_present", not clear_screw_present)
         await bus.write(instance, "torque_achieved", torque_achieved)
         await bus.write(instance, "angle_achieved", angle_achieved)
         await bus.write(instance, "result_ok", bool(result_ok_for(hole_id)))

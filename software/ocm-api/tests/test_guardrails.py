@@ -20,7 +20,18 @@ def _place_robot_and_sd1(api: OcmApi, cell_id: str) -> None:
     api.create_cell(cell_id, "com.accelsolutions.base.frame1200@2.0.0")
     api.place_instance(cell_id, "robot1", "com.universal-robots.ur5e@3.1.0", {"pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}})
     api.set_joint_state(cell_id, "robot1", {"shoulder_lift_joint": -1.5707963267948966, "elbow_joint": 1.5707963267948966})
-    e = api.place_instance(cell_id, "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"})
+    # ADR-0023: sd50's drive_screw declares requires.workpiece_secured, so
+    # the cell must bind it or resolve refuses REQUIREMENT_UNBOUND. These
+    # fixtures exercise mount-slot / orphan guardrails, not the interlock
+    # itself, and don't place a holding fixture -- bind to sd1's own
+    # screw_present (an input bool that exists here) so resolve is satisfied.
+    e = api.place_instance(
+        cell_id,
+        "sd1",
+        "com.accelsolutions.screwdriver.sd50@1.2.0",
+        {"on": "robot1.flange"},
+        requires={"workpiece_secured": "sd1.screw_present"},
+    )
     assert e.ok, e.refusals
 
 

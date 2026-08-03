@@ -112,6 +112,11 @@ class ModuleInstance:
     # values are written everywhere else in robotics tooling. Absent ->
     # every joint defaults to zero.
     joint_state: dict[str, float] = field(default_factory=dict)
+    # ADR-0023: binds this instance's capability `requires` keys to concrete
+    # signals -- requirement name -> "instance.signal". Parsed here, never
+    # resolved: whether the target instance/signal exists is a resolve-time
+    # concern (ocm-resolve), like every other cross-instance reference.
+    requires: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ModuleInstance":
@@ -128,6 +133,7 @@ class ModuleInstance:
             },
             calibration=data.get("calibration"),
             joint_state={k: float(v) for k, v in data.get("joint_state", {}).items()},
+            requires={k: str(v) for k, v in data.get("requires", {}).items()},
         )
 
 

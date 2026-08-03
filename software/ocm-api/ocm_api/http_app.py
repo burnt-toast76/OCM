@@ -163,9 +163,13 @@ def build_app(repo_root: str) -> FastAPI:
 
     @app.post("/place_instance")
     def place_instance(
-        cell: str = Body(...), instance: str = Body(...), module: str = Body(...), mount: dict[str, Any] = Body(...)
+        cell: str = Body(...),
+        instance: str = Body(...),
+        module: str = Body(...),
+        mount: dict[str, Any] = Body(...),
+        requires: dict[str, str] | None = Body(default=None),
     ) -> dict[str, Any]:
-        return envelope_response(api.place_instance(cell, instance, module, mount))
+        return envelope_response(api.place_instance(cell, instance, module, mount, requires=requires))
 
     @app.post("/move_instance")
     def move_instance(cell: str = Body(...), instance: str = Body(...), mount: dict[str, Any] = Body(...)) -> dict[str, Any]:

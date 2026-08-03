@@ -119,6 +119,8 @@ capabilities:
   postconditions:
   - flow_actual > 0
   nominal_duration_s: 3.0
+  timeout_s: 15.0             # ADR-0023 default (~5x nominal, the clamp anchor's ratio); pending owner calibration
+  on_timeout: abort           # a purge that won't flow means a clogged tip; part routes to reject (not abort-safe)
   consumes: [adhesive]
 
 - name: dispense_bead
@@ -191,6 +193,13 @@ capabilities:
     volume_dispensed: {type: number, unit: ml}
     flow_deviation: {type: number, unit: "%", summary: "Max deviation from setpoint along the path. >10% means a bad bead."}
 
+  # ADR-0023: this op has no fixed nominal_duration_s -- a bead's duration is
+  # path length / speed, solved at plan time. A fixed module timeout is a
+  # coarse ceiling only; a path-aware timeout is future work (like the
+  # grammar extension the ADR defers). 45 s is a generous upper bound for the
+  # longest bead this head is used for; the module owner must set the real value.
+  timeout_s: 45.0
+  on_timeout: abort           # a half-laid bead cannot be resumed; part routes to reject (not abort-safe)
   consumes: [adhesive]
 
 - name: dispense_dot
@@ -210,6 +219,8 @@ capabilities:
   - temp_ready == true
   - cartridge_low == false
   nominal_duration_s: 0.4
+  timeout_s: 2.0             # ADR-0023 default (~5x nominal, the clamp anchor's ratio); pending owner calibration
+  on_timeout: abort           # a dot that won't jet leaves the part short; routes to reject (not abort-safe)
   consumes: [adhesive]
 
 state_machine:

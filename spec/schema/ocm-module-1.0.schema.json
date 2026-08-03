@@ -436,7 +436,9 @@
         "type": "object",
         "required": [
           "name",
-          "summary"
+          "summary",
+          "timeout_s",
+          "on_timeout"
         ],
         "additionalProperties": false,
         "properties": {
@@ -568,6 +570,45 @@
                 "screw_m3x8"
               ]
             ]
+          },
+          "requires": {
+            "type": "object",
+            "description": "ADR-0023: abstract boolean facts this capability needs, named without saying who provides them. The cell binds each key to a concrete `instance.signal`; a precondition may reference a key by name. Unbound at cell resolve -> REQUIREMENT_UNBOUND.",
+            "propertyNames": {
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "summary"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "bool"
+                  ]
+                },
+                "summary": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "timeout_s": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "ADR-0023: how long before this op is wrong -- distinct from nominal_duration_s, and NOT overridable by a plan. On expiry the module is disposed per on_timeout."
+          },
+          "on_timeout": {
+            "type": "string",
+            "enum": [
+              "hold",
+              "abort"
+            ],
+            "description": "ADR-0023: disposition when timeout_s expires. hold -> PackML Held (nothing damaged; operator clears and resumes). abort -> Abort (part compromised, routes to reject). hold on a capability whose state_machine.abort_safe is false refuses (TIMEOUT_DISPOSITION_CONFLICT)."
           }
         }
       }

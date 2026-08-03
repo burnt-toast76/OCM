@@ -64,8 +64,8 @@ verbs. **The refusal engine lives behind this surface and nowhere else.**
 | Verb | Behavior |
 |---|---|
 | `create_cell(id, base_module)` | Scaffolds cell.yaml with the base + datum conventions. |
-| `place_instance(cell, instance, module@rev, mount)` / `move_instance` / `remove_instance` | Each call re-resolves and returns the envelope — **live refusals**: unknown module, revision mismatch, dangling `mount.on`, workspace overhang (with mm + direction). This is the GUI's drag handler and the agent's placement tool: same verb. |
-| `set_plan(cell, plan)` | Writes + resolves: unknown ops, param bounds, precondition references. |
+| `place_instance(cell, instance, module@rev, mount, requires?)` / `move_instance` / `remove_instance` | Each call re-resolves and returns the envelope — **live refusals**: unknown module, revision mismatch, dangling `mount.on`, workspace overhang (with mm + direction). `requires` binds a capability's abstract requirement to a concrete `instance.signal` (ADR-0023); `REQUIREMENT_UNBOUND` if a placed instance carries a requirement the cell binds to nothing, `REQUIREMENT_UNKNOWN_TARGET` if a binding names an instance/signal that isn't there. This is the GUI's drag handler and the agent's placement tool: same verb. |
+| `set_plan(cell, plan)` | Writes + resolves: unknown ops, param bounds, and **conditions** (ADR-0023). A capability's `preconditions`/`postconditions` and `requires` keys resolve statically here — `CONDITION_UNKNOWN_SIGNAL` if a condition names neither a `comms.signals` name nor a declared `requires` key, `TIMEOUT_DISPOSITION_CONFLICT` if a capability declares `on_timeout: hold` while its module is not `abort_safe`. The plan itself is verbs only: there is no wait/guard/`when` key, because the wait lives inside the verb (ADR-0023 Decision 1). |
 | `set_joint_state(cell, instance, joints)` | Robot home pose. |
 
 ### Checking & generation (wrapping what exists)

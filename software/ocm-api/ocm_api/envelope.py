@@ -62,6 +62,11 @@ class Codes:
     LINK_NON_COMMUNICATION_PORT = "LINK_NON_COMMUNICATION_PORT"  # link endpoint on an electrical/pneumatic port
     LINK_PROTOCOL_MISMATCH = "LINK_PROTOCOL_MISMATCH"  # a link's two ends speak different protocols
     ETHERCAT_CHAIN_BROKEN = "ETHERCAT_CHAIN_BROKEN"  # chain reaches no master, loops, or leaves slaves unreached
+    # ADR-0023: the plan is verbs; conditions belong to modules.
+    CONDITION_UNKNOWN_SIGNAL = "CONDITION_UNKNOWN_SIGNAL"  # a pre/postcondition names no known signal or requires key
+    REQUIREMENT_UNBOUND = "REQUIREMENT_UNBOUND"  # a capability's requires key is unbound by the cell
+    REQUIREMENT_UNKNOWN_TARGET = "REQUIREMENT_UNKNOWN_TARGET"  # a binding names an unknown instance/signal
+    TIMEOUT_DISPOSITION_CONFLICT = "TIMEOUT_DISPOSITION_CONFLICT"  # on_timeout: hold on a not-abort-safe capability
 
 
 @dataclass(frozen=True)

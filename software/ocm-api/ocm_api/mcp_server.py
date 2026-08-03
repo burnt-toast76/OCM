@@ -293,8 +293,12 @@ def build_server(repo_root: str) -> FastMCP:
         '  call: place_instance(cell="bracket-asm-01", instance="pk1", module="com.example.pickhead.pk100@1.0.0", mount={"pose": {"xyz_mm": [2000, 300, 0], "rpy_deg": [0,0,0]}})\n'
         '  response: {"ok": false, "refusals": [{"code": "WORKSPACE_OVERHANG", "path": "modules.pk1.mount", "message": "...+X by 800.0 mm", "hint": "Move pk1 inside the base footprint (...)."}]}',
     ))
-    def place_instance(cell: str, instance: str, module: str, mount: dict[str, Any]) -> dict[str, Any]:
-        return api.place_instance(cell, instance, module, mount).to_dict()
+    def place_instance(
+        cell: str, instance: str, module: str, mount: dict[str, Any], requires: dict[str, str] | None = None
+    ) -> dict[str, Any]:
+        # ADR-0023: `requires` binds a capability's abstract requirement to a
+        # concrete `instance.signal` (e.g. {"workpiece_secured": "nest1.clamped"}).
+        return api.place_instance(cell, instance, module, mount, requires=requires).to_dict()
 
     @mcp.tool(description=_doc(
         "Reposition an already-placed instance's mount. Same live-refusal behavior as place_instance, "

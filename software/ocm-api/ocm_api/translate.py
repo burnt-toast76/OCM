@@ -163,6 +163,25 @@ _RE_UNRESOLVED_ENDPOINT = re.compile(
     r"refdes '[^']*' \([^)]*\) without naming|neither a port)"
 )
 
+# ADR-0023: plan-are-verbs conditions/requirements/timeouts. Module-scoped
+# (validate_module + set_plan) share the `module <loc> (<id>): ` stem; the
+# cell-scoped requirement-binding refusals use a `cell <id>: ` stem.
+_RE_CONDITION_UNKNOWN_SIGNAL = re.compile(
+    _CONN + r"capability '(?P<cap>[^']+)' (?:pre|post)condition .+ references '(?P<name>[^']+)', "
+    r"which is neither a comms signal nor a declared requires key"
+)
+_RE_TIMEOUT_DISPOSITION_CONFLICT = re.compile(
+    _CONN + r"capability '(?P<cap>[^']+)' declares on_timeout 'hold' but state_machine\.abort_safe is false"
+)
+_CELL = r"^cell (?P<cell>\S+): "
+_RE_REQUIREMENT_UNBOUND = re.compile(
+    _CELL + r"instance (?P<inst>\S+) \((?P<module_id>[^)]+)\) capability '(?P<cap>[^']+)' requires "
+    r"'(?P<req>[^']+)', which the cell binds to nothing \(instances declaring an input bool: (?P<candidates>\[.*\])\)"
+)
+_RE_REQUIREMENT_UNKNOWN_TARGET = re.compile(
+    _CELL + r"instance (?P<inst>\S+) binds requirement '(?P<req>[^']+)' to "
+)
+
 
 def _parse_pylist(text: str) -> list[str]:
     # `known ops: ['a', 'b']`-style Python repr of a list of strings --
@@ -331,6 +350,37 @@ def resolve_error_to_refusal(error: str) -> Refusal:
             path=f"modules['{m['loc']}']",
             message=error,
             hint="An endpoint may only name an existing port, or a refdes/ref/pin the placed component itself declares (ADR-0015).",
+        )
+
+    # ADR-0023: conditions / requirements / timeout disposition.
+    if m := _RE_CONDITION_UNKNOWN_SIGNAL.match(error):
+        return Refusal(
+            code=Codes.CONDITION_UNKNOWN_SIGNAL,
+            path=f"modules['{m['loc']}'].capabilities['{m['cap']}']",
+            message=error,
+            hint=f"Declare {m['name']!r} in comms.signals, add it to {m['cap']}'s requires, or fix the name -- conditions resolve statically (ADR-0023).",
+        )
+    if m := _RE_TIMEOUT_DISPOSITION_CONFLICT.match(error):
+        return Refusal(
+            code=Codes.TIMEOUT_DISPOSITION_CONFLICT,
+            path=f"modules['{m['loc']}'].capabilities['{m['cap']}'].on_timeout",
+            message=error,
+            hint="Use on_timeout: abort (a compromised part routes to reject), or make the module abort_safe only if a held op can truly resume.",
+        )
+    if m := _RE_REQUIREMENT_UNBOUND.match(error):
+        return Refusal(
+            code=Codes.REQUIREMENT_UNBOUND,
+            path=f"modules['{m['inst']}'].requires['{m['req']}']",
+            message=error,
+            allowed={"instances": _parse_pylist(m["candidates"])},
+            hint=f"Bind it on the instance: requires: {{{m['req']}: <instance>.<signal>}}. Instances declaring an input bool: {m['candidates']}.",
+        )
+    if m := _RE_REQUIREMENT_UNKNOWN_TARGET.match(error):
+        return Refusal(
+            code=Codes.REQUIREMENT_UNKNOWN_TARGET,
+            path=f"modules['{m['inst']}'].requires['{m['req']}']",
+            message=error,
+            hint="Point the binding at an 'instance.signal' that exists in this cell.",
         )
 
     return Refusal(code=Codes.CELL_INVALID, path="$", message=error)

@@ -277,7 +277,12 @@ def test_place_move_remove_instance(api: OcmApi):
 def test_set_plan(api: OcmApi):
     api.create_cell("assembly-b", "com.accelsolutions.base.frame1200@2.0.0")
     api.place_instance("assembly-b", "robot1", "com.universal-robots.ur5e@3.1.0", {"pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}})
-    api.place_instance("assembly-b", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"})
+    # ADR-0023: bind sd50's drive_screw requirement (no fixture here -- bind to
+    # sd1's own screw_present, an input bool that exists, so resolve is satisfied).
+    api.place_instance(
+        "assembly-b", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"},
+        requires={"workpiece_secured": "sd1.screw_present"},
+    )
     api.set_joint_state("assembly-b", "robot1", {"shoulder_lift_joint": -1.5707963267948966, "elbow_joint": 1.5707963267948966})
 
     e = api.set_plan("assembly-b", [{"step": "fasten", "module": "sd1", "op": "drive_screw", "params": {"torque_nm": 2.4}}])

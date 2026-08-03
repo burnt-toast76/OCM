@@ -33,6 +33,7 @@ from ocm_generator.coordinator import (  # noqa: E402
     DriverNotRegisteredError,
     DriverRegistry,
     HeartbeatStaleError,
+    PostconditionError,
     RobotAborted,
     RobotLink,
     SimulatedPackMLModule,
@@ -70,7 +71,15 @@ def _coordinator_cell_dict(features: dict[str, list[float]], for_each: list[str]
                 "mount": {"station": [400, 300], "pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}},
                 "joint_state": dict(_HOME_JOINT_STATE),
             },
-            {"instance": "sd1", "module": "com.accelsolutions.screwdriver.sd50@1.2.0", "mount": {"on": "robot1.flange"}},
+            {
+                "instance": "sd1",
+                "module": "com.accelsolutions.screwdriver.sd50@1.2.0",
+                "mount": {"on": "robot1.flange"},
+                # ADR-0023: bind drive_screw's workpiece_secured requirement to
+                # the nest -- the dogfood interlock. _Loopback sets nest1.clamped
+                # true (the nest itself isn't a simulated module here).
+                "requires": {"workpiece_secured": "nest1.clamped"},
+            },
             {
                 "instance": "nest1",
                 "module": "com.accelsolutions.fixture.pneumatic-nest@1.1.0",
@@ -126,6 +135,7 @@ class _Loopback:
         script: str,
         *,
         drive_screw_result_ok_for=None,
+        drive_screw_clear_screw_present: bool = True,
         op_delay_s: float = 0.01,
         trace_log_path=None,
         heartbeat_timeout_s: float | None = None,
@@ -140,11 +150,19 @@ class _Loopback:
 
         recipes = {
             "load_screw": default_load_screw_recipe,
-            "drive_screw": make_drive_screw_recipe(result_ok_for=drive_screw_result_ok_for or (lambda hole_id: True)),
+            "drive_screw": make_drive_screw_recipe(
+                result_ok_for=drive_screw_result_ok_for or (lambda hole_id: True),
+                clear_screw_present=drive_screw_clear_screw_present,
+            ),
         }
         self.module = SimulatedPackMLModule(bus=self.bus, instance="sd1", recipes=recipes, op_delay_s=op_delay_s, poll_interval_s=0.005)
 
     async def run(self, timeout: float = 10.0):
+        # ADR-0023: drive_screw now gates on workpiece_secured, bound to
+        # nest1.clamped. The nest isn't a simulated module in this loopback, so
+        # stand in for it: the part is held for the whole run. (The precondition
+        # timeout path is proven separately in test_coordinator_conditions.py.)
+        await self.bus.write("nest1", "clamped", True)
         module_task = asyncio.create_task(self.module.run())
         coordinator_task = asyncio.ensure_future(self.coordinator.run())
         robot_task = asyncio.ensure_future(self.robot.run())
@@ -223,6 +241,29 @@ def test_coordinator_withholds_done_step_while_screw_present_is_false(repo_root:
     # And the robot's own wait loop (spec/08's heartbeat-incrementing poll)
     # genuinely iterated more than once or twice -- not a single glance.
     assert loop.robot.wait_iterations[1] >= 5, loop.robot.wait_iterations
+
+
+# ---------------------------------------------------------------------------
+# ADR-0023 Decision 2: PackML Complete is not believed on its own. A module
+# reporting Complete while a declared postcondition reads false faults the cell.
+# ---------------------------------------------------------------------------
+
+
+def test_reported_complete_with_a_false_postcondition_faults_the_cell(repo_root: Path):
+    # The C.4 fixture: the simulated drive_screw reports Complete with
+    # result_ok true, but leaves screw_present TRUE -- so the capability's own
+    # `screw_present == false` postcondition reads false against the live bus.
+    # Complete alone must NOT advance the step; the coordinator faults.
+    resolved, script = _build_script(repo_root, {"hole_1": [12, 12, 0]}, ["hole_1"])
+    loop = _Loopback(resolved, script, drive_screw_clear_screw_present=False)
+
+    coordinator_outcome, robot_outcome = asyncio.run(loop.run())
+
+    assert isinstance(coordinator_outcome, PostconditionError)
+    assert "screw_present == false" in str(coordinator_outcome)
+    # hs_abort was dropped before the fault, so the robot halted rather than
+    # hanging on a coordinator that stopped advancing.
+    assert isinstance(robot_outcome, RobotAborted)
 
 
 # ---------------------------------------------------------------------------

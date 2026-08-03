@@ -146,6 +146,9 @@ def minimal_tool_manifest(
                 "name": "drive_screw",
                 "summary": "Drive a screw to a target torque.",
                 "parameters": {"torque_nm": {"type": "number", "unit": "N.m", "min": 0.2, "max": 5.0}},
+                # ADR-0023: timeout_s/on_timeout required; abort_safe is False so on_timeout must be "abort".
+                "timeout_s": 6.0,
+                "on_timeout": "abort",
             }
         ],
         "state_machine": {"model": "packml", "implements": ["idle", "execute"], "abort_safe": False},

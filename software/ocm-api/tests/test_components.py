@@ -51,7 +51,8 @@ def _tool_module_manifest(module_id: str, components: list[dict], signal_source:
             "com_mm": [0.0, 0.0, 50.0],
         },
         "state_machine": {"model": "packml", "implements": ["idle", "execute"], "abort_safe": False},
-        "capabilities": [{"name": "pick", "summary": "Pick a part."}],
+        # ADR-0023: timeout_s/on_timeout required; abort_safe is False so on_timeout must be "abort".
+        "capabilities": [{"name": "pick", "summary": "Pick a part.", "timeout_s": 6.0, "on_timeout": "abort"}],
         "comms": {"protocol": "ethercat", "signals": [signal]},
         "components": components,
     }

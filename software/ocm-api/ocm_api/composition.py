@@ -160,7 +160,14 @@ def _mutate_and_resolve(ws: Workspace, cell_id: str, mutate: Callable[[dict[str,
     )
 
 
-def place_instance(ws: Workspace, cell_id: str, instance: str, module_ref: str, mount: dict[str, Any]) -> Envelope:
+def place_instance(
+    ws: Workspace,
+    cell_id: str,
+    instance: str,
+    module_ref: str,
+    mount: dict[str, Any],
+    requires: dict[str, str] | None = None,
+) -> Envelope:
     def mutate(doc: dict[str, Any], warnings: list[str]) -> Refusal | None:
         modules = doc.setdefault("modules", [])
         if any(m.get("instance") == instance for m in modules):
@@ -174,7 +181,14 @@ def place_instance(ws: Workspace, cell_id: str, instance: str, module_ref: str, 
             incumbent = _find_tool_slot_incumbent(modules, mount_on)
             if incumbent is not None:
                 return _tool_slot_refusal(instance, mount_on, incumbent)
-        modules.append({"instance": instance, "module": module_ref, "mount": mount})
+        entry: dict[str, Any] = {"instance": instance, "module": module_ref, "mount": mount}
+        # ADR-0023 Decision 4: the cell's binding of a capability's abstract
+        # `requires:` to a concrete `instance.signal`. Written straight through
+        # (whether the target instance/signal exists is a resolve-time concern,
+        # like every other cross-instance reference).
+        if requires:
+            entry["requires"] = dict(requires)
+        modules.append(entry)
         return None
 
     return _mutate_and_resolve(ws, cell_id, mutate)

@@ -76,6 +76,8 @@ modules:
   module: com.accelsolutions.screwdriver.sd50@1.2.0
   mount:
     on: robot1.flange
+  requires:
+    workpiece_secured: nest1.clamped
 controller:
   runtime: beremiz
   target: revpi-connect-5

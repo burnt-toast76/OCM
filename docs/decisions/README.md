@@ -31,3 +31,4 @@ context was.
 | [0020](0020-carrier-identity.md) | Unit identity travels on the carrier | Accepted |
 | [0021](0021-record-journal.md) | The journal is the write; the store is declared | Accepted |
 | [0022](0022-lifecycle-and-agent-authority.md) | Lifecycle governs write authority; the agent edits manifests only | Accepted |
+| [0023](0023-plans-are-verbs.md) | The plan is verbs; conditions belong to modules | Accepted |

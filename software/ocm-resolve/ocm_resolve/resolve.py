@@ -13,6 +13,7 @@ finds rather than raising on the first one.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -260,6 +261,121 @@ def _check_module_components(
     return resolved_by_refdes
 
 
+_LHS_IDENT = re.compile(r"^\s*([a-z][a-z0-9_]*)")
+
+
+def _condition_lhs(expr: str) -> str:
+    """The signal/requirement NAME a condition reads -- the leading
+    identifier, whatever comparison follows it.
+
+    The coordinator's own grammar is `name == literal` (ADR-0023 Decision 7),
+    but this refusal is about whether the *name* is declared, not which
+    operator compares it. Some committed manifests predate the `==`-only
+    grammar and use `>` (dh200's `flow_actual > 0`); extracting the leading
+    identifier means those still resolve against a real signal instead of
+    being misreported as an unknown one. A grammar the coordinator can't yet
+    evaluate is a separate concern (the runtime `PreconditionError` backstop),
+    not a CONDITION_UNKNOWN_SIGNAL. Signal/requirement names match
+    `^[a-z][a-z0-9_]*`, so the leading identifier is unambiguous.
+    """
+    m = _LHS_IDENT.match(expr)
+    return m.group(1) if m else expr.strip()
+
+
+def _check_module_capabilities(location: str, module: Module, errors: list[str]) -> None:
+    """ADR-0023 module-scoped refusals, surfaced by validate_module and
+    (per instance) set_plan:
+
+    - CONDITION_UNKNOWN_SIGNAL: a pre/postcondition names something that is
+      neither a `comms.signals` name nor a declared `requires` key. This is
+      the resolve-time replacement for the coordinator's runtime
+      `PreconditionError` (Decision 5); a manifest that would fault the
+      coordinator on first contact must not validate clean.
+    - TIMEOUT_DISPOSITION_CONFLICT: `on_timeout: hold` on a capability whose
+      module is not abort-safe -- a held op cannot resume a compromised part
+      (Decision 6).
+    """
+    signal_names = {s.name for s in module.comms.signals} if module.comms else set()
+    abort_safe = module.state_machine.abort_safe
+
+    for cap in module.capabilities:
+        known = signal_names | set(cap.requires)
+        for kind, conditions in (("precondition", cap.preconditions), ("postcondition", cap.postconditions)):
+            for expr in conditions:
+                name = _condition_lhs(expr)
+                if name and name not in known:
+                    errors.append(
+                        f"module {location} ({module.id}): capability {cap.name!r} {kind} {expr!r} "
+                        f"references {name!r}, which is neither a comms signal nor a declared requires key "
+                        f"(known: {sorted(known)})"
+                    )
+        if cap.on_timeout == "hold" and abort_safe is False:
+            errors.append(
+                f"module {location} ({module.id}): capability {cap.name!r} declares on_timeout 'hold' "
+                f"but state_machine.abort_safe is false -- a held op cannot resume a compromised part"
+            )
+
+
+def _input_bool_instances(loaded: dict[str, ResolvedModuleInstance]) -> list[str]:
+    """Instance names whose module declares at least one input bool signal --
+    the candidate targets a `requires` key can be bound to. Named in the
+    REQUIREMENT_UNBOUND hint so the human's next move is obvious."""
+    out = []
+    for name, ri in loaded.items():
+        comms = ri.module.comms
+        if comms and any(s.direction == "input" and s.type == "bool" for s in comms.signals):
+            out.append(name)
+    return sorted(out)
+
+
+def _check_requirement_bindings(
+    cell: Cell, loaded: dict[str, ResolvedModuleInstance], errors: list[str]
+) -> None:
+    """ADR-0023 Decision 4, cell-scoped: every `requires` key a placed
+    instance's capabilities declare must be bound by the cell to a real
+    `instance.signal`.
+
+    - REQUIREMENT_UNBOUND: the instance carries a capability with a requires
+      key the cell binds nothing to.
+    - REQUIREMENT_UNKNOWN_TARGET: a binding names an instance not in the cell,
+      or a signal that instance doesn't declare.
+    """
+    for name, ri in loaded.items():
+        bindings = cell.module(name).requires
+        for cap in ri.module.capabilities:
+            for req_name in cap.requires:
+                target = bindings.get(req_name)
+                if target is None:
+                    candidates = _input_bool_instances(loaded)
+                    errors.append(
+                        f"cell {cell.id}: instance {name} ({ri.module.id}) capability {cap.name!r} "
+                        f"requires {req_name!r}, which the cell binds to nothing "
+                        f"(instances declaring an input bool: {candidates})"
+                    )
+                    continue
+                target_instance, sep, target_signal = target.partition(".")
+                if not sep or not target_instance or not target_signal:
+                    errors.append(
+                        f"cell {cell.id}: instance {name} binds requirement {req_name!r} to malformed "
+                        f"target {target!r} (expected 'instance.signal')"
+                    )
+                    continue
+                target_ri = loaded.get(target_instance)
+                if target_ri is None:
+                    errors.append(
+                        f"cell {cell.id}: instance {name} binds requirement {req_name!r} to {target!r}, "
+                        f"but no instance {target_instance!r} is in this cell (instances: {sorted(loaded)})"
+                    )
+                    continue
+                target_signals = {s.name for s in target_ri.module.comms.signals} if target_ri.module.comms else set()
+                if target_signal not in target_signals:
+                    errors.append(
+                        f"cell {cell.id}: instance {name} binds requirement {req_name!r} to {target!r}, "
+                        f"but {target_instance} ({target_ri.module.id}) declares no signal {target_signal!r} "
+                        f"(signals: {sorted(target_signals)})"
+                    )
+
+
 def resolve_module(module: Module, components_search_path: SearchPath | None = None) -> list[str]:
     """Cross-check ONE module in isolation, exactly the way resolve_cell does
     for each instance it loads: its `components:` list and signal `source`
@@ -276,6 +392,7 @@ def resolve_module(module: Module, components_search_path: SearchPath | None = N
     errors: list[str] = []
     resolved_components = _check_module_components(module.id, module, components_search_path, errors)
     check_module_connectivity(module.id, module, resolved_components, errors)
+    _check_module_capabilities(module.id, module, errors)
     return errors
 
 
@@ -298,6 +415,7 @@ def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: Se
     if base_module is not None:
         resolved_components = _check_module_components("base", base_module, components_search_path, errors)
         check_module_connectivity("base", base_module, resolved_components, errors)
+        _check_module_capabilities("base", base_module, errors)
 
     loaded: dict[str, ResolvedModuleInstance] = {}
     for mi in cell.modules:
@@ -307,6 +425,9 @@ def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: Se
             loaded[mi.instance] = ResolvedModuleInstance(instance=mi, module=module)
             resolved_components = _check_module_components(mi.instance, module, components_search_path, errors)
             check_module_connectivity(mi.instance, module, resolved_components, errors)
+            _check_module_capabilities(mi.instance, module, errors)
+
+    _check_requirement_bindings(cell, loaded, errors)
 
     resolved = _resolve_mounts(loaded, errors)
 

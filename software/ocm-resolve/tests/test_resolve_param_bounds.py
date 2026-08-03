@@ -116,6 +116,8 @@ def test_pose6d_param_is_not_bounds_checked(search_root):
                     "name": "place_part",
                     "summary": "Place a part at a given pose.",
                     "parameters": {"target_pose": {"type": "pose6d", "frame": "tool1.tcp"}},
+                    "timeout_s": 6.0,  # ADR-0023: required on every capability
+                    "on_timeout": "abort",
                 }
             ]
         ),
@@ -147,6 +149,8 @@ def test_vec3_and_struct_params_are_not_bounds_checked(search_root):
                         "offset": {"type": "vec3"},
                         "blob": {"type": "struct", "fields": {"a": "integer", "b": "boolean"}},
                     },
+                    "timeout_s": 6.0,  # ADR-0023: required on every capability
+                    "on_timeout": "abort",
                 }
             ]
         ),

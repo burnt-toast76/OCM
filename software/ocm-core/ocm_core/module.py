@@ -270,6 +270,22 @@ class Motion:
 
 
 @dataclass(frozen=True)
+class Requirement:
+    """ADR-0023: one entry in a capability's `requires` -- an abstract boolean
+    fact the capability needs, named without saying who provides it. The cell
+    binds each requirement to a concrete `instance.signal` (ADR-0015's
+    ports-and-nets pattern applied to logic).
+    """
+
+    type: str
+    summary: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Requirement":
+        return cls(type=data["type"], summary=data["summary"])
+
+
+@dataclass(frozen=True)
 class Capability:
     """A verb this module offers. The agent-facing surface."""
 
@@ -282,6 +298,13 @@ class Capability:
     results: dict[str, Parameter] = field(default_factory=dict)
     nominal_duration_s: float | None = None
     consumes: tuple[str, ...] = ()
+    # ADR-0023. `requires` is a mapping (requirement name -> Requirement),
+    # not a tuple: the cell binds each key to an instance.signal. `timeout_s`
+    # / `on_timeout` are schema-required on every capability; None only on an
+    # incomplete draft (ADR-0014), which the resolver refuses.
+    requires: dict[str, Requirement] = field(default_factory=dict)
+    timeout_s: float | None = None
+    on_timeout: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Capability":
@@ -298,6 +321,9 @@ class Capability:
             results={k: Parameter.from_dict(v) for k, v in data.get("results", {}).items()},
             nominal_duration_s=data.get("nominal_duration_s"),
             consumes=tuple(data.get("consumes", [])),
+            requires={k: Requirement.from_dict(v) for k, v in data.get("requires", {}).items()},
+            timeout_s=data.get("timeout_s"),
+            on_timeout=data.get("on_timeout"),
         )
 
 

@@ -321,8 +321,13 @@ def test_unavailable_plan_cell(api: OcmApi, monkeypatch: pytest.MonkeyPatch):
     api.create_cell("c17", "com.accelsolutions.base.frame1200@2.0.0")
     api.place_instance("c17", "robot1", "com.universal-robots.ur5e@3.1.0", {"pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}})
     api.set_joint_state("c17", "robot1", {"shoulder_lift_joint": -1.5707963267948966, "elbow_joint": 1.5707963267948966})
-    api.place_instance("c17", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"})
+    # nest1 first, so sd1 can bind its workpiece_secured requirement (ADR-0023)
+    # to a target that already exists.
     api.place_instance("c17", "nest1", "com.accelsolutions.fixture.pneumatic-nest@1.1.0", {"pose": {"xyz_mm": [640, 300, 0], "rpy_deg": [0, 0, 90]}})
+    api.place_instance(
+        "c17", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"},
+        requires={"workpiece_secured": "nest1.clamped"},
+    )
     part = {"id": "BRK-TEST", "features": {"hole_1": {"xyz_mm": [12, 12, 0], "normal": [0, 0, 1]}}}
     plan = [
         {"step": "clamp", "module": "nest1", "op": "clamp", "params": {"force_n": 120}},
