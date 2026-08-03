@@ -93,6 +93,7 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_HANDOFF_SAME_ROLE` | design | refuse | cell | ADR-0019 | deferred |
 | `OCM_IDENTITY_DOUBLE_CREATION` | design | refuse | line | ADR-0020 | deferred |
 | `OCM_IDENTITY_PORT_MISSING` | design | refuse | cell | ADR-0020 | deferred |
+| `OCM_LINK_ENDPOINT_NOT_A_PORT` | design | refuse | cell | ADR-0026 | deferred |
 | `OCM_MANUAL_MODE_SAFETY_UNRESOLVED` | design | refuse | cell | ADR-0024 | deferred |
 | `OCM_MEASUREMENT_NO_UNIT` | design | refuse | cell | ADR-0021 | deferred |
 | `OCM_MEASUREMENT_SOURCE_INVALID` | design | refuse | cell | ADR-0021 | deferred |

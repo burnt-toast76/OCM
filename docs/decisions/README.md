@@ -34,4 +34,4 @@ context was.
 | [0023](0023-plans-are-verbs.md) | The plan is verbs; conditions belong to modules | Accepted |
 | [0024](0024-manifest-authority-vs-command-authority.md) | Manifest authority and command authority are different axes | Accepted |
 | [0025](0025-refusal-phases-and-catalogue.md) | One refusal source, three evaluation phases | Accepted |
-| [0026](0026-a-port-is-what-a-net-can-name.md) | A port is what a net can name; everything else is a subsystem block | Accepted |
+| [0026](0026-a-port-is-what-a-net-can-name.md) | A port is what a net can name; everything else is a subsystem block | Accepted (Erratum 1) |

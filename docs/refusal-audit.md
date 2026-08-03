@@ -4,7 +4,7 @@ Companion to `spec/11-refusals.md` / `spec/schema/ocm-refusals-1.0.yaml` (ADR-00
 catalogue entry: where it is evaluated **today**, and the gap flag. This is a worklist, not an
 essay.
 
-**Counts.** 77 entries: 37 `live` (an engine emits them now), 40 `deferred` (an ADR names them;
+**Counts.** 78 entries: 37 `live` (an engine emits them now), 41 `deferred` (an ADR names them;
 no engine emits them yet). (ADR-0020 Erratum 1 split `OCM_IDENTITY_MISMATCH` into a local and a
 store code, +1 deferred.)
 
@@ -77,6 +77,7 @@ namespace.
 | `OCM_HANDOFF_SAME_ROLE` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_IDENTITY_DOUBLE_CREATION` | design/refuse | — nowhere yet | **unrunnable** |
 | `OCM_IDENTITY_PORT_MISSING` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_LINK_ENDPOINT_NOT_A_PORT` | design/refuse | — nowhere yet | structural (OCM_SCHEMA_INVALID) |
 | `OCM_MANUAL_MODE_SAFETY_UNRESOLVED` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_MEASUREMENT_NO_UNIT` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_MEASUREMENT_SOURCE_INVALID` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |

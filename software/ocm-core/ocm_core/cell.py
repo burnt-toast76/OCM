@@ -199,20 +199,21 @@ class CellSafety:
 
 @dataclass(frozen=True)
 class Endpoint:
-    """One end of a net or link. Names a cell `port` (+ optional `pin`), reaches
-    into a contained module via `{instance, port, pin}` (ADR-0026 D3), or names
-    the cell's `record_sink` via `sink`. Which combination is valid is a
+    """One end of a net or link. Names a cell `port` (+ optional `pin`), or
+    reaches into a contained module via `{instance, port, pin}` (ADR-0026 D3).
+    Nothing else -- ADR-0026 Erratum 1 removed the `sink` endpoint (a link
+    endpoint names a port; the record_sink is reached from the port via
+    `record_sink.port`, never named by a link). Which combination is valid is a
     resolve-time concern, not enforced here.
     """
 
     port: str | None = None
     instance: str | None = None
     pin: str | None = None
-    sink: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Endpoint":
-        return cls(port=data.get("port"), instance=data.get("instance"), pin=data.get("pin"), sink=data.get("sink"))
+        return cls(port=data.get("port"), instance=data.get("instance"), pin=data.get("pin"))
 
 
 @dataclass(frozen=True)
@@ -371,7 +372,10 @@ class ForwardTarget:
 
 @dataclass(frozen=True)
 class RecordSink:
-    """ADR-0021: where the cell's records drain to. Declared, not wired."""
+    """ADR-0021: where the cell's records drain to. Declared, not wired.
+    `port` (ADR-0026 Erratum 1) names the cell port this sink drains through --
+    the subsystem block references the port; a link never names the sink.
+    """
 
     journal: Journal
     forward: tuple[ForwardTarget, ...] = ()
@@ -379,6 +383,7 @@ class RecordSink:
     on_forward_unavailable: str | None = None
     buffer_max_events: int | None = None
     on_buffer_full: str | None = None
+    port: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "RecordSink":
@@ -389,6 +394,7 @@ class RecordSink:
             on_forward_unavailable=data.get("on_forward_unavailable"),
             buffer_max_events=data.get("buffer_max_events"),
             on_buffer_full=data.get("on_buffer_full"),
+            port=data.get("port"),
         )
 
 

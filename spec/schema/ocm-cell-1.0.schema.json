@@ -149,7 +149,7 @@
     },
     "links": {
       "type": "array",
-      "description": "ADR-0015/0026: communication connectivity as LINKS -- exactly two endpoints. Optional. A link end may name the `record_sink` (ADR-0026 Shape, L_TRACE), not only a port.",
+      "description": "ADR-0015/0026 (Erratum 1): communication connectivity as LINKS -- exactly two endpoints, each naming a port. Optional. The record_sink is NOT a valid endpoint; it is reached from the traceability port via record_sink.port, not named by a link.",
       "items": {
         "$ref": "#/$defs/link"
       }
@@ -293,6 +293,10 @@
           "enum": [
             "refuse"
           ]
+        },
+        "port": {
+          "type": "string",
+          "description": "ADR-0026 Erratum 1: the cell ports[].id this sink drains through (e.g. the traceability communication port). The subsystem block references the port -- a link never names the sink."
         }
       }
     },
@@ -581,7 +585,7 @@
     "endpoint": {
       "type": "object",
       "additionalProperties": false,
-      "description": "ADR-0015/0026: one end of a net or link. Names a cell `port` (+ optional `pin`), reaches into a contained module via `{instance, port, pin}` (ADR-0026 D3, reference-downward), or names the `record_sink` via `sink` (ADR-0026 Shape). Exactly-one-primary-reference and downward resolution are resolve-time concerns, not schema-enforced.",
+      "description": "ADR-0015/0026 (Erratum 1): one end of a net or link. Names a cell `port` (+ optional `pin`), or reaches into a contained module via `{instance, port, pin}` (ADR-0026 D3, reference-downward). Nothing else -- a link endpoint naming a non-port is rejected structurally (OCM_LINK_ENDPOINT_NOT_A_PORT, surfacing as OCM_SCHEMA_INVALID). Exactly-one-primary-reference and downward resolution are resolve-time concerns.",
       "properties": {
         "port": {
           "type": "string",
@@ -594,10 +598,6 @@
         "pin": {
           "type": "string",
           "description": "A pin on the named port -- resolves downward to a module port (ADR-0026 D3); the cell cannot create a pin."
-        },
-        "sink": {
-          "type": "string",
-          "description": "Names the cell's `record_sink` (a link end, ADR-0026 Shape). Not a port."
         }
       }
     },

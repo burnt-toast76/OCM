@@ -1,7 +1,11 @@
 # ADR-0026 — A port is what a net can name. Everything else is a subsystem block.
 
-**Status:** Accepted. Supersedes the `ports` shapes in ADR-0019 and ADR-0020; retroactively
-justifies ADR-0024's `mode_selector`. Prerequisite to the `cells/` schema.
+**Status:** Accepted, with Erratum 1 (2026-08-03) — see the end of this document. The Shape
+block's `{sink: record_sink}` link endpoint contradicted D1's own test (a link named a
+non-port); the erratum retires it — the `traceability` port is the endpoint, and the sink is
+reached from the port via `record_sink.port`. Supersedes the `ports` shapes in ADR-0019 and
+ADR-0020; retroactively justifies ADR-0024's `mode_selector`. Prerequisite to the `cells/`
+schema.
 
 ## Context
 
@@ -159,3 +163,33 @@ Refusals this admits:
 ADR-0015 (module connectivity), ADR-0017 (context is layered), ADR-0019 (cell interconnect),
 ADR-0020 (carrier identity), ADR-0021 (journal), ADR-0024 (command authority),
 ADR-0025 (refusal phases and catalogue)
+
+---
+
+## Erratum 1 (2026-08-03) — the `sink` endpoint let a link name a non-port
+
+Found while wiring the cell schema's endpoint shape into the refusal audit: the schema (and
+`ocm_core.cell.Endpoint`) let a link endpoint say `{sink: record_sink}`, following this ADR's
+own Shape block (`L_TRACE`).
+
+**What was wrong.** Decision 1 is a partition: what a net or link can name is a port; what it
+cannot name is not one. Decision 2 then made `record_sink` a subsystem block — not a port. The
+Shape block contradicted both by having a link name the sink directly, so the one test this ADR
+exists to state no longer partitioned cleanly: a link could name a non-port, and `record_sink`
+was half a port after all. The schema faithfully implemented the contradiction.
+
+**Correction — the `traceability` port is the link endpoint; the sink is reached from the
+port, not named directly.** A link endpoint names a port (a cell `ports[].id`, or a contained
+module's port via `{instance, port, pin}`) and nothing else. The `sink` field is removed from
+the endpoint shape. Where the record sink drains through the cell boundary, that association is
+declared on the **subsystem block**, pointing at the port — `record_sink.port: traceability` —
+which is the same reference-downward direction every other block uses. The Shape block's
+`L_TRACE` link is retired, not rewired: a link with only one real end was never a link.
+
+**Refusal this admits.** A link endpoint naming a non-port. With `sink` removed the schema
+enforces this structurally (`additionalProperties: false` on the endpoint), surfacing as
+`OCM_SCHEMA_INVALID`; catalogued as `OCM_LINK_ENDPOINT_NOT_A_PORT` so the rule has a name.
+
+**Unchanged.** Decision 1's test, verbatim — this erratum exists to keep it intact rather than
+carve out an exception. Decision 2's block list (`record_sink` stays a subsystem block).
+Decision 3's downward pin resolution. The `endpoint` shape's other fields.

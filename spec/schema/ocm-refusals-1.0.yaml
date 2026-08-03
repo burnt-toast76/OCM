@@ -355,8 +355,12 @@ OCM_SIGNAL_NO_ACTIVE_STATE:
   adr: ADR-0019
   layer: cell
   status: deferred
-  requires: "cell manifest `ports` schema"
   # ADR-0026 D4: `active` is a property of a NET now, not a signal on a port.
+  # The cells/ schema landed with `active` optional on a net (a purely internal
+  # net legitimately has none), so this is NOT schema-enforceable -- it awaits
+  # resolve logic that requires `active` on nets that cross the cell boundary
+  # (an endpoint on a cell port).
+  requires: "resolve logic over cell `nets` -- require `active` on boundary-crossing nets (schema landed, ADR-0026)"
   message: "Net {net_id} is declared without an active state"
 OCM_HANDOFF_PORT_NO_IO:
   phase: design
@@ -417,6 +421,14 @@ OCM_NET_PIN_NOT_EXPOSED:
   # exposed by a contained module port (ADR-0026 D3, reference-downward).
   requires: "cell manifest `ports` schema"
   message: "Net endpoint names cell port {port} pin {pin}, which no contained module port exposes"
+OCM_LINK_ENDPOINT_NOT_A_PORT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0026
+  layer: cell
+  status: deferred
+  requires: "STRUCTURAL -- ADR-0026 Erratum 1 removed the `sink` endpoint field; additionalProperties:false on the endpoint rejects any non-port reference; surfaces as OCM_SCHEMA_INVALID"
+  message: "Link {link} endpoint names {what}, which is not a port; the record_sink is reached via record_sink.port, never named by a link (ADR-0026 Erratum 1)"
 
 # --- Carrier identity (ADR-0020). Cycle-phase reads + line-scoped design. ---
 # ADR-0020 Erratum 1 Correction A: the LOCAL disagreement (two channels the cell
