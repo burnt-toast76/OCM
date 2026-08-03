@@ -1,6 +1,9 @@
 # ADR-0022 — Lifecycle state governs write authority; the agent edits manifests only
 
-**Status:** Accepted
+**Status:** Accepted. Decisions 1, 3, and 6 are amended in part by ADR-0024 (manifest
+authority and command authority are separated onto two axes; the D6 absolute is narrowed to
+the agent). The decisions below stay as written and readable as history — ADR-0024 carries the
+superseding reasoning (the house pattern; cf. ADR-0015 Erratum 1).
 
 ## Context
 
@@ -169,4 +172,5 @@ Refusals this admits:
 ## Related
 
 ADR-0012 (one refusal engine), ADR-0013 (generated HMIs), ADR-0016 (one validation surface),
-ADR-0017 (context is layered), ADR-0021 (journal and record sink)
+ADR-0017 (context is layered), ADR-0021 (journal and record sink), ADR-0024 (manifest
+authority vs command authority — amends D1, D3, D6)

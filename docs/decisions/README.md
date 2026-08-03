@@ -32,3 +32,5 @@ context was.
 | [0021](0021-record-journal.md) | The journal is the write; the store is declared | Accepted |
 | [0022](0022-lifecycle-and-agent-authority.md) | Lifecycle governs write authority; the agent edits manifests only | Accepted |
 | [0023](0023-plans-are-verbs.md) | The plan is verbs; conditions belong to modules | Accepted |
+| [0024](0024-manifest-authority-vs-command-authority.md) | Manifest authority and command authority are different axes | Accepted |
+| [0025](0025-refusal-phases-and-catalogue.md) | One refusal source, three evaluation phases | Accepted |

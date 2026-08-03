@@ -1,0 +1,31 @@
+name: refusal-catalogue
+
+# `ci/check_refusal_catalogue.py` enforces ADR-0025's two CI invariants against
+# spec/schema/ocm-refusals-1.0.yaml:
+#   1. every refusal code emitted anywhere in software/ appears in the catalogue,
+#   2. every `outcome: degrade` entry carries a `records:` field.
+#
+# Dependency-light on purpose (PyYAML + stdlib, no ocm-* imports), so like
+# fmt-check it runs without installing the packages under test. PyYAML is pulled
+# from the CI dependency lock (ci/requirements.txt) so the version is pinned and
+# reproducible -- see that file and .github/dependabot.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  refusal-catalogue:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML (pinned)
+        run: pip install -c ci/requirements.txt pyyaml
+
+      - run: python ci/check_refusal_catalogue.py

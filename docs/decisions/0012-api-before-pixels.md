@@ -1,6 +1,8 @@
 # ADR-0012 — The GUI and the AI agent are clients of one API
 
-**Status:** Accepted
+**Status:** Accepted. ADR-0025 restates what "singular" means here — one refusal *source*, not
+one *process* — after runtime refusals (ADRs 0019–0024) made the literal "server-side" reading
+false.
 
 ## Context
 

@@ -1,0 +1,188 @@
+# Refusal audit — worklist
+
+Companion to `spec/11-refusals.md` / `spec/schema/ocm-refusals-1.0.yaml` (ADR-0025). For every
+catalogue entry: where it is evaluated **today**, and the gap flag. This is a worklist, not an
+essay.
+
+**Counts.** 71 entries: 37 `live` (an engine emits them now), 34 `deferred` (an ADR names them;
+no engine emits them yet).
+
+## Namespace discrepancy (must reconcile)
+
+ADR-0025 D4 says codes are namespaced `OCM_`. The 37 codes engines emit today are **un-prefixed**
+(`SCHEMA_INVALID`, `NET_TOO_FEW_ENDPOINTS`, … — `software/ocm-api/ocm_api/envelope.py::Codes`).
+This pass keeps the emitted names verbatim (so the CI check matches real strings) and reserves
+`OCM_` for not-yet-emitted vocabulary. The result is a two-namespace catalogue. Reconciliation —
+either rename the live codes to `OCM_*` (an engine-behaviour change, out of scope for this
+doc-only pass) or amend ADR-0025 D4 to bless the bare design-phase names — is **open** and needs
+its own decision. Until then the split is intentional and documented here.
+
+## Flag legend
+
+- **unrunnable** — no phase/layer can evaluate it (the layer it needs does not exist).
+- **store-dependent** — a cycle-phase refusal that needs the record store, which ADR-0021 D6
+  permits to be unreachable.
+- **cell-no-schema** — needs a field of a `cells/` JSON schema that does not exist
+  (`spec/schema/` has only component + module schemas).
+- **declared-unimpl** — named by an ADR, in the catalogue, emitted by no engine.
+- **emitted-uncatalogued** — an engine emits it; no ADR describes it.
+- **spec/09-only** — an engine emits it; described narratively in spec/09 but in no ADR refusal
+  list (nearest ADR of record: ADR-0007).
+
+## Every entry
+
+| Code | Phase/Outcome | Evaluated today | Flag |
+|---|---|---|---|
+| `ALREADY_EXISTS` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `CELL_INVALID` | design/refuse | ocm-core loader → ocm-api/translate.py | — |
+| `COLLISION_DETECTED` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
+| `COMPONENT_HAS_NO_CONNECTORS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `CONDITION_UNKNOWN_SIGNAL` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `DANGLING_MOUNT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `DRAFT_MODULE_REFERENCED` | design/refuse | ocm-api verb (direct) | — |
+| `DRAFT_NOT_PUBLISHABLE` | design/refuse | ocm-api verb (direct) | — |
+| `DUPLICATE_REFDES` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `ETHERCAT_CHAIN_BROKEN` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `HUMAN_SIGNATURE_REQUIRED` | design/refuse | ocm-api verb (direct) | — |
+| `INVALID_ARGUMENT` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `INVALID_SOURCE` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `LINK_NON_COMMUNICATION_PORT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `LINK_PROTOCOL_MISMATCH` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `NET_TOO_FEW_ENDPOINTS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `NOT_FOUND` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `NO_FASTENING_STEP` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
+| `PARAM_OUT_OF_BOUNDS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `PATH_COLLISION` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
+| `PIN_ON_MULTIPLE_NETS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `PORT_UNCONNECTED` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `POSE_UNREACHABLE` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
+| `REQUIREMENT_UNBOUND` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `REQUIREMENT_UNKNOWN_TARGET` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `REVISION_MISMATCH` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `SCHEMA_INVALID` | design/refuse | ocm-core loader → ocm-api/translate.py | — |
+| `TIMEOUT_DISPOSITION_CONFLICT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `TOOL_SLOT_OCCUPIED` | design/refuse | ocm-api verb (direct) | — |
+| `UNKNOWN_COMPONENT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `UNKNOWN_MODULE` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `UNKNOWN_OP` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `UNKNOWN_PARAM` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `UNRESOLVED_ENDPOINT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `WORKSPACE_OVERHANG` | design/refuse | ocm-api verb (direct) | — |
+| `OCM_CARRIER_ENDURANCE_EXCEEDED` | design/refuse | — nowhere yet | **unrunnable** |
+| `OCM_COMMS_CHAIN_BROKEN` | design/refuse | — nowhere yet | declared-unimpl |
+| `OCM_HANDOFF_DIRECTION_MISMATCH` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_HANDOFF_PORT_NO_IO` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_HANDOFF_SAME_ROLE` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_IDENTITY_DOUBLE_CREATION` | design/refuse | — nowhere yet | **unrunnable** |
+| `OCM_IDENTITY_PORT_MISSING` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_MANUAL_MODE_SAFETY_UNRESOLVED` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_MEASUREMENT_NO_UNIT` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_MEASUREMENT_SOURCE_INVALID` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_NET_OVERPRESSURE` | design/refuse | — nowhere yet | declared-unimpl |
+| `OCM_NET_SIGNAL_CLASS_MISMATCH` | design/refuse | — nowhere yet | declared-unimpl |
+| `OCM_NET_TWO_DRIVERS` | design/refuse | — nowhere yet | declared-unimpl |
+| `OCM_NO_RECORD_SINK` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_PIN_REQUIRED_UNCONNECTED` | design/refuse | — nowhere yet | declared-unimpl |
+| `OCM_PNEUMATIC_PORT_MISMATCH` | design/refuse | — nowhere yet | declared-unimpl |
+| `OCM_SAFETY_NET_UNRATED` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_SIGNAL_NO_ACTIVE_STATE` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `AGENT_UNAVAILABLE` | load/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `UNAVAILABLE` | load/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `OCM_COMMISSIONING_EXIT_KEY_IN_EDIT` | load/refuse | — nowhere yet | declared-unimpl |
+| `OCM_COMMISSIONING_NO_KEYSWITCH` | load/refuse | — nowhere yet | declared-unimpl |
+| `OCM_JOURNAL_PATH_UNWRITABLE` | load/refuse | — nowhere yet | declared-unimpl |
+| `OCM_MANIFEST_ROOT_UNREADABLE` | load/refuse | — nowhere yet | declared-unimpl |
+| `OCM_MANIFEST_SHA_MISMATCH` | load/refuse | — nowhere yet | declared-unimpl |
+| `OCM_NO_MODE_SELECTOR` | load/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_REGENERATE_VERIFY_MISMATCH` | load/refuse | — nowhere yet | declared-unimpl |
+| `OCM_BINDING_UNVERIFIED` | cycle/degrade | — nowhere yet | declared-unimpl |
+| `OCM_BUFFER_FULL` | cycle/refuse | — nowhere yet | declared-unimpl |
+| `OCM_CARRIER_BOUND_TO_SCRAP` | cycle/refuse | — nowhere yet | **store-dependent** |
+| `OCM_CARRIER_STALE_BINDING` | cycle/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_COMMAND_PARAM_OUT_OF_BOUNDS` | cycle/refuse | — nowhere yet | declared-unimpl |
+| `OCM_DIAGNOSTIC_SOURCE_UNAVAILABLE` | cycle/advise | — nowhere yet | declared-unimpl |
+| `OCM_IDENTITY_MISMATCH` | cycle/refuse | — nowhere yet | **store-dependent** |
+| `OCM_MANUAL_OP_PRECONDITION_UNMET` | cycle/refuse | — nowhere yet | declared-unimpl |
+| `OCM_TAG_READBACK_MISMATCH` | cycle/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+
+## 1. Unrunnable — no phase can evaluate them
+
+| Code | ADR | Why unrunnable |
+|---|---|---|
+| `OCM_CARRIER_ENDURANCE_EXCEEDED` | ADR-0020 | Fleet endurance vs the line's cycle-count budget is a **line-scoped** check. ADR-0019 D5 deferred the line layer, so there is no manifest object that spans the cells whose cycles it must sum. |
+| `OCM_IDENTITY_DOUBLE_CREATION` | ADR-0020 | "Two cells in one line both create identity" can only be seen with all cells of a line in view. Same missing line layer. |
+
+These are exactly the two ADR-0025 predicted. No others surfaced: every remaining deferred entry
+has a phase that *could* run it once its schema field or runtime lands (below), whereas these two
+have no layer to run in at all. **Fix:** they wait on the line layer (a new ADR), not on a schema
+field.
+
+## 2. Store-dependent in cycle phase
+
+ADR-0021 D6 permits the record store to be unreachable without stopping the line. A **cycle**
+refusal that needs the store therefore cannot simply `refuse` — it would halt production on a
+store outage, the exact failure ADR-0021 rejects.
+
+| Code | Cataloged as | Should it be `degrade`? |
+|---|---|---|
+| `OCM_CARRIER_BOUND_TO_SCRAP` | refuse | **Yes → `degrade`**, recording e.g. `scrap_check: skipped`. With the store down the cell cannot know the unit is scrap; refusing would stop the line, absorbing would ship a scrap-bound carrier silently. Degrade-and-record is the legible middle, and a later query over that field finds every unit that ran uncross-checked. This is the same shape as `OCM_BINDING_UNVERIFIED` (already `degrade`). |
+| `OCM_IDENTITY_MISMATCH` | refuse | **Split.** The tag-vs-part-mark half is local (two on-carrier reads) and stays `refuse`. The tag-vs-**store**-binding half is store-dependent and should `degrade` (record `store_binding_checked: false`) when the store is unreachable, matching `OCM_BINDING_UNVERIFIED`. Catalogued as one code today; may need to split into the local and store halves. |
+| `OCM_BINDING_UNVERIFIED` | degrade ✓ | Already correct — the canonical case (records `binding_verified`). |
+
+## 3. Cell-layer refusals with no schema to stand on
+
+`spec/schema/` has only `ocm-component-1.0` and `ocm-module-1.0`. There is **no cell schema** —
+`cells/*.yaml` is validated by Python (`ocm-core/ocm_core/cell.py`) structurally. Four ADRs each
+say "cell manifests gain X"; every field they need is below. (Authoring the schema is out of
+scope here — this is the list it must cover.)
+
+| ADR | Cell field | For |
+|---|---|---|
+| ADR-0019 | `ports` — handoff ports (`smema-upstream`/`smema-downstream`, `role`, `domain`), handoff nets, safety-domain nets, signals with an `active` state | cell interconnect; the discrete-I/O handoff |
+| ADR-0020 | `identity` — a port type (reader → transcribed component) | reading part identity at cell entry |
+| ADR-0020 | `carriers` — fleet declaration (tag endurance, `warn`/`refuse` fractions, retirement) | carrier lifecycle and wear budget |
+| ADR-0021 | `produces` — measurements, each with `source` (→ component) and `unit` | what the cell records |
+| ADR-0021 | `record_sink` — where records drain to; buffer depth; `retention_days` | the journal sink |
+| ADR-0024 | `mode_selector` — `component`, `positions: [auto, manual, edit]`, `manual_mode_safety` | AUTO/MANUAL/EDIT command authority |
+
+**Precedent + anomaly:** ADR-0023 (plans-are-verbs) already added a per-instance `requires:` map
+to the cell — and it landed **without** a cell schema, parsed structurally in `cell.py`. So today
+cell fields are enforced by Python, not JSON Schema. Every refusal above is stuck behind that
+same missing schema (or a hand-rolled Python check like `requires`). A cell schema is the single
+biggest unblock in this audit.
+
+## 4. Declared but unimplemented
+
+All 34 `OCM_*` entries: named by an ADR, in the catalogue, emitted by no engine. They are the
+catalogue's honest core — the vocabulary is complete; the implementation is not. Grouped by what
+each waits on:
+
+- **Component schema field** (ADR-0015 D5 table 2): `OCM_NET_TWO_DRIVERS`,
+  `OCM_NET_SIGNAL_CLASS_MISMATCH`, `OCM_PIN_REQUIRED_UNCONNECTED`, `OCM_PNEUMATIC_PORT_MISMATCH`,
+  `OCM_NET_OVERPRESSURE`, `OCM_COMMS_CHAIN_BROKEN`.
+- **Cell schema field** (§3 above): the ADR-0019/0020/0021/0024 design-phase entries.
+- **Runtime load/cycle engine** (generated PLC / coordinator, on the machine): the ADR-0021/0022
+  load + cycle entries, and ADR-0024's command-path entries. These are the ones ADR-0025 D1 says
+  are *generated from* the catalogue, not hand-written.
+- **The line layer** (§1): the two unrunnables.
+
+## 5. Emitted but uncatalogued (by any ADR)
+
+Engines emit these; no ADR describes them. They are catalogued now (so CI passes and the
+vocabulary is closed) but have no ADR of record:
+
+| Code | Emitted by | Note |
+|---|---|---|
+| `NOT_FOUND`, `ALREADY_EXISTS`, `INVALID_ARGUMENT` | ocm-api verbs | API plumbing, not manifest refusals. Fine as-is; flagged so no one mistakes them for standardised vocabulary. |
+| `UNAVAILABLE`, `AGENT_UNAVAILABLE` | ocm-api verbs | Environment/infra gates (a missing optional extra; no API key), not manifest defects. `phase: load` is the closest fit. |
+| `POSE_UNREACHABLE`, `PATH_COLLISION`, `COLLISION_DETECTED`, `NO_FASTENING_STEP` | ocm-generator (plan/scene) | Described narratively in spec/09's `plan_cell` row but in **no ADR refusal list**. Nearest ADR of record: ADR-0007 (Tesseract). Candidate for a short "generation refusals" note in an ADR. |
+
+## Summary worklist
+
+1. **Reconcile the namespace** (bare vs `OCM_`) — decide rename-codes vs amend-ADR-0025-D4.
+2. **Author a `cells/` JSON schema** — unblocks the whole of §3 and most of §4.
+3. **Re-classify two store-dependent cycle refusals** to `degrade` (`OCM_CARRIER_BOUND_TO_SCRAP`;
+   the store half of `OCM_IDENTITY_MISMATCH`) with recorded fields.
+4. **The line layer** (new ADR) — the only home for the two unrunnables.
+5. **Give the four generation refusals an ADR of record** (or fold into ADR-0007).
+

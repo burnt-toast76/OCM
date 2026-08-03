@@ -13,4 +13,5 @@ CC BY-SA 4.0. The standard, independently implementable.
 | [08-robot-handshake.md](08-robot-handshake.md) | ✅ Step-counter handshake — RTDE binding, no coordination wiring |
 | [09-ocm-api.md](09-ocm-api.md) | 🟡 Draft — the one API surface for agents + GUI (ADR-0012) |
 | [10-components.md](10-components.md) | 🟡 Draft — components (transcribed) vs modules (designed), ADR-0014 |
+| [11-refusals.md](11-refusals.md) | 🟡 Draft — the refusal vocabulary is part of OCM: codes, phases, outcomes (ADR-0025) |
 | [schema/](schema/) | JSON Schema |

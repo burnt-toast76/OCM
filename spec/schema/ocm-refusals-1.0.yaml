@@ -1,0 +1,558 @@
+# OCM refusal catalogue — the vocabulary is part of the standard (ADR-0025).
+#
+# One source of refusal rules; three phases evaluate it (ADR-0025 D1):
+#   design — manifests only (ocm-resolve / validate_*)
+#   load   — manifests + machine environment, once at start-up / state change
+#   cycle  — live machine state, inside the cycle path (generated PLC/coordinator)
+#
+# outcome (ADR-0025 D3): refuse | degrade | advise.
+#   A `degrade` entry MUST carry a `records:` field (the fact written on the
+#   event so a later query can identify every affected unit). Enforced in CI.
+#
+# NAMING (ADR-0025 D4 says codes are namespaced `OCM_`). Two namespaces live
+# here, deliberately, and the split is the honest state of the repo today:
+#   * BARE codes (SCHEMA_INVALID, NET_TOO_FEW_ENDPOINTS, ...) are the codes
+#     `ocm-resolve` / `ocm-api` ALREADY emit (see software/ocm-api/ocm_api/
+#     envelope.py `Codes`). The task keeps the existing names rather than
+#     inventing a parallel `OCM_`-prefixed scheme; the CI check matches emitted
+#     strings against these keys verbatim.
+#   * OCM_ codes are vocabulary an ADR names but NO engine emits yet. They are
+#     `status: deferred` with a `requires:` note.
+# The bare-vs-OCM_ discrepancy, and the migration it implies, is documented in
+# docs/refusal-audit.md. Do not rename emitted codes in this doc-only pass.
+#
+# Fields per entry: phase, outcome, adr, layer, message; records (degrade only);
+# status + requires (deferred only).
+
+# ===========================================================================
+# DESIGN PHASE — emitted today by ocm-core / ocm-resolve / ocm-api / generator
+# ===========================================================================
+
+# --- Schema & authoring plumbing (ADR-0012 / ADR-0016) ---------------------
+SCHEMA_INVALID:
+  phase: design
+  outcome: refuse
+  adr: ADR-0016
+  layer: module
+  message: "Manifest failed schema validation: {detail}"
+DRAFT_NOT_PUBLISHABLE:
+  phase: design
+  outcome: refuse
+  adr: ADR-0016
+  layer: module
+  message: "Draft {id} is not publishable: {reason}"
+CELL_INVALID:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: cell
+  message: "Cell failed structural validation: {detail}"
+NOT_FOUND:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: api
+  message: "No {kind} {id}"
+ALREADY_EXISTS:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: api
+  message: "A {kind} {id} already exists"
+INVALID_ARGUMENT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: api
+  message: "{detail}"
+HUMAN_SIGNATURE_REQUIRED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: cell
+  message: "safety.verified_by is a human signature (spec/06); the API will not write it"
+
+# --- Component transcription (ADR-0014) ------------------------------------
+UNKNOWN_COMPONENT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0014
+  layer: module
+  message: "components entry {refdes} references unknown component {ref}"
+DUPLICATE_REFDES:
+  phase: design
+  outcome: refuse
+  adr: ADR-0014
+  layer: module
+  message: "two components entries share refdes {refdes}"
+INVALID_SOURCE:
+  phase: design
+  outcome: refuse
+  adr: ADR-0014
+  layer: module
+  message: "signal {signal} source provenance does not check out: {detail}"
+
+# --- Module connectivity, structural / implementable (ADR-0015 D5, table 1) -
+NET_TOO_FEW_ENDPOINTS:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  message: "Net {net_id} has {n} endpoint(s); a net requires at least 2"
+PIN_ON_MULTIPLE_NETS:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  message: "Pin {pin} appears on more than one net"
+UNRESOLVED_ENDPOINT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  message: "Endpoint {endpoint} names an unknown refdes/ref/pin/port"
+COMPONENT_HAS_NO_CONNECTORS:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  message: "Wired instance {refdes} whose component declares no {domain_noun}"  # ADR-0015 Erratum 1 D: domain-fit noun
+PORT_UNCONNECTED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  message: "Module port {port} is declared but on no net or link"
+LINK_NON_COMMUNICATION_PORT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  message: "Link {link} endpoint {endpoint} is on an electrical/pneumatic port, not a communication one"
+LINK_PROTOCOL_MISMATCH:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  message: "Link {link}'s two ends speak different protocols ({a} vs {b})"
+ETHERCAT_CHAIN_BROKEN:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  message: "EtherCAT chain reaches no master, loops, or leaves slave(s) unreached: {detail}"
+
+# --- Cell composition & placement (ADR-0012) -------------------------------
+UNKNOWN_MODULE:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: cell
+  message: "Instance {instance} references unknown module {ref}"
+REVISION_MISMATCH:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: cell
+  message: "Module {id} found but declares {found}, not {requested}"
+DANGLING_MOUNT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: cell
+  message: "mount.on {target} names no instance in this cell"
+DRAFT_MODULE_REFERENCED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0016
+  layer: cell
+  message: "Cell references draft (0.x) module {id}; only published modules resolve"
+WORKSPACE_OVERHANG:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: cell
+  message: "Instance {instance} extends beyond the workspace footprint ({direction} by {mm} mm)"
+TOOL_SLOT_OCCUPIED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: cell
+  message: "mount.on {mount_on} is already carrying {incumbent}; place never evicts"
+UNKNOWN_OP:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: cell
+  message: "Plan step names unknown op {op} on {instance} (available: {known})"
+UNKNOWN_PARAM:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: cell
+  message: "Op {op} has no parameter {param} (declared: {known})"
+PARAM_OUT_OF_BOUNDS:
+  phase: design
+  outcome: refuse
+  adr: ADR-0013
+  layer: cell
+  message: "Parameter {param}={value} is outside the capability's declared bounds [{min}, {max}]"
+
+# --- Generation: fastening plan, IK, collision (ADR-0007) ------------------
+NO_FASTENING_STEP:
+  phase: design
+  outcome: refuse
+  adr: ADR-0012
+  layer: cell
+  message: "Plan declares no fastening step for the coordinator to sequence"
+POSE_UNREACHABLE:
+  phase: design
+  outcome: refuse
+  adr: ADR-0007
+  layer: cell
+  message: "Pose at {feature} is unreachable by {robot}"
+PATH_COLLISION:
+  phase: design
+  outcome: refuse
+  adr: ADR-0007
+  layer: cell
+  message: "Path segment {segment} collides ({pair}) at t={t}"
+COLLISION_DETECTED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0007
+  layer: cell
+  message: "Scene contact at the composed state: {pair} (depth {depth} mm)"
+
+# --- Conditions belong to modules (ADR-0023, plans-are-verbs) --------------
+CONDITION_UNKNOWN_SIGNAL:
+  phase: design
+  outcome: refuse
+  adr: ADR-0023
+  layer: module
+  message: "Capability {cap} {kind}condition {expr} names {name}, neither a comms signal nor a declared requires key"
+TIMEOUT_DISPOSITION_CONFLICT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0023
+  layer: module
+  message: "Capability {cap} declares on_timeout 'hold' but state_machine.abort_safe is false"
+REQUIREMENT_UNBOUND:
+  phase: design
+  outcome: refuse
+  adr: ADR-0023
+  layer: cell
+  message: "Instance {instance} capability {cap} requires {req}, which the cell binds to nothing (candidates: {candidates})"
+REQUIREMENT_UNKNOWN_TARGET:
+  phase: design
+  outcome: refuse
+  adr: ADR-0023
+  layer: cell
+  message: "Instance {instance} binds requirement {req} to {target}, which does not resolve to a real instance.signal"
+
+# --- Infrastructure gates (emitted, but not a manifest refusal — see audit) -
+UNAVAILABLE:
+  phase: load
+  outcome: refuse
+  adr: ADR-0012
+  layer: api
+  message: "A required optional extra ({extra}) is not installed; this operation cannot run here"
+AGENT_UNAVAILABLE:
+  phase: load
+  outcome: refuse
+  adr: ADR-0012
+  layer: api
+  message: "The agent endpoint is not configured (no ANTHROPIC_API_KEY)"
+
+# ===========================================================================
+# DEFERRED VOCABULARY — named by an ADR, emitted by NO engine yet.
+# `OCM_` namespace (ADR-0025 D4). Each carries `status: deferred` + `requires`.
+# ===========================================================================
+
+# --- Module connectivity, deferred until a component field is transcribed
+#     (ADR-0015 D5, table 2) ------------------------------------------------
+OCM_NET_TWO_DRIVERS:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  status: deferred
+  requires: "component pin `direction`"
+  message: "Net {net_id} has two driving pins"
+OCM_NET_SIGNAL_CLASS_MISMATCH:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  status: deferred
+  requires: "component pin signal class"
+  message: "Net {net_id} joins endpoints of differing signal class"
+OCM_PIN_REQUIRED_UNCONNECTED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  status: deferred
+  requires: "component pin `required`"
+  message: "Required pin {pin} on {refdes} is left unconnected"
+OCM_PNEUMATIC_PORT_MISMATCH:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  status: deferred
+  requires: "component `pneumatic.ports[]` (function/thread)"
+  message: "Pneumatic net {net_id} joins ports whose function/size disagree"
+OCM_NET_OVERPRESSURE:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  status: deferred
+  requires: "component `pressure_max` + `pneumatic.ports[]`"
+  message: "Pneumatic net {net_id} pressure {p} exceeds endpoint {endpoint}'s rating"
+OCM_COMMS_CHAIN_BROKEN:
+  phase: design
+  outcome: refuse
+  adr: ADR-0015
+  layer: module
+  status: deferred
+  requires: "component `comms.connectors[]` with `role`"
+  message: "Communication chain {chain} does not resolve to a valid ordering"
+
+# --- Cell interconnect (ADR-0019). Design-phase, but the cells/ schema has no
+#     `ports` block yet, and ADR-0019 D5 deferred the line layer. -----------
+OCM_HANDOFF_DIRECTION_MISMATCH:
+  phase: design
+  outcome: refuse
+  adr: ADR-0019
+  layer: cell
+  status: deferred
+  requires: "cell manifest `ports` schema"
+  message: "smema-downstream port {port} directions do not oppose the smema-upstream port it is netted to"
+OCM_HANDOFF_SAME_ROLE:
+  phase: design
+  outcome: refuse
+  adr: ADR-0019
+  layer: cell
+  status: deferred
+  requires: "cell manifest `ports` schema"
+  message: "Handoff net {net_id} joins two ports of the same role"
+OCM_SAFETY_NET_UNRATED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0019
+  layer: cell
+  status: deferred
+  requires: "cell manifest `ports` schema"
+  message: "Safety-domain net {net_id} has an endpoint that is not a safety-rated component"
+OCM_SIGNAL_NO_ACTIVE_STATE:
+  phase: design
+  outcome: refuse
+  adr: ADR-0019
+  layer: cell
+  status: deferred
+  requires: "cell manifest `ports` schema"
+  message: "Handoff signal {signal} is declared without an active state"
+OCM_HANDOFF_PORT_NO_IO:
+  phase: design
+  outcome: refuse
+  adr: ADR-0019
+  layer: cell
+  status: deferred
+  requires: "cell manifest `ports` schema"
+  message: "Handoff port {port} signals do not resolve to real I/O on a transcribed component"
+
+# --- Carrier identity (ADR-0020). Cycle-phase reads + line-scoped design. ---
+OCM_IDENTITY_MISMATCH:
+  phase: cycle
+  outcome: refuse
+  adr: ADR-0020
+  layer: cell
+  status: deferred
+  requires: "cell `identity` port + runtime reader; store for the store-binding half"
+  message: "Carrier {carrier_id} tag unit_id disagrees with the part mark or the store binding"
+OCM_CARRIER_STALE_BINDING:
+  phase: cycle
+  outcome: refuse
+  adr: ADR-0020
+  layer: cell
+  status: deferred
+  requires: "cell `carriers` fleet declaration + runtime carrier tracking"
+  message: "Carrier {carrier_id} arrived at load with live binding {unit_id}"
+OCM_CARRIER_BOUND_TO_SCRAP:
+  phase: cycle
+  outcome: refuse
+  adr: ADR-0020
+  layer: cell
+  status: deferred
+  requires: "runtime record store reachable (see docs/refusal-audit.md: store-dependent)"
+  message: "Carrier {carrier_id} is bound to unit {unit_id} already dispositioned as scrap"
+OCM_TAG_READBACK_MISMATCH:
+  phase: cycle
+  outcome: refuse
+  adr: ADR-0020
+  layer: cell
+  status: deferred
+  requires: "cell `identity` port + runtime writer"
+  message: "Tag write read-back mismatch on carrier {carrier_id}"
+OCM_IDENTITY_PORT_MISSING:
+  phase: design
+  outcome: refuse
+  adr: ADR-0020
+  layer: cell
+  status: deferred
+  requires: "cell manifest `identity` port schema"
+  message: "Cell in a traceability line has no identity port, or a reader that does not resolve to a transcribed component"
+OCM_CARRIER_ENDURANCE_EXCEEDED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0020
+  layer: line
+  status: deferred
+  requires: "the line layer (ADR-0019 D5 deferred it); a fleet cycle-count budget"
+  message: "Carrier fleet {fleet}'s declared tag endurance cannot sustain the line's cycle count"
+OCM_IDENTITY_DOUBLE_CREATION:
+  phase: design
+  outcome: refuse
+  adr: ADR-0020
+  layer: line
+  status: deferred
+  requires: "the line layer (ADR-0019 D5 deferred it)"
+  message: "Two cells in one line both declare identity creation"
+
+# --- Record journal (ADR-0021). Load + cycle runtime; produces/record_sink
+#     need the cells/ schema. -------------------------------------------------
+OCM_MEASUREMENT_SOURCE_INVALID:
+  phase: design
+  outcome: refuse
+  adr: ADR-0021
+  layer: cell
+  status: deferred
+  requires: "cell `produces` schema + component measurement provenance"
+  message: "produces measurement {measurement} sourced from {source}, which cannot produce it"
+OCM_MEASUREMENT_NO_UNIT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0021
+  layer: cell
+  status: deferred
+  requires: "cell `produces` schema"
+  message: "Measurement {measurement} is declared without a unit"
+OCM_NO_RECORD_SINK:
+  phase: design
+  outcome: refuse
+  adr: ADR-0021
+  layer: cell
+  status: deferred
+  requires: "cell `produces` + `record_sink` schema"
+  message: "Cell declares produces but no record_sink"
+OCM_JOURNAL_PATH_UNWRITABLE:
+  phase: load
+  outcome: refuse
+  adr: ADR-0021
+  layer: cell
+  status: deferred
+  requires: "runtime journal path + start-up load phase engine"
+  message: "Journal path {path} is unwritable at start-up"
+OCM_BUFFER_FULL:
+  phase: cycle
+  outcome: refuse
+  adr: ADR-0021
+  layer: cell
+  status: deferred
+  requires: "runtime record buffer + generated cycle logic"
+  message: "Record buffer full ({n}/{depth}); refusing to start a cycle it cannot record"
+OCM_BINDING_UNVERIFIED:
+  phase: cycle
+  outcome: degrade
+  adr: ADR-0021
+  layer: cell
+  status: deferred
+  requires: "runtime record store (permitted unreachable, ADR-0021 D6) + degrade record path"
+  records: binding_verified
+  message: "Store unreachable; binding for {unit_id} not cross-checked"
+
+# --- Lifecycle & deployment (ADR-0022). Load-phase on the machine. ---------
+OCM_MANIFEST_SHA_MISMATCH:
+  phase: load
+  outcome: refuse
+  adr: ADR-0022
+  layer: cell
+  status: deferred
+  requires: "deployed manifest root + running program `manifest_sha`"
+  message: "Deployed manifest {manifest_sha} does not match running program {program_sha}"
+OCM_COMMISSIONING_NO_KEYSWITCH:
+  phase: load
+  outcome: refuse
+  adr: ADR-0022
+  layer: cell
+  status: deferred
+  requires: "machine binding + keyswitch input"
+  message: "Commissioning entered without a keyswitch assertion"
+OCM_REGENERATE_VERIFY_MISMATCH:
+  phase: load
+  outcome: refuse
+  adr: ADR-0022
+  layer: cell
+  status: deferred
+  requires: "deployed program + regenerate-and-verify step"
+  message: "Commissioning to Deployed: regenerate-and-verify does not reproduce the installed program"
+OCM_MANIFEST_ROOT_UNREADABLE:
+  phase: load
+  outcome: refuse
+  adr: ADR-0022
+  layer: cell
+  status: deferred
+  requires: "deployed manifest root on the machine"
+  message: "Manifest root is absent or unreadable on a machine in Deployed or Commissioning"
+OCM_DIAGNOSTIC_SOURCE_UNAVAILABLE:
+  phase: cycle
+  outcome: advise
+  adr: ADR-0022
+  layer: cell
+  status: deferred
+  requires: "runtime journal / live tags"
+  message: "Journal or live tags unavailable; answering the explanation only, not the diagnosis"
+
+# --- Command authority (ADR-0024). Cycle-phase commands + mode_selector. ----
+OCM_COMMAND_PARAM_OUT_OF_BOUNDS:
+  phase: cycle
+  outcome: refuse
+  adr: ADR-0024
+  layer: cell
+  status: deferred
+  requires: "runtime command path (the design-phase twin is PARAM_OUT_OF_BOUNDS)"
+  message: "Command parameter {param}={value} is outside the capability's declared bounds [{min}, {max}]"
+OCM_MANUAL_OP_PRECONDITION_UNMET:
+  phase: cycle
+  outcome: refuse
+  adr: ADR-0024
+  layer: cell
+  status: deferred
+  requires: "runtime coordinator in MANUAL (ADR-0013's rule, unchanged)"
+  message: "Manual op {op} issued with unsatisfied precondition {expr}; MANUAL relaxes sequencing, never interlocks"
+OCM_MANUAL_MODE_SAFETY_UNRESOLVED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0024
+  layer: cell
+  status: deferred
+  requires: "cell `mode_selector` schema"
+  message: "Cell declares manual_mode_safety that does not resolve to a safety-rated component"
+OCM_COMMISSIONING_EXIT_KEY_IN_EDIT:
+  phase: load
+  outcome: refuse
+  adr: ADR-0024
+  layer: cell
+  status: deferred
+  requires: "machine binding + keyswitch input"
+  message: "Commissioning to Deployed attempted while the key is still in EDIT"
+OCM_NO_MODE_SELECTOR:
+  phase: load
+  outcome: refuse
+  adr: ADR-0024
+  layer: cell
+  status: deferred
+  requires: "cell `mode_selector` schema + Deployed binding"
+  message: "Deployed cell has capabilities but no mode_selector"
