@@ -72,6 +72,14 @@ class Codes:
     OCM_UNIT_UNRECOGNISED = "OCM_UNIT_UNRECOGNISED"  # a unit string outside ocm_core.units' explicit table
     OCM_LINK_UNKNOWN = "OCM_LINK_UNKNOWN"  # component/structure names a link absent from the fragment (D4)
     OCM_ENVELOPE_OVERLAP = "OCM_ENVELOPE_OVERLAP"  # advise, not refuse (D5): overlapping envelopes surfaced
+    # ADR-0028: a capability declares the joints it actuates.
+    OCM_ACTUATION_JOINT_UNKNOWN = "OCM_ACTUATION_JOINT_UNKNOWN"  # actuates a joint absent from the fragment
+    OCM_ACTUATION_JOINT_FIXED = "OCM_ACTUATION_JOINT_FIXED"  # actuates a fixed joint -- no configurable position
+    OCM_ACTUATION_UNIT_MISMATCH = "OCM_ACTUATION_UNIT_MISMATCH"  # length unit on a revolute joint, or angular on prismatic (D2)
+    OCM_ACTUATION_OUT_OF_LIMIT = "OCM_ACTUATION_OUT_OF_LIMIT"  # target outside the joint's own <limit> (D3)
+    OCM_ACTUATION_CONFLICT = "OCM_ACTUATION_CONFLICT"  # one capability actuates the same joint twice
+    OCM_JOINT_STATE_OUT_OF_LIMIT = "OCM_JOINT_STATE_OUT_OF_LIMIT"  # cell joint_state beyond the joint's <limit> (D3 retrofit)
+    OCM_JOINT_UNACTUATED = "OCM_JOINT_UNACTUATED"  # advise: a movable joint no capability actuates (D4)
     # ADR-0023: the plan is verbs; conditions belong to modules.
     OCM_CONDITION_UNKNOWN_SIGNAL = "OCM_CONDITION_UNKNOWN_SIGNAL"  # a pre/postcondition names no known signal or requires key
     OCM_REQUIREMENT_UNBOUND = "OCM_REQUIREMENT_UNBOUND"  # a capability's requires key is unbound by the cell

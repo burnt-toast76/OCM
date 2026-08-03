@@ -328,6 +328,24 @@ class Motion:
 
 
 @dataclass(frozen=True)
+class Actuation:
+    """ADR-0028 D1: one joint a capability drives, and the value it holds when
+    the postcondition is true. `joint` is the module's own urdf_fragment joint
+    name, unnamespaced; `units` is required and resolved through
+    ocm_core.units, type-checked against the joint's type at resolve (D2).
+    No `from` -- the precondition already asserts where the machine was.
+    """
+
+    joint: str
+    to: float
+    units: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Actuation":
+        return cls(joint=data["joint"], to=float(data["to"]), units=data["units"])
+
+
+@dataclass(frozen=True)
 class Requirement:
     """ADR-0023: one entry in a capability's `requires` -- an abstract boolean
     fact the capability needs, named without saying who provides it. The cell
@@ -363,6 +381,8 @@ class Capability:
     requires: dict[str, Requirement] = field(default_factory=dict)
     timeout_s: float | None = None
     on_timeout: str | None = None
+    # ADR-0028 D1: the joints this verb drives. Empty = moves nothing (D4).
+    actuates: tuple[Actuation, ...] = ()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Capability":
@@ -382,6 +402,7 @@ class Capability:
             requires={k: Requirement.from_dict(v) for k, v in data.get("requires", {}).items()},
             timeout_s=data.get("timeout_s"),
             on_timeout=data.get("on_timeout"),
+            actuates=tuple(Actuation.from_dict(a) for a in data.get("actuates", [])),
         )
 
 

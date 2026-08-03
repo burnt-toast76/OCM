@@ -4,7 +4,7 @@ Companion to `spec/11-refusals.md` / `spec/schema/ocm-refusals-1.0.yaml` (ADR-00
 catalogue entry: where it is evaluated **today**, and the gap flag. This is a worklist, not an
 essay.
 
-**Counts.** 87 entries: 45 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
+**Counts.** 94 entries: 52 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
 no engine emits them yet). (ADR-0020 Erratum 1 split `OCM_IDENTITY_MISMATCH` into a local and a
 store code, +1 deferred.)
 
@@ -33,6 +33,11 @@ namespace.
 
 | Code | Phase/Outcome | Evaluated today | Flag |
 |---|---|---|---|
+| `OCM_ACTUATION_CONFLICT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_ACTUATION_JOINT_FIXED` | design/refuse | ocm-generator scene/actuation → validate_module | — |
+| `OCM_ACTUATION_JOINT_UNKNOWN` | design/refuse | ocm-generator scene/actuation → validate_module | — |
+| `OCM_ACTUATION_OUT_OF_LIMIT` | design/refuse | ocm-generator scene/actuation → validate_module | — |
+| `OCM_ACTUATION_UNIT_MISMATCH` | design/refuse | ocm-generator scene/actuation → validate_module | — |
 | `OCM_ALREADY_EXISTS` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_AUTHORED_COLLISION_MISSING` | design/refuse | ocm-generator collision_geometry → validate_module | — |
 | `OCM_CELL_INVALID` | design/refuse | ocm-core loader → ocm-api/translate.py | — |
@@ -52,6 +57,8 @@ namespace.
 | `OCM_HUMAN_SIGNATURE_REQUIRED` | design/refuse | ocm-api verb (direct) | — |
 | `OCM_INVALID_ARGUMENT` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_INVALID_SOURCE` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_JOINT_STATE_OUT_OF_LIMIT` | design/refuse | ocm-generator scene/build (joint_state) | — |
+| `OCM_JOINT_UNACTUATED` | design/advise | ocm-generator scene/actuation → validate_module | — |
 | `OCM_LINK_NON_COMMUNICATION_PORT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_LINK_PROTOCOL_MISMATCH` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_LINK_UNKNOWN` | design/refuse | ocm-generator collision_geometry → validate_module | — |

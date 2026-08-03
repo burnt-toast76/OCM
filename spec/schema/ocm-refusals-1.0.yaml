@@ -707,3 +707,56 @@ OCM_ENVELOPE_OVERLAP:
   # records the overlapping pair so every flagged placement is identifiable.
   records: envelope_overlap_pair
   message: "{id}: envelopes of {refdes_a} and {refdes_b} overlap at their declared poses -- surfaced, not gated (D5)"
+
+# --- A capability declares the joints it actuates (ADR-0028). All phase
+#     design. LIVE: OCM_ACTUATION_CONFLICT + the actuation arm of
+#     OCM_UNIT_UNRECOGNISED from ocm-resolve (manifest-only); the fragment-
+#     dependent five from the generator's actuation checks through
+#     validate_module; OCM_JOINT_STATE_OUT_OF_LIMIT from scene build (the D3
+#     retrofit, cell layer). OCM_JOINT_UNACTUATED is advise, never refuse (D4).
+OCM_ACTUATION_JOINT_UNKNOWN:
+  phase: design
+  outcome: refuse
+  adr: ADR-0028
+  layer: module
+  message: "Capability {cap} actuates joint {joint}, absent from this module's urdf_fragment (has: {known})"
+OCM_ACTUATION_JOINT_FIXED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0028
+  layer: module
+  message: "Capability {cap} actuates {joint}, a fixed joint -- no configurable position"
+OCM_ACTUATION_UNIT_MISMATCH:
+  phase: design
+  outcome: refuse
+  adr: ADR-0028
+  layer: module
+  message: "Capability {cap} gives {joint} a {kind} unit {units}; a {joint_type} joint takes {expected}"
+OCM_ACTUATION_OUT_OF_LIMIT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0028
+  layer: module
+  message: "Capability {cap} drives {joint} to {value} {units}, outside its declared limit [{lower}, {upper}] (a revolute joint with no <limit> refuses here too -- malformed URDF, not a silent pass)"
+OCM_ACTUATION_CONFLICT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0028
+  layer: module
+  message: "Capability {cap} actuates {joint} more than once"
+OCM_JOINT_STATE_OUT_OF_LIMIT:
+  phase: design
+  outcome: refuse
+  adr: ADR-0028
+  layer: cell
+  message: "Instance {inst}: joint_state drives {joint} to {value}, outside its declared limit [{lower}, {upper}]"
+OCM_JOINT_UNACTUATED:
+  phase: design
+  outcome: advise
+  adr: ADR-0028
+  layer: module
+  # advise, never refuse (D4): the engine cannot tell a genuinely passive
+  # joint from an unfinished manifest, so it says so on the completion list.
+  # The advisory records the joint so every flagged fragment is identifiable.
+  records: unactuated_joint
+  message: "Module {id}: movable joint {joint} is actuated by no capability"

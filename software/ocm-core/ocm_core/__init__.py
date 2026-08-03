@@ -36,6 +36,7 @@ from .component import (
 from .errors import CellLoadError, ManifestValidationError, OcmCoreError
 from .loader import load_cell, load_component, load_module, load_schema, validate_module_dict
 from .module import (
+    Actuation,
     Capability,
     Comms,
     ComponentRef,
@@ -67,10 +68,13 @@ from .module import (
     WearItem,
 )
 from .parameter import Frame, Parameter
-from .units import UnknownUnitError, known_length_units, length_to_mm
+from .units import UnknownUnitError, angle_to_rad, known_angle_units, known_length_units, length_to_mm
 from .yaml_rt import new_yaml_rt
 
 __all__ = [
+    "Actuation",
+    "known_angle_units",
+    "angle_to_rad",
     "length_to_mm",
     "known_length_units",
     "UnknownUnitError",

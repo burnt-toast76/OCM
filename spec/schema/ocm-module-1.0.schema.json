@@ -753,6 +753,34 @@
               "abort"
             ],
             "description": "ADR-0023: disposition when timeout_s expires. hold -> PackML Held (nothing damaged; operator clears and resumes). abort -> Abort (part compromised, routes to reject). hold on a capability whose state_machine.abort_safe is false refuses (OCM_TIMEOUT_DISPOSITION_CONFLICT)."
+          },
+          "actuates": {
+            "type": "array",
+            "minItems": 1,
+            "description": "ADR-0028 D1: the joints this verb drives and the value each holds when the postcondition is true -- the geometric half of the verb. Joint names are this module's own urdf_fragment's, unnamespaced. `to` is the endpoint only (no `from`: the precondition asserts where the machine was); `units` is REQUIRED and resolved through ocm_core.units, type-checked against the joint (D2 -- a bare number meaning metres-or-radians by context is the silent-plausible-value failure the refusal engine exists to exclude). Optional: a capability with no `actuates` moves nothing (D4), which is a legitimate description, not a gap.",
+            "items": {
+              "type": "object",
+              "required": [
+                "joint",
+                "to",
+                "units"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "joint": {
+                  "type": "string",
+                  "description": "A joint name in this module's own urdf_fragment (unnamespaced). Unknown, fixed, or limit-violating targets refuse at resolve (OCM_ACTUATION_*)."
+                },
+                "to": {
+                  "type": "number",
+                  "description": "The value the joint holds when the postcondition is true, in `units`."
+                },
+                "units": {
+                  "type": "string",
+                  "description": "Verbatim unit, resolved by ocm_core.units' explicit tables -- length for prismatic, angle for revolute/continuous; a mismatch refuses (OCM_ACTUATION_UNIT_MISMATCH)."
+                }
+              }
+            }
           }
         }
       }

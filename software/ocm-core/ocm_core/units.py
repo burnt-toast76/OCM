@@ -26,6 +26,8 @@ Policy, non-negotiable:
 
 from __future__ import annotations
 
+import math
+
 
 class UnknownUnitError(ValueError):
     """A unit string the explicit table does not recognise. The caller turns
@@ -54,6 +56,13 @@ _LENGTH_TO_MM: dict[str, float] = {
     "ft": 304.8,
 }
 
+# Verbatim unit string -> exact factor to radians (ADR-0028 D2: an actuation
+# target's unit is explicit and resolved here, never inferred from the joint).
+_ANGLE_TO_RAD: dict[str, float] = {
+    "deg": math.pi / 180.0,
+    "rad": 1.0,
+}
+
 
 def known_length_units() -> tuple[str, ...]:
     return tuple(_LENGTH_TO_MM)
@@ -68,4 +77,20 @@ def length_to_mm(value: float, unit: str) -> float:
         factor = _LENGTH_TO_MM[unit]
     except KeyError:
         raise UnknownUnitError(unit, "length", known_length_units()) from None
+    return float(value) * factor
+
+
+def known_angle_units() -> tuple[str, ...]:
+    return tuple(_ANGLE_TO_RAD)
+
+
+def angle_to_rad(value: float, unit: str) -> float:
+    """Convert an angle in the given verbatim unit to radians.
+
+    Raises UnknownUnitError for any unit string not in the explicit table.
+    """
+    try:
+        factor = _ANGLE_TO_RAD[unit]
+    except KeyError:
+        raise UnknownUnitError(unit, "angle", known_angle_units()) from None
     return float(value) * factor

@@ -43,6 +43,7 @@ REGISTRY: dict[str, object] = {
     "<root>.comms": module_mod.Comms,
     "<root>.comms.signals[]": module_mod.Signal,
     "<root>.capabilities[]": module_mod.Capability,
+    "<root>.capabilities[].actuates[]": module_mod.Actuation,
     "<root>.capabilities[].motion": module_mod.Motion,
     "<root>.capabilities[].motion.path": module_mod.PathSpec,
     "<root>.capabilities[].requires.<additionalProperties>": module_mod.Requirement,

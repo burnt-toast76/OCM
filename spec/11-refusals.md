@@ -49,6 +49,11 @@ field, a layer, or a runtime that does not exist yet).
 
 | Code | Phase | Outcome | Layer | ADR | Status |
 |---|---|---|---|---|---|
+| `OCM_ACTUATION_CONFLICT` | design | refuse | module | ADR-0028 | live |
+| `OCM_ACTUATION_JOINT_FIXED` | design | refuse | module | ADR-0028 | live |
+| `OCM_ACTUATION_JOINT_UNKNOWN` | design | refuse | module | ADR-0028 | live |
+| `OCM_ACTUATION_OUT_OF_LIMIT` | design | refuse | module | ADR-0028 | live |
+| `OCM_ACTUATION_UNIT_MISMATCH` | design | refuse | module | ADR-0028 | live |
 | `OCM_ALREADY_EXISTS` | design | refuse | api | ADR-0012 | live |
 | `OCM_AUTHORED_COLLISION_MISSING` | design | refuse | module | ADR-0027 | live |
 | `OCM_CELL_INVALID` | design | refuse | cell | ADR-0012 | live |
@@ -68,6 +73,8 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_HUMAN_SIGNATURE_REQUIRED` | design | refuse | cell | ADR-0012 | live |
 | `OCM_INVALID_ARGUMENT` | design | refuse | api | ADR-0012 | live |
 | `OCM_INVALID_SOURCE` | design | refuse | module | ADR-0014 | live |
+| `OCM_JOINT_STATE_OUT_OF_LIMIT` | design | refuse | cell | ADR-0028 | live |
+| `OCM_JOINT_UNACTUATED` | design | advise | module | ADR-0028 | live |
 | `OCM_LINK_NON_COMMUNICATION_PORT` | design | refuse | module | ADR-0015 | live |
 | `OCM_LINK_PROTOCOL_MISMATCH` | design | refuse | module | ADR-0015 | live |
 | `OCM_LINK_UNKNOWN` | design | refuse | module | ADR-0027 | live |

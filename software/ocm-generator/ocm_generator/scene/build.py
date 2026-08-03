@@ -192,6 +192,21 @@ def _validate_joint_state(
                 f"module {name}: joint_state names {joint_name!r}, which is a fixed joint (no configurable position)"
             )
             continue
+        # ADR-0028 D3 retrofit: a cell-supplied joint value is the same class
+        # of claim as a capability's actuation target, so it gets the same
+        # limit check -- a joint driven through its own stop is a fabricated
+        # machine state. Continuous joints have no limits and are exempt.
+        limit_el = joint_el.find("limit")
+        if joint_el.get("type") != "continuous" and limit_el is not None:
+            lower_attr, upper_attr = limit_el.get("lower"), limit_el.get("upper")
+            if lower_attr is not None and upper_attr is not None:
+                lower, upper = float(lower_attr), float(upper_attr)
+                if not (lower <= float(value) <= upper):
+                    errors.append(
+                        f"OCM_JOINT_STATE_OUT_OF_LIMIT: instance {name!r}: joint_state drives "
+                        f"{joint_name!r} to {value}, outside its declared limit [{lower}, {upper}]"
+                    )
+                    continue
         joint_state_out[namespaced] = float(value)
 
 

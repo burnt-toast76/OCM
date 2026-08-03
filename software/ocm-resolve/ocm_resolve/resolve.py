@@ -315,6 +315,29 @@ def _check_module_capabilities(location: str, module: Module, errors: list[str])
                 f"but state_machine.abort_safe is false -- a held op cannot resume a compromised part"
             )
 
+        # ADR-0028 manifest-only checks. Which unit table applies depends on
+        # the JOINT TYPE, which lives in the urdf_fragment -- a file this
+        # manifest-only pass deliberately doesn't read. So here a unit is
+        # accepted if EITHER table recognises it; the length-vs-angle
+        # coherence check (OCM_ACTUATION_UNIT_MISMATCH) is the generator's
+        # fragment-dependent pass, not this one.
+        from ocm_core.units import known_angle_units, known_length_units
+
+        seen_joints: set[str] = set()
+        for act in cap.actuates:
+            if act.joint in seen_joints:
+                errors.append(
+                    f"module {location} ({module.id}): capability {cap.name!r} actuates joint "
+                    f"{act.joint!r} more than once"
+                )
+            seen_joints.add(act.joint)
+            if act.units not in known_length_units() and act.units not in known_angle_units():
+                errors.append(
+                    f"module {location} ({module.id}): capability {cap.name!r} actuation unit "
+                    f"{act.units!r} is unrecognised (known: "
+                    f"{sorted(known_length_units() + known_angle_units())})"
+                )
+
 
 def _input_bool_instances(loaded: dict[str, ResolvedModuleInstance]) -> list[str]:
     """Instance names whose module declares at least one input bool signal --

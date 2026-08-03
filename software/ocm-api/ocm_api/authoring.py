@@ -323,6 +323,19 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
             )
             warnings.extend(advisories)
 
+            # ADR-0028: the fragment-dependent actuation checks (joint exists,
+            # is movable, unit matches the joint's kind, target within its
+            # <limit>) plus the D4 unactuated-joint advisory -- same pattern,
+            # same one validation surface.
+            from ocm_generator.scene.actuation import check_module_actuation
+
+            act_refusals, act_advisories = check_module_actuation(module, module_dir)
+            refusals.extend(
+                Refusal(code=getattr(Codes, code), path=path, message=message)
+                for code, path, message in act_refusals
+            )
+            warnings.extend(act_advisories)
+
     if refusals:
         return Envelope.refuse(refusals, warnings=warnings)
     return Envelope.succeed({"id": module_id, "valid": True}, warnings=warnings)

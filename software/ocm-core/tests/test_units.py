@@ -27,3 +27,25 @@ def test_unrecognised_unit_refuses_never_guesses():
 
 def test_known_units_is_the_explicit_table():
     assert set(known_length_units()) == {"mm", "cm", "m", "in", "ft"}
+
+
+def test_exact_angle_conversions():
+    import math
+
+    from ocm_core import angle_to_rad, known_angle_units
+
+    assert angle_to_rad(180, "deg") == pytest.approx(math.pi)
+    assert angle_to_rad(1.5, "rad") == 1.5
+    assert set(known_angle_units()) == {"deg", "rad"}
+
+
+def test_unrecognised_angle_unit_refuses_never_guesses():
+    from ocm_core import angle_to_rad, known_angle_units
+
+    # 'degree'/'degrees'/'°' are deliberately NOT normalised -- same discipline
+    # as the length table (ADR-0028 D2 leans on ADR-0014's verbatim policy).
+    for bad in ("degree", "degrees", "°", "grad", "turn", "rev", ""):
+        with pytest.raises(UnknownUnitError) as exc:
+            angle_to_rad(1, bad)
+        assert exc.value.kind == "angle"
+        assert exc.value.known == known_angle_units()

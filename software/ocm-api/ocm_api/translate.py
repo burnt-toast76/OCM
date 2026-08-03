@@ -183,8 +183,13 @@ _RE_DERIVED_ENVELOPE_MISSING = re.compile(
     r"declares no complete geometry\.envelope"
 )
 _RE_UNIT_UNRECOGNISED = re.compile(
-    _CONN + r"(?:component (?P<refdes>\S+) envelope|structure (?P<struct>\S+)) unit "
+    _CONN + r"(?:component (?P<refdes>\S+) envelope|structure (?P<struct>\S+)|"
+    r"capability '(?P<cap>[^']+)' actuation) unit "
     r"'(?P<unit>[^']+)' is unrecognised"
+)
+# ADR-0028: two actuates entries in one capability naming the same joint.
+_RE_ACTUATION_CONFLICT = re.compile(
+    _CONN + r"capability '(?P<cap>[^']+)' actuates joint '(?P<joint>[^']+)' more than once"
 )
 _CELL = r"^cell (?P<cell>\S+): "
 _RE_REQUIREMENT_UNBOUND = re.compile(
@@ -415,6 +420,13 @@ def resolve_error_to_refusal(error: str) -> Refusal:
             path=f"modules['{m['loc']}']",
             message=error,
             hint="Use a unit from ocm_core.units' explicit table, or add the datasheet's verbatim spelling there -- never guess (ADR-0027).",
+        )
+    if m := _RE_ACTUATION_CONFLICT.match(error):
+        return Refusal(
+            code=Codes.OCM_ACTUATION_CONFLICT,
+            path=f"modules['{m['loc']}'].capabilities['{m['cap']}'].actuates",
+            message=error,
+            hint=f"One actuates entry per joint -- {m['joint']!r} can only hold one value when the postcondition is true (ADR-0028).",
         )
 
     return Refusal(code=Codes.OCM_CELL_INVALID, path="$", message=error)
