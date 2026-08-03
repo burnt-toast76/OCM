@@ -5,6 +5,12 @@ store-dependent identity refusals (D4/D5) from `refuse` to `degrade` when the re
 unreachable, so a store outage no longer stops the line (ADR-0021 D2). The decisions below stay
 as written; the erratum carries the correction.
 
+**Shape superseded by ADR-0026** (separate from Erratum 1, which is about outcomes): the
+identity Shape block — a `ports` entry with `domain: identification` carrying a nested `carrier:`
+block — is superseded. Identity is a top-level `identity` subsystem block, not a port; `domain:
+identification` is deleted. The decision (read identity at entry, authority order, refuse on
+disagreement) stands; the YAML written under the old Shape does not.
+
 ## Context
 
 The handoff interlock (ADR-0019) carries no identity. `part_available` says a part is there;

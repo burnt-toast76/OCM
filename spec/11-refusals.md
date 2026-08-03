@@ -84,8 +84,10 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_UNKNOWN_PARAM` | design | refuse | cell | ADR-0012 | live |
 | `OCM_UNRESOLVED_ENDPOINT` | design | refuse | module | ADR-0015 | live |
 | `OCM_WORKSPACE_OVERHANG` | design | refuse | cell | ADR-0012 | live |
+| `OCM_ACTIVE_NOT_ON_NET` | design | refuse | cell | ADR-0026 | deferred |
 | `OCM_CARRIER_ENDURANCE_EXCEEDED` | design | refuse | line | ADR-0020 | deferred |
 | `OCM_COMMS_CHAIN_BROKEN` | design | refuse | module | ADR-0015 | deferred |
+| `OCM_DIRECTION_AT_CELL_LAYER` | design | refuse | cell | ADR-0026 | deferred |
 | `OCM_HANDOFF_DIRECTION_MISMATCH` | design | refuse | cell | ADR-0019 | deferred |
 | `OCM_HANDOFF_PORT_NO_IO` | design | refuse | cell | ADR-0019 | deferred |
 | `OCM_HANDOFF_SAME_ROLE` | design | refuse | cell | ADR-0019 | deferred |
@@ -95,11 +97,14 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_MEASUREMENT_NO_UNIT` | design | refuse | cell | ADR-0021 | deferred |
 | `OCM_MEASUREMENT_SOURCE_INVALID` | design | refuse | cell | ADR-0021 | deferred |
 | `OCM_NET_OVERPRESSURE` | design | refuse | module | ADR-0015 | deferred |
+| `OCM_NET_PIN_NOT_EXPOSED` | design | refuse | cell | ADR-0026 | deferred |
 | `OCM_NET_SIGNAL_CLASS_MISMATCH` | design | refuse | module | ADR-0015 | deferred |
 | `OCM_NET_TWO_DRIVERS` | design | refuse | module | ADR-0015 | deferred |
 | `OCM_NO_RECORD_SINK` | design | refuse | cell | ADR-0021 | deferred |
 | `OCM_PIN_REQUIRED_UNCONNECTED` | design | refuse | module | ADR-0015 | deferred |
 | `OCM_PNEUMATIC_PORT_MISMATCH` | design | refuse | module | ADR-0015 | deferred |
+| `OCM_PORT_DOMAIN_IDENTIFICATION` | design | refuse | cell | ADR-0026 | deferred |
+| `OCM_PORT_HAS_SIGNALS_LIST` | design | refuse | cell | ADR-0026 | deferred |
 | `OCM_SAFETY_NET_UNRATED` | design | refuse | cell | ADR-0019 | deferred |
 | `OCM_SIGNAL_NO_ACTIVE_STATE` | design | refuse | cell | ADR-0019 | deferred |
 | `OCM_AGENT_UNAVAILABLE` | load | refuse | api | ADR-0012 | live |

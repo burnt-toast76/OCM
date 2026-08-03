@@ -4,7 +4,7 @@ Companion to `spec/11-refusals.md` / `spec/schema/ocm-refusals-1.0.yaml` (ADR-00
 catalogue entry: where it is evaluated **today**, and the gap flag. This is a worklist, not an
 essay.
 
-**Counts.** 72 entries: 37 `live` (an engine emits them now), 35 `deferred` (an ADR names them;
+**Counts.** 77 entries: 37 `live` (an engine emits them now), 40 `deferred` (an ADR names them;
 no engine emits them yet). (ADR-0020 Erratum 1 split `OCM_IDENTITY_MISMATCH` into a local and a
 store code, +1 deferred.)
 
@@ -66,8 +66,10 @@ namespace.
 | `OCM_UNKNOWN_PARAM` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_UNRESOLVED_ENDPOINT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_WORKSPACE_OVERHANG` | design/refuse | ocm-api verb (direct) | — |
+| `OCM_ACTIVE_NOT_ON_NET` | design/refuse | — nowhere yet | structural (OCM_SCHEMA_INVALID) |
 | `OCM_CARRIER_ENDURANCE_EXCEEDED` | design/refuse | — nowhere yet | **unrunnable** |
 | `OCM_COMMS_CHAIN_BROKEN` | design/refuse | — nowhere yet | declared-unimpl |
+| `OCM_DIRECTION_AT_CELL_LAYER` | design/refuse | — nowhere yet | structural (OCM_SCHEMA_INVALID) |
 | `OCM_HANDOFF_DIRECTION_MISMATCH` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_HANDOFF_PORT_NO_IO` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_HANDOFF_SAME_ROLE` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
@@ -77,11 +79,14 @@ namespace.
 | `OCM_MEASUREMENT_NO_UNIT` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_MEASUREMENT_SOURCE_INVALID` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_NET_OVERPRESSURE` | design/refuse | — nowhere yet | declared-unimpl |
+| `OCM_NET_PIN_NOT_EXPOSED` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_NET_SIGNAL_CLASS_MISMATCH` | design/refuse | — nowhere yet | declared-unimpl |
 | `OCM_NET_TWO_DRIVERS` | design/refuse | — nowhere yet | declared-unimpl |
 | `OCM_NO_RECORD_SINK` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_PIN_REQUIRED_UNCONNECTED` | design/refuse | — nowhere yet | declared-unimpl |
 | `OCM_PNEUMATIC_PORT_MISMATCH` | design/refuse | — nowhere yet | declared-unimpl |
+| `OCM_PORT_DOMAIN_IDENTIFICATION` | design/refuse | — nowhere yet | structural (OCM_SCHEMA_INVALID) |
+| `OCM_PORT_HAS_SIGNALS_LIST` | design/refuse | — nowhere yet | structural (OCM_SCHEMA_INVALID) |
 | `OCM_SAFETY_NET_UNRATED` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_SIGNAL_NO_ACTIVE_STATE` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_AGENT_UNAVAILABLE` | load/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
@@ -95,12 +100,12 @@ namespace.
 | `OCM_REGENERATE_VERIFY_MISMATCH` | load/refuse | — nowhere yet | declared-unimpl |
 | `OCM_BINDING_UNVERIFIED` | cycle/degrade | — nowhere yet | declared-unimpl |
 | `OCM_BUFFER_FULL` | cycle/refuse | — nowhere yet | declared-unimpl |
-| `OCM_CARRIER_BOUND_TO_SCRAP` | cycle/degrade | — nowhere yet | declared-unimpl (Erratum 1) |
+| `OCM_CARRIER_BOUND_TO_SCRAP` | cycle/degrade | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_CARRIER_STALE_BINDING` | cycle/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_COMMAND_PARAM_OUT_OF_BOUNDS` | cycle/refuse | — nowhere yet | declared-unimpl |
 | `OCM_DIAGNOSTIC_SOURCE_UNAVAILABLE` | cycle/advise | — nowhere yet | declared-unimpl |
-| `OCM_IDENTITY_MISMATCH` | cycle/refuse | — nowhere yet | declared-unimpl (Erratum 1: local half) |
-| `OCM_IDENTITY_STORE_MISMATCH` | cycle/degrade | — nowhere yet | declared-unimpl (Erratum 1: store half) |
+| `OCM_IDENTITY_MISMATCH` | cycle/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_IDENTITY_STORE_MISMATCH` | cycle/degrade | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_MANUAL_OP_PRECONDITION_UNMET` | cycle/refuse | — nowhere yet | declared-unimpl |
 | `OCM_TAG_READBACK_MISMATCH` | cycle/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 

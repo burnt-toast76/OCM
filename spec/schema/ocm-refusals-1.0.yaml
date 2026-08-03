@@ -328,7 +328,10 @@ OCM_HANDOFF_DIRECTION_MISMATCH:
   adr: ADR-0019
   layer: cell
   status: deferred
-  requires: "cell manifest `ports` schema"
+  # ADR-0026 D4: direction is derived from the component pin, not declared at
+  # the cell layer -- so this needs the same pin `direction` field OCM_NET_TWO_DRIVERS
+  # names, on top of the cell schema. The cell schema alone will not light it up.
+  requires: "cell manifest `ports` schema + component pin `direction`"
   message: "smema-downstream port {port} directions do not oppose the smema-upstream port it is netted to"
 OCM_HANDOFF_SAME_ROLE:
   phase: design
@@ -353,15 +356,67 @@ OCM_SIGNAL_NO_ACTIVE_STATE:
   layer: cell
   status: deferred
   requires: "cell manifest `ports` schema"
-  message: "Handoff signal {signal} is declared without an active state"
+  # ADR-0026 D4: `active` is a property of a NET now, not a signal on a port.
+  message: "Net {net_id} is declared without an active state"
 OCM_HANDOFF_PORT_NO_IO:
   phase: design
   outcome: refuse
   adr: ADR-0019
   layer: cell
   status: deferred
+  # ADR-0026 D4: a handoff pin resolving to real I/O carries a direction, which
+  # is transcribed at the component layer -- so this needs pin `direction` too,
+  # not just the cell schema.
+  requires: "cell manifest `ports` schema + component pin `direction`"
+  message: "Handoff port {port} pin does not resolve to real I/O on a transcribed component"
+
+# --- A port is what a net can name (ADR-0026). Four of these five are enforced
+#     STRUCTURALLY by the cells/ schema (additionalProperties:false + enums), so
+#     they surface as OCM_SCHEMA_INVALID rather than as a separately-emitted
+#     code -- marked below. One (net pin not exposed) is a resolve-time cross-
+#     check into the contained modules. All stay deferred in this pass.
+OCM_PORT_HAS_SIGNALS_LIST:
+  phase: design
+  outcome: refuse
+  adr: ADR-0026
+  layer: cell
+  status: deferred
+  requires: "STRUCTURAL -- cells/ schema additionalProperties:false on a port rejects the superseded ADR-0019 `signals[]`; surfaces as OCM_SCHEMA_INVALID"
+  message: "Port {port} carries a nested signals list (the superseded ADR-0019 shape); handoff signals are pins named by nets"
+OCM_PORT_DOMAIN_IDENTIFICATION:
+  phase: design
+  outcome: refuse
+  adr: ADR-0026
+  layer: cell
+  status: deferred
+  requires: "STRUCTURAL -- cells/ schema port `domain` enum omits 'identification'; surfaces as OCM_SCHEMA_INVALID"
+  message: "Port {port} declares domain 'identification' (the superseded ADR-0020 shape); identity is a top-level block, not a port"
+OCM_ACTIVE_NOT_ON_NET:
+  phase: design
+  outcome: refuse
+  adr: ADR-0026
+  layer: cell
+  status: deferred
+  requires: "STRUCTURAL -- cells/ schema puts `active` on a net only; a port/pin `active` is rejected by additionalProperties:false; surfaces as OCM_SCHEMA_INVALID"
+  message: "`active` declared on port/pin {where} rather than on the net (ADR-0026 D4)"
+OCM_DIRECTION_AT_CELL_LAYER:
+  phase: design
+  outcome: refuse
+  adr: ADR-0026
+  layer: cell
+  status: deferred
+  requires: "STRUCTURAL -- no `direction` field exists anywhere in the cells/ schema; additionalProperties:false rejects it; surfaces as OCM_SCHEMA_INVALID"
+  message: "`direction` declared at the cell layer at {where}; direction is derived from the component pin (ADR-0026 D4), never declared here"
+OCM_NET_PIN_NOT_EXPOSED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0026
+  layer: cell
+  status: deferred
+  # Not structural: a resolve-time cross-check that the named cell-port pin is
+  # exposed by a contained module port (ADR-0026 D3, reference-downward).
   requires: "cell manifest `ports` schema"
-  message: "Handoff port {port} signals do not resolve to real I/O on a transcribed component"
+  message: "Net endpoint names cell port {port} pin {pin}, which no contained module port exposes"
 
 # --- Carrier identity (ADR-0020). Cycle-phase reads + line-scoped design. ---
 # ADR-0020 Erratum 1 Correction A: the LOCAL disagreement (two channels the cell

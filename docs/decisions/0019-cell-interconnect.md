@@ -1,6 +1,10 @@
 # ADR-0019 — Cells interconnect by discrete I/O, not by fieldbus
 
-**Status:** Accepted
+**Status:** Accepted. The **Shape block** (the `ports` entry carrying a nested `signals[]` array)
+is superseded by ADR-0026: a cell port is ADR-0015's flat shape, and the SMEMA signals become
+pins named by nets, with `active` on the net and `direction` derived, not declared. The
+decisions stand; the YAML written under the old Shape does not. (House pattern — cf. ADR-0015
+Erratum 1.)
 
 ## Context
 

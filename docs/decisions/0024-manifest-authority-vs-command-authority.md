@@ -1,6 +1,9 @@
 # ADR-0024 — Manifest authority and command authority are different axes
 
 **Status:** Accepted. Supersedes ADR-0022 Decisions 1, 3, and 6 in part; unblocks ADR-0013.
+ADR-0026 D2 supplies the rule that retroactively justifies putting `mode_selector` at the top
+level rather than making it a port: a keyswitch is wired to this cell's own safety circuit, not
+across a boundary, so it is a subsystem block, not a port.
 
 ## Context
 
