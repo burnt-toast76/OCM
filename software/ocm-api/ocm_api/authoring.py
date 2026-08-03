@@ -213,6 +213,11 @@ def generate_geometry_stub(ws: Workspace, module_id: str, footprint_mm: tuple[fl
     mechanical.setdefault("mount", {})["footprint_mm"] = [x_mm, y_mm]
     mechanical.setdefault("geometry", {})["urdf_fragment"] = fragment_rel
     mechanical["geometry"]["collision"] = fragment_rel
+    # ADR-0027 D1: a stub mesh is a hand-(well, tool-)produced artifact the
+    # planner treats as authoritative until real CAD replaces it -- that is
+    # `authored`, declared, not inferred from the path's presence. A module
+    # whose author chooses `derived` instead simply doesn't call this stub.
+    mechanical["geometry"]["collision_source"] = "authored"
     write_yaml(ws.module_path(module_id), doc)
 
     return Envelope.succeed({"id": module_id, "urdf_fragment": fragment_rel, "fragment_path": str(fragment_path)})
@@ -245,25 +250,32 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
     draft = is_draft_revision(str(doc.get("revision", "0.0.0")))
 
     collision = geometry.get("collision")
-    if collision and not (module_dir / collision).is_file():
-        refusals.append(
-            Refusal(
-                code=Codes.OCM_NOT_FOUND,
-                path="mechanical.geometry.collision",
-                message=f"{collision!r} does not exist under {module_dir}",
-                hint="generate_geometry_stub(...) first, or point at a real collision mesh file.",
+    collision_source = geometry.get("collision_source")
+    # ADR-0027: when collision_source is 'authored', the generator-side check
+    # below owns the collision-path refusals (OCM_AUTHORED_COLLISION_MISSING);
+    # when 'derived', an absent collision is CORRECT (D1/D6). The two legacy
+    # branches here cover only the not-yet-migrated module with no declared
+    # source.
+    if collision_source is None:
+        if collision and not (module_dir / collision).is_file():
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_NOT_FOUND,
+                    path="mechanical.geometry.collision",
+                    message=f"{collision!r} does not exist under {module_dir}",
+                    hint="generate_geometry_stub(...) first, or point at a real collision mesh file.",
+                )
             )
-        )
-    elif not collision and not draft:
-        # ADR-0016 Decision 3: a draft may omit this; a published module cannot.
-        refusals.append(
-            Refusal(
-                code=Codes.OCM_NOT_FOUND,
-                path="mechanical.geometry.collision",
-                message=f"a published module must declare mechanical.geometry.collision; {module_id!r} does not",
-                hint="generate_geometry_stub(...) before publishing, or keep it a 0.x draft.",
+        elif not collision and not draft:
+            # ADR-0016 Decision 3: a draft may omit this; a published module cannot.
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_NOT_FOUND,
+                    path="mechanical.geometry.collision",
+                    message=f"a published module must declare mechanical.geometry.collision; {module_id!r} does not",
+                    hint="generate_geometry_stub(...) before publishing, or keep it a 0.x draft.",
+                )
             )
-        )
     urdf_fragment = geometry.get("urdf_fragment")
     if urdf_fragment and not (module_dir / urdf_fragment).is_file():
         refusals.append(
@@ -283,6 +295,7 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
     # instance, off the components search path _check_module_components already
     # threads (no second path). Only when the document is schema-clean, so a
     # typed Module can be built; schema errors are reported above, not piled on.
+    warnings: list[str] = []
     if not errors:
         try:
             module = Module.from_dict(doc)
@@ -291,9 +304,28 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
         if module is not None:
             refusals.extend(resolve_error_to_refusal(e) for e in resolve_module(module, ws.components_dir))
 
+            # ADR-0027: the file-dependent collision-geometry checks (authored
+            # mesh existence + D2 containment, D4 link-in-fragment, D5 overlap
+            # advisory) -- generator-side because they need the module's own
+            # files, reached through this one validation surface (ADR-0016).
+            from ocm_generator.scene.collision_geometry import check_module_collision_geometry
+            from ocm_resolve.search import find_component
+
+            components = {}
+            for mc in module.components:
+                comp, _comp_errors = find_component(mc.ref, ws.components_dir)
+                if comp is not None:
+                    components[mc.refdes] = comp
+            geo_refusals, advisories = check_module_collision_geometry(module, module_dir, components)
+            refusals.extend(
+                Refusal(code=getattr(Codes, code), path=path, message=message)
+                for code, path, message in geo_refusals
+            )
+            warnings.extend(advisories)
+
     if refusals:
-        return Envelope.refuse(refusals)
-    return Envelope.succeed({"id": module_id, "valid": True})
+        return Envelope.refuse(refusals, warnings=warnings)
+    return Envelope.succeed({"id": module_id, "valid": True}, warnings=warnings)
 
 
 def publish_module(ws: Workspace, module_id: str, revision: str) -> Envelope:
@@ -314,16 +346,27 @@ def publish_module(ws: Workspace, module_id: str, revision: str) -> Envelope:
         return validation
 
     doc = read_yaml(ws.module_path(module_id)) or {}
-    # ADR-0016 Decision 3: a draft may omit its artifact claims, but publishing
-    # requires them -- a published module cannot claim (or lack) geometry it
-    # does not have. validate_module already proved any DECLARED collision's
-    # file exists; here we require it be declared at all.
-    if not doc.get("mechanical", {}).get("geometry", {}).get("collision"):
+    geometry = doc.get("mechanical", {}).get("geometry", {})
+    # ADR-0027 D6, amending ADR-0016 D3: publish requires a collision SOURCE,
+    # not a collision MESH. `derived` with no mesh artifact is correct and
+    # complete (validate_module above already proved the derived input set --
+    # poses, envelopes, units -- resolves); `authored` requires the mesh claim
+    # (validate proved the file exists). No source declared -> refuse: absence
+    # here would mean two different things (ADR-0027 D1's rejected inference).
+    collision_source = geometry.get("collision_source")
+    if collision_source is None:
         return single_refusal(
-            Codes.OCM_NOT_FOUND,
+            Codes.OCM_COLLISION_SOURCE_MISSING,
+            path="mechanical.geometry.collision_source",
+            message=f"cannot publish {module_id!r}: it declares no mechanical.geometry.collision_source",
+            hint="Choose 'derived' (proxy built from posed component envelopes + structure) or 'authored' (a hand-produced mesh, containment-checked) -- ADR-0027 D1/D6.",
+        )
+    if collision_source == "authored" and not geometry.get("collision"):
+        return single_refusal(
+            Codes.OCM_AUTHORED_COLLISION_MISSING,
             path="mechanical.geometry.collision",
-            message=f"cannot publish {module_id!r}: it declares no mechanical.geometry.collision",
-            hint="generate_geometry_stub(...) first, then publish.",
+            message=f"cannot publish {module_id!r}: collision_source 'authored' with no mechanical.geometry.collision",
+            hint="Point at the authored collision mesh, or switch to collision_source: derived.",
         )
     doc["revision"] = revision
     write_yaml(ws.module_path(module_id), doc)

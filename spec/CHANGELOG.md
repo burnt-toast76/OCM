@@ -1,5 +1,21 @@
 # Spec changelog
 
+## Collision geometry: derived or checked (ADR-0027) — additive schema; **breaking** for publish
+
+Module schema additions: `mechanical.geometry.collision_source` (`derived` | `authored`),
+`mechanical.structure[]` (posed box/cylinder/mesh primitives, per-shape required fields
+schema-enforced), and `link` on component instances and structure primitives (ADR-0027 D4;
+defaults to the fragment root). All additive — every existing manifest still validates.
+
+**The publish contract changes** (ADR-0027 D6, amending ADR-0016 D3): `publish_module` now
+requires a collision *source*, not a collision *mesh* — `OCM_COLLISION_SOURCE_MISSING` without
+one; `authored` additionally requires the `collision` claim. A published `derived` module with
+no mesh artifact is correct. Existing published modules predate the field and are unaffected
+until they republish; the migration worklist is `docs/adr-0027-migration.md`.
+
+Also normative from this change: manifests are parsed under **YAML 1.2 core schema** (see
+spec/00) — bare `on`/`off`/`yes`/`no` are strings, never booleans.
+
 ## Refusal codes namespaced `OCM_` (ADR-0025 D4) — **breaking** for the API surface
 
 Every refusal code is now prefixed `OCM_`. The 37 codes the engines emitted bare

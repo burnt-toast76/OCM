@@ -62,6 +62,16 @@ class Codes:
     OCM_LINK_NON_COMMUNICATION_PORT = "OCM_LINK_NON_COMMUNICATION_PORT"  # link endpoint on an electrical/pneumatic port
     OCM_LINK_PROTOCOL_MISMATCH = "OCM_LINK_PROTOCOL_MISMATCH"  # a link's two ends speak different protocols
     OCM_ETHERCAT_CHAIN_BROKEN = "OCM_ETHERCAT_CHAIN_BROKEN"  # chain reaches no master, loops, or leaves slaves unreached
+    # ADR-0027: collision geometry is derived from posed components, or
+    # authored and checked against them.
+    OCM_COLLISION_SOURCE_MISSING = "OCM_COLLISION_SOURCE_MISSING"  # publish requires collision_source (D6)
+    OCM_AUTHORED_COLLISION_MISSING = "OCM_AUTHORED_COLLISION_MISSING"  # authored with no collision path, or not a file
+    OCM_COMPONENT_OUTSIDE_COLLISION = "OCM_COMPONENT_OUTSIDE_COLLISION"  # envelope protrudes outside authored mesh (D2)
+    OCM_DERIVED_POSE_MISSING = "OCM_DERIVED_POSE_MISSING"  # derived + a component instance with no pose (D5)
+    OCM_DERIVED_ENVELOPE_MISSING = "OCM_DERIVED_ENVELOPE_MISSING"  # derived + referenced component lacks geometry.envelope (D5)
+    OCM_UNIT_UNRECOGNISED = "OCM_UNIT_UNRECOGNISED"  # a unit string outside ocm_core.units' explicit table
+    OCM_LINK_UNKNOWN = "OCM_LINK_UNKNOWN"  # component/structure names a link absent from the fragment (D4)
+    OCM_ENVELOPE_OVERLAP = "OCM_ENVELOPE_OVERLAP"  # advise, not refuse (D5): overlapping envelopes surfaced
     # ADR-0023: the plan is verbs; conditions belong to modules.
     OCM_CONDITION_UNKNOWN_SIGNAL = "OCM_CONDITION_UNKNOWN_SIGNAL"  # a pre/postcondition names no known signal or requires key
     OCM_REQUIREMENT_UNBOUND = "OCM_REQUIREMENT_UNBOUND"  # a capability's requires key is unbound by the cell

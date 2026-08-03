@@ -642,3 +642,68 @@ OCM_NO_MODE_SELECTOR:
   status: deferred
   requires: "cell `mode_selector` schema + Deployed binding"
   message: "Deployed cell has capabilities but no mode_selector"
+
+# --- Collision geometry: derived or checked (ADR-0027). All phase design,
+#     layer module. LIVE: emitted by ocm-resolve (derived completeness, units),
+#     the generator's collision_geometry checks, and ocm-api's publish gate.
+#     The structure-incompleteness row is STRUCTURAL (schema if/then per shape).
+OCM_COLLISION_SOURCE_MISSING:
+  phase: design
+  outcome: refuse
+  adr: ADR-0027
+  layer: module
+  message: "Cannot publish {id}: no mechanical.geometry.collision_source (derived | authored) -- publish requires a collision SOURCE, not a mesh (D6)"
+OCM_AUTHORED_COLLISION_MISSING:
+  phase: design
+  outcome: refuse
+  adr: ADR-0027
+  layer: module
+  message: "{id}: collision_source 'authored' with no collision path, or a path that is not a file"
+OCM_COMPONENT_OUTSIDE_COLLISION:
+  phase: design
+  outcome: refuse
+  adr: ADR-0027
+  layer: module
+  message: "{id}: component {refdes} envelope at its pose protrudes outside the authored collision geometry -- the planner would not know it is there (D2; checked against the mesh's convex hull)"
+OCM_DERIVED_POSE_MISSING:
+  phase: design
+  outcome: refuse
+  adr: ADR-0027
+  layer: module
+  message: "{id}: collision_source 'derived' but component {refdes} has no pose -- the resolver refuses instead of approximating (D5)"
+OCM_DERIVED_ENVELOPE_MISSING:
+  phase: design
+  outcome: refuse
+  adr: ADR-0027
+  layer: module
+  message: "{id}: collision_source 'derived' but component {refdes} ({component_id}) declares no complete geometry.envelope -- datasheet-answerable transcription work (D5)"
+OCM_UNIT_UNRECOGNISED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0027
+  layer: module
+  message: "{id}: unit {unit} is not in ocm_core.units' explicit table (known: {known}) -- never guessed, never normalised"
+OCM_LINK_UNKNOWN:
+  phase: design
+  outcome: refuse
+  adr: ADR-0027
+  layer: module
+  message: "{id}: {what} names link {link}, absent from the urdf_fragment (D4 -- a check, not a mechanism)"
+OCM_STRUCTURE_INCOMPLETE:
+  phase: design
+  outcome: refuse
+  adr: ADR-0027
+  layer: module
+  status: deferred
+  requires: "STRUCTURAL -- the module schema's per-shape if/then (box -> size+units, cylinder -> radius+length+units, mesh -> path) rejects an incomplete primitive; surfaces as OCM_SCHEMA_INVALID"
+  message: "Structure primitive {id} is missing a dimension or units for its shape"
+OCM_ENVELOPE_OVERLAP:
+  phase: design
+  outcome: advise
+  adr: ADR-0027
+  layer: module
+  # advise, never refuse (D5): real assemblies interpenetrate; overlap is weak
+  # evidence of a pose error and strong evidence of nothing. The advisory
+  # records the overlapping pair so every flagged placement is identifiable.
+  records: envelope_overlap_pair
+  message: "{id}: envelopes of {refdes_a} and {refdes_b} overlap at their declared poses -- surfaced, not gated (D5)"

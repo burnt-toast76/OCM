@@ -61,13 +61,21 @@ from .module import (
     Safety,
     Signal,
     StateMachine,
+    StructurePose,
+    StructurePrimitive,
     Supply,
     WearItem,
 )
 from .parameter import Frame, Parameter
+from .units import UnknownUnitError, known_length_units, length_to_mm
 from .yaml_rt import new_yaml_rt
 
 __all__ = [
+    "length_to_mm",
+    "known_length_units",
+    "UnknownUnitError",
+    "StructurePrimitive",
+    "StructurePose",
     "Base",
     "Capability",
     "Cell",

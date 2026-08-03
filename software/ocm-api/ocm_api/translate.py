@@ -173,6 +173,19 @@ _RE_CONDITION_UNKNOWN_SIGNAL = re.compile(
 _RE_TIMEOUT_DISPOSITION_CONFLICT = re.compile(
     _CONN + r"capability '(?P<cap>[^']+)' declares on_timeout 'hold' but state_machine\.abort_safe is false"
 )
+# ADR-0027: derived-mode collision-geometry completeness, module-scoped
+# (`module <loc> (<id>): ` stem, same as capabilities).
+_RE_DERIVED_POSE_MISSING = re.compile(
+    _CONN + r"collision_source 'derived' but component (?P<refdes>\S+) has no pose"
+)
+_RE_DERIVED_ENVELOPE_MISSING = re.compile(
+    _CONN + r"collision_source 'derived' but component (?P<refdes>\S+) \((?P<comp_id>[^)]+)\) "
+    r"declares no complete geometry\.envelope"
+)
+_RE_UNIT_UNRECOGNISED = re.compile(
+    _CONN + r"(?:component (?P<refdes>\S+) envelope|structure (?P<struct>\S+)) unit "
+    r"'(?P<unit>[^']+)' is unrecognised"
+)
 _CELL = r"^cell (?P<cell>\S+): "
 _RE_REQUIREMENT_UNBOUND = re.compile(
     _CELL + r"instance (?P<inst>\S+) \((?P<module_id>[^)]+)\) capability '(?P<cap>[^']+)' requires "
@@ -381,6 +394,27 @@ def resolve_error_to_refusal(error: str) -> Refusal:
             path=f"modules['{m['inst']}'].requires['{m['req']}']",
             message=error,
             hint="Point the binding at an 'instance.signal' that exists in this cell.",
+        )
+    if m := _RE_DERIVED_POSE_MISSING.match(error):
+        return Refusal(
+            code=Codes.OCM_DERIVED_POSE_MISSING,
+            path=f"modules['{m['loc']}'].components['{m['refdes']}'].pose",
+            message=error,
+            hint="Give the instance its pose in the module frame -- derived mode refuses instead of approximating (ADR-0027 D5).",
+        )
+    if m := _RE_DERIVED_ENVELOPE_MISSING.match(error):
+        return Refusal(
+            code=Codes.OCM_DERIVED_ENVELOPE_MISSING,
+            path=f"modules['{m['loc']}'].components['{m['refdes']}']",
+            message=error,
+            hint=f"Transcribe geometry.envelope (length/width/height/units, verbatim) on {m['comp_id']} -- datasheet-answerable (ADR-0027 D5).",
+        )
+    if m := _RE_UNIT_UNRECOGNISED.match(error):
+        return Refusal(
+            code=Codes.OCM_UNIT_UNRECOGNISED,
+            path=f"modules['{m['loc']}']",
+            message=error,
+            hint="Use a unit from ocm_core.units' explicit table, or add the datasheet's verbatim spelling there -- never guess (ADR-0027).",
         )
 
     return Refusal(code=Codes.OCM_CELL_INVALID, path="$", message=error)

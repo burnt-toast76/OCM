@@ -226,16 +226,17 @@ def test_validate_module_resolves_connectivity(api: OcmApi):
     assert any(r.code == Codes.OCM_PORT_UNCONNECTED for r in validated.refusals), [(r.code, r.message) for r in validated.refusals]
 
 
-def test_publish_requires_geometry_a_draft_may_omit(api: OcmApi):
-    # ADR-0016 Decision 3: a fresh draft omits its geometry artifact claim and
-    # validates clean (a reachable done state); publish_module is what requires
-    # the geometry, and generate_geometry_stub supplies it.
+def test_publish_requires_a_collision_source_a_draft_may_omit(api: OcmApi):
+    # ADR-0016 Decision 3 as amended by ADR-0027 D6: a fresh draft omits its
+    # geometry claims AND its collision_source and validates clean (a reachable
+    # done state); publish_module requires a collision SOURCE, not a mesh --
+    # generate_geometry_stub supplies both (the stub is `authored`).
     api.create_module_draft("com.example.fix.pub1", "fixture")
     assert api.validate_module("com.example.fix.pub1").ok  # draft: artifacts pending, still valid
 
     refused = api.publish_module("com.example.fix.pub1", "1.0.0")
     assert not refused.ok
-    assert any(r.code == Codes.OCM_NOT_FOUND and r.path == "mechanical.geometry.collision" for r in refused.refusals)
+    assert any(r.code == Codes.OCM_COLLISION_SOURCE_MISSING for r in refused.refusals)
 
     api.generate_geometry_stub("com.example.fix.pub1", (100.0, 100.0), 50.0)
     assert api.publish_module("com.example.fix.pub1", "1.0.0").ok

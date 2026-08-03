@@ -53,6 +53,7 @@ from typing import Optional
 from ocm_core import Module
 from ocm_resolve import ResolvedCell
 
+from .collision_geometry import derived_collision_elements
 from .containment import check_workspace_containment
 from .errors import FragmentError, SceneBuildError
 from .kinematics import JointState
@@ -194,7 +195,58 @@ def _validate_joint_state(
         joint_state_out[namespaced] = float(value)
 
 
-def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
+def _inject_derived_collision(
+    module: Module,
+    prefix: str,
+    frag: _LoadedFragment,
+    components_root: Path | None,
+    errors: list[str],
+) -> None:
+    """ADR-0027: for a `collision_source: derived` module, splice per-link
+    <collision> geometry (posed component envelopes + structure primitives)
+    into the already-namespaced fragment links -- the planner collides against
+    what the manifest states, with no second artifact to fall out of sync.
+    Completeness was refused at resolve; here a missing components root is the
+    one thing left to catch (a derived module cannot build its proxy blind).
+    """
+    if module.mechanical.geometry.collision_source != "derived":
+        return
+    if components_root is None:
+        errors.append(
+            f"module {prefix} ({module.id}): collision_source 'derived' but build_scene was "
+            "given no components root -- cannot build the collision proxy"
+        )
+        return
+
+    from ocm_resolve.search import find_component
+
+    components: dict[str, "object"] = {}
+    for mc in module.components:
+        comp, comp_errors = find_component(mc.ref, components_root)
+        if comp is not None:
+            components[mc.refdes] = comp
+        else:
+            errors.extend(f"module {prefix} ({module.id}): {e}" for e in comp_errors)
+
+    links_by_name = {link.get("name"): link for link in frag.links}
+    for local_link, elements in derived_collision_elements(module, components).items():
+        target = frag.root_link if local_link is None else f"{prefix}__{local_link}"
+        link_el = links_by_name.get(target)
+        if link_el is None:
+            errors.append(
+                f"module {prefix} ({module.id}): derived collision targets link "
+                f"{local_link!r}, absent from the urdf_fragment"
+            )
+            continue
+        for el in elements:
+            link_el.append(el)
+
+
+def build_scene(
+    resolved: ResolvedCell,
+    modules_root: Path | str,
+    components_root: Path | str | None = None,
+) -> Scene:
     """Compose a resolved cell into a single combined URDF (a Scene).
 
     Raises SceneBuildError (carrying every violation found) if any
@@ -203,20 +255,29 @@ def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
     that doesn't exist on its target, any joint_state entry is invalid, or
     any non-base/non-robot instance's geometry extends past the base
     module's workspace footprint (see .containment).
+
+    `components_root` (ADR-0027): where components/ definitions live, needed
+    only to build the derived collision proxy of a `collision_source: derived`
+    module. Optional so existing callers keep working -- but a derived module
+    with no components root is a collected violation, never a silently
+    mesh-less scene.
     """
     modules_root = Path(modules_root)
+    components_root = Path(components_root) if components_root is not None else None
     errors: list[str] = []
 
     loaded: dict[str, _LoadedFragment] = {}
 
     try:
         loaded[_BASE_KEY] = _load_and_namespace(resolved.base, _BASE_KEY, modules_root)
+        _inject_derived_collision(resolved.base, _BASE_KEY, loaded[_BASE_KEY], components_root, errors)
     except FragmentError as e:
         errors.append(f"base ({resolved.base.id}): {e}")
 
     for name, ri in resolved.instances.items():
         try:
             loaded[name] = _load_and_namespace(ri.module, name, modules_root)
+            _inject_derived_collision(ri.module, name, loaded[name], components_root, errors)
         except FragmentError as e:
             errors.append(f"module {name} ({ri.module.id}): {e}")
 

@@ -4,7 +4,7 @@ Companion to `spec/11-refusals.md` / `spec/schema/ocm-refusals-1.0.yaml` (ADR-00
 catalogue entry: where it is evaluated **today**, and the gap flag. This is a worklist, not an
 essay.
 
-**Counts.** 78 entries: 37 `live` (an engine emits them now), 41 `deferred` (an ADR names them;
+**Counts.** 87 entries: 45 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
 no engine emits them yet). (ADR-0020 Erratum 1 split `OCM_IDENTITY_MISMATCH` into a local and a
 store code, +1 deferred.)
 
@@ -34,20 +34,27 @@ namespace.
 | Code | Phase/Outcome | Evaluated today | Flag |
 |---|---|---|---|
 | `OCM_ALREADY_EXISTS` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `OCM_AUTHORED_COLLISION_MISSING` | design/refuse | ocm-generator collision_geometry → validate_module | — |
 | `OCM_CELL_INVALID` | design/refuse | ocm-core loader → ocm-api/translate.py | — |
 | `OCM_COLLISION_DETECTED` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
+| `OCM_COLLISION_SOURCE_MISSING` | design/refuse | ocm-api verb (direct) | — |
 | `OCM_COMPONENT_HAS_NO_CONNECTORS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_COMPONENT_OUTSIDE_COLLISION` | design/refuse | ocm-generator collision_geometry → validate_module | — |
 | `OCM_CONDITION_UNKNOWN_SIGNAL` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_DANGLING_MOUNT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_DERIVED_ENVELOPE_MISSING` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_DERIVED_POSE_MISSING` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_DRAFT_MODULE_REFERENCED` | design/refuse | ocm-api verb (direct) | — |
 | `OCM_DRAFT_NOT_PUBLISHABLE` | design/refuse | ocm-api verb (direct) | — |
 | `OCM_DUPLICATE_REFDES` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_ENVELOPE_OVERLAP` | design/advise | ocm-generator collision_geometry → validate_module | — |
 | `OCM_ETHERCAT_CHAIN_BROKEN` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_HUMAN_SIGNATURE_REQUIRED` | design/refuse | ocm-api verb (direct) | — |
 | `OCM_INVALID_ARGUMENT` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_INVALID_SOURCE` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_LINK_NON_COMMUNICATION_PORT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_LINK_PROTOCOL_MISMATCH` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_LINK_UNKNOWN` | design/refuse | ocm-generator collision_geometry → validate_module | — |
 | `OCM_NET_TOO_FEW_ENDPOINTS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_NOT_FOUND` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_NO_FASTENING_STEP` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
@@ -62,6 +69,7 @@ namespace.
 | `OCM_SCHEMA_INVALID` | design/refuse | ocm-core loader → ocm-api/translate.py | — |
 | `OCM_TIMEOUT_DISPOSITION_CONFLICT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_TOOL_SLOT_OCCUPIED` | design/refuse | ocm-api verb (direct) | — |
+| `OCM_UNIT_UNRECOGNISED` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_UNKNOWN_COMPONENT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_UNKNOWN_MODULE` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_UNKNOWN_OP` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
@@ -92,6 +100,7 @@ namespace.
 | `OCM_PORT_HAS_SIGNALS_LIST` | design/refuse | — nowhere yet | structural (OCM_SCHEMA_INVALID) |
 | `OCM_SAFETY_NET_UNRATED` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_SIGNAL_NO_ACTIVE_STATE` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
+| `OCM_STRUCTURE_INCOMPLETE` | design/refuse | — nowhere yet | structural (OCM_SCHEMA_INVALID) |
 | `OCM_AGENT_UNAVAILABLE` | load/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_UNAVAILABLE` | load/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_COMMISSIONING_EXIT_KEY_IN_EDIT` | load/refuse | — nowhere yet | declared-unimpl |

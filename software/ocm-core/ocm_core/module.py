@@ -34,9 +34,14 @@ class Mount:
 
 @dataclass(frozen=True)
 class Geometry:
+    # ADR-0027 D1: `collision_source` declares how collision geometry is
+    # produced -- 'derived' (built from posed component envelopes + structure
+    # primitives; no mesh artifact) or 'authored' (`collision` is the mesh,
+    # authoritative, containment-checked). None on a draft that hasn't chosen.
     visual: str | None = None
     collision: str | None = None
     urdf_fragment: str | None = None
+    collision_source: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Geometry":
@@ -44,6 +49,56 @@ class Geometry:
             visual=data.get("visual"),
             collision=data.get("collision"),
             urdf_fragment=data.get("urdf_fragment"),
+            collision_source=data.get("collision_source"),
+        )
+
+
+@dataclass(frozen=True)
+class StructurePose:
+    """A structure primitive's pose in its owning link's frame -- xyz in the
+    primitive's own `units`, rpy in degrees (ADR-0027 D3)."""
+
+    xyz: tuple[float, float, float]
+    rpy: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "StructurePose":
+        xyz = data["xyz"]
+        rpy = data.get("rpy", (0.0, 0.0, 0.0))
+        return cls(xyz=(xyz[0], xyz[1], xyz[2]), rpy=(rpy[0], rpy[1], rpy[2]))
+
+
+@dataclass(frozen=True)
+class StructurePrimitive:
+    """ADR-0027 D3: one module-owned structural element -- a bracket, plate,
+    or standoff -- declared as a posed primitive (box | cylinder | mesh).
+    Fabricated, no datasheet, nothing to transcribe: module-layer DESIGN.
+    `link` (D4) names the urdf_fragment link it rides; None = fragment root.
+    """
+
+    id: str
+    shape: str
+    pose: StructurePose
+    size: tuple[float, float, float] | None = None
+    radius: float | None = None
+    length: float | None = None
+    path: str | None = None
+    units: str | None = None
+    link: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "StructurePrimitive":
+        size = data.get("size")
+        return cls(
+            id=data["id"],
+            shape=data["shape"],
+            pose=StructurePose.from_dict(data["pose"]),
+            size=tuple(size) if size else None,
+            radius=data.get("radius"),
+            length=data.get("length"),
+            path=data.get("path"),
+            units=data.get("units"),
+            link=data.get("link"),
         )
 
 
@@ -55,6 +110,8 @@ class Mechanical:
     mass_kg: float
     com_mm: tuple[float, float, float] | None = None
     inertia_kgm2: tuple[float, float, float, float, float, float] | None = None
+    # ADR-0027 D3: module-owned structure as posed primitives.
+    structure: tuple[StructurePrimitive, ...] = ()
 
     @property
     def origin(self) -> Frame:
@@ -75,6 +132,7 @@ class Mechanical:
             mass_kg=data["mass_kg"],
             com_mm=tuple(com) if com else None,
             inertia_kgm2=tuple(inertia) if inertia else None,
+            structure=tuple(StructurePrimitive.from_dict(sp) for sp in data.get("structure", [])),
         )
 
 
@@ -464,11 +522,16 @@ class InstancePose:
 class ModuleComponent:
     """One entry in a module's `components:` list -- a purchased part this
     module is assembled from, by its own reference designator (ADR-0014).
+    `link` (ADR-0027 D4) names the urdf_fragment link this instance attaches
+    to, so a component riding a moving axis travels with it; None = the
+    fragment root. Link names are our own authored fragment's -- not the
+    STEP node-path binding ADR-0015 D1 rejected.
     """
 
     refdes: str
     ref: ComponentRef
     pose: InstancePose | None = None
+    link: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ModuleComponent":
@@ -477,6 +540,7 @@ class ModuleComponent:
             refdes=data["refdes"],
             ref=ComponentRef.parse(data["ref"]),
             pose=InstancePose.from_dict(pose) if pose else None,
+            link=data.get("link"),
         )
 
 

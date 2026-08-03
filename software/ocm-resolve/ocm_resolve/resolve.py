@@ -376,6 +376,71 @@ def _check_requirement_bindings(
                     )
 
 
+def _check_collision_geometry(
+    location: str,
+    module: Module,
+    resolved_components: dict[str, "Component"],
+    errors: list[str],
+) -> None:
+    """ADR-0027 D5 manifest-level checks, in `derived` mode only: the resolver
+    builds the collision proxy from posed component envelopes plus structure
+    primitives, and REFUSES instead of approximating -- a partial collision
+    proxy looks like a collision model, is smaller than the machine, and
+    nothing says so.
+
+    - OCM_DERIVED_POSE_MISSING: a component instance with no `pose`.
+    - OCM_DERIVED_ENVELOPE_MISSING: a referenced component with no (or an
+      incomplete) `geometry.envelope` -- datasheet-answerable transcription
+      work, so the refusal is the completion list (ADR-0014).
+    - OCM_UNIT_UNRECOGNISED: an envelope/structure unit string outside
+      ocm_core.units' explicit table -- never guessed, never normalised.
+
+    File-dependent checks (authored mesh existence, link-in-fragment,
+    containment) live in the generator's collision_geometry module, reached
+    through validate_module -- they need the module's directory, which this
+    manifest-only pass deliberately doesn't.
+    """
+    from ocm_core.units import UnknownUnitError, length_to_mm
+
+    if module.mechanical.geometry.collision_source != "derived":
+        return
+
+    for mc in module.components:
+        if mc.pose is None:
+            errors.append(
+                f"module {location} ({module.id}): collision_source 'derived' but component "
+                f"{mc.refdes} has no pose -- the resolver refuses instead of approximating"
+            )
+        comp = resolved_components.get(mc.refdes)
+        if comp is None:
+            continue  # unresolved ref already errored in _check_module_components
+        envelope = comp.geometry.envelope if comp.geometry else None
+        if envelope is None or None in (envelope.length, envelope.width, envelope.height, envelope.units):
+            errors.append(
+                f"module {location} ({module.id}): collision_source 'derived' but component "
+                f"{mc.refdes} ({comp.id}) declares no complete geometry.envelope -- "
+                "datasheet-answerable transcription work, not design"
+            )
+        elif envelope.units is not None:
+            try:
+                length_to_mm(1.0, envelope.units)
+            except UnknownUnitError as e:
+                errors.append(
+                    f"module {location} ({module.id}): component {mc.refdes} envelope unit "
+                    f"{envelope.units!r} is unrecognised ({e.known and 'known: ' + str(list(e.known))})"
+                )
+
+    for sp in module.mechanical.structure:
+        if sp.units is not None:
+            try:
+                length_to_mm(1.0, sp.units)
+            except UnknownUnitError as e:
+                errors.append(
+                    f"module {location} ({module.id}): structure {sp.id} unit {sp.units!r} "
+                    f"is unrecognised ({'known: ' + str(list(e.known))})"
+                )
+
+
 def resolve_module(module: Module, components_search_path: SearchPath | None = None) -> list[str]:
     """Cross-check ONE module in isolation, exactly the way resolve_cell does
     for each instance it loads: its `components:` list and signal `source`
@@ -393,6 +458,7 @@ def resolve_module(module: Module, components_search_path: SearchPath | None = N
     resolved_components = _check_module_components(module.id, module, components_search_path, errors)
     check_module_connectivity(module.id, module, resolved_components, errors)
     _check_module_capabilities(module.id, module, errors)
+    _check_collision_geometry(module.id, module, resolved_components, errors)
     return errors
 
 
@@ -416,6 +482,7 @@ def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: Se
         resolved_components = _check_module_components("base", base_module, components_search_path, errors)
         check_module_connectivity("base", base_module, resolved_components, errors)
         _check_module_capabilities("base", base_module, errors)
+        _check_collision_geometry("base", base_module, resolved_components, errors)
 
     loaded: dict[str, ResolvedModuleInstance] = {}
     for mi in cell.modules:
@@ -425,6 +492,7 @@ def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: Se
             loaded[mi.instance] = ResolvedModuleInstance(instance=mi, module=module)
             resolved_components = _check_module_components(mi.instance, module, components_search_path, errors)
             check_module_connectivity(mi.instance, module, resolved_components, errors)
+            _check_collision_geometry(mi.instance, module, resolved_components, errors)
             _check_module_capabilities(mi.instance, module, errors)
 
     _check_requirement_bindings(cell, loaded, errors)

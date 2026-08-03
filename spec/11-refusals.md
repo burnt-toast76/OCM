@@ -50,20 +50,27 @@ field, a layer, or a runtime that does not exist yet).
 | Code | Phase | Outcome | Layer | ADR | Status |
 |---|---|---|---|---|---|
 | `OCM_ALREADY_EXISTS` | design | refuse | api | ADR-0012 | live |
+| `OCM_AUTHORED_COLLISION_MISSING` | design | refuse | module | ADR-0027 | live |
 | `OCM_CELL_INVALID` | design | refuse | cell | ADR-0012 | live |
 | `OCM_COLLISION_DETECTED` | design | refuse | cell | ADR-0007 | live |
+| `OCM_COLLISION_SOURCE_MISSING` | design | refuse | module | ADR-0027 | live |
 | `OCM_COMPONENT_HAS_NO_CONNECTORS` | design | refuse | module | ADR-0015 | live |
+| `OCM_COMPONENT_OUTSIDE_COLLISION` | design | refuse | module | ADR-0027 | live |
 | `OCM_CONDITION_UNKNOWN_SIGNAL` | design | refuse | module | ADR-0023 | live |
 | `OCM_DANGLING_MOUNT` | design | refuse | cell | ADR-0012 | live |
+| `OCM_DERIVED_ENVELOPE_MISSING` | design | refuse | module | ADR-0027 | live |
+| `OCM_DERIVED_POSE_MISSING` | design | refuse | module | ADR-0027 | live |
 | `OCM_DRAFT_MODULE_REFERENCED` | design | refuse | cell | ADR-0016 | live |
 | `OCM_DRAFT_NOT_PUBLISHABLE` | design | refuse | module | ADR-0016 | live |
 | `OCM_DUPLICATE_REFDES` | design | refuse | module | ADR-0014 | live |
+| `OCM_ENVELOPE_OVERLAP` | design | advise | module | ADR-0027 | live |
 | `OCM_ETHERCAT_CHAIN_BROKEN` | design | refuse | module | ADR-0015 | live |
 | `OCM_HUMAN_SIGNATURE_REQUIRED` | design | refuse | cell | ADR-0012 | live |
 | `OCM_INVALID_ARGUMENT` | design | refuse | api | ADR-0012 | live |
 | `OCM_INVALID_SOURCE` | design | refuse | module | ADR-0014 | live |
 | `OCM_LINK_NON_COMMUNICATION_PORT` | design | refuse | module | ADR-0015 | live |
 | `OCM_LINK_PROTOCOL_MISMATCH` | design | refuse | module | ADR-0015 | live |
+| `OCM_LINK_UNKNOWN` | design | refuse | module | ADR-0027 | live |
 | `OCM_NET_TOO_FEW_ENDPOINTS` | design | refuse | module | ADR-0015 | live |
 | `OCM_NOT_FOUND` | design | refuse | api | ADR-0012 | live |
 | `OCM_NO_FASTENING_STEP` | design | refuse | cell | ADR-0012 | live |
@@ -78,6 +85,7 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_SCHEMA_INVALID` | design | refuse | module | ADR-0016 | live |
 | `OCM_TIMEOUT_DISPOSITION_CONFLICT` | design | refuse | module | ADR-0023 | live |
 | `OCM_TOOL_SLOT_OCCUPIED` | design | refuse | cell | ADR-0012 | live |
+| `OCM_UNIT_UNRECOGNISED` | design | refuse | module | ADR-0027 | live |
 | `OCM_UNKNOWN_COMPONENT` | design | refuse | module | ADR-0014 | live |
 | `OCM_UNKNOWN_MODULE` | design | refuse | cell | ADR-0012 | live |
 | `OCM_UNKNOWN_OP` | design | refuse | cell | ADR-0012 | live |
@@ -108,6 +116,7 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_PORT_HAS_SIGNALS_LIST` | design | refuse | cell | ADR-0026 | deferred |
 | `OCM_SAFETY_NET_UNRATED` | design | refuse | cell | ADR-0019 | deferred |
 | `OCM_SIGNAL_NO_ACTIVE_STATE` | design | refuse | cell | ADR-0019 | deferred |
+| `OCM_STRUCTURE_INCOMPLETE` | design | refuse | module | ADR-0027 | deferred |
 | `OCM_AGENT_UNAVAILABLE` | load | refuse | api | ADR-0012 | live |
 | `OCM_UNAVAILABLE` | load | refuse | api | ADR-0012 | live |
 | `OCM_COMMISSIONING_EXIT_KEY_IN_EDIT` | load | refuse | cell | ADR-0024 | deferred |
