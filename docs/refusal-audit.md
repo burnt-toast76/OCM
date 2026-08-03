@@ -4,8 +4,9 @@ Companion to `spec/11-refusals.md` / `spec/schema/ocm-refusals-1.0.yaml` (ADR-00
 catalogue entry: where it is evaluated **today**, and the gap flag. This is a worklist, not an
 essay.
 
-**Counts.** 71 entries: 37 `live` (an engine emits them now), 34 `deferred` (an ADR names them;
-no engine emits them yet).
+**Counts.** 72 entries: 37 `live` (an engine emits them now), 35 `deferred` (an ADR names them;
+no engine emits them yet). (ADR-0020 Erratum 1 split `OCM_IDENTITY_MISMATCH` into a local and a
+store code, +1 deferred.)
 
 ## Namespace discrepancy (must reconcile)
 
@@ -97,11 +98,12 @@ its own decision. Until then the split is intentional and documented here.
 | `OCM_REGENERATE_VERIFY_MISMATCH` | load/refuse | — nowhere yet | declared-unimpl |
 | `OCM_BINDING_UNVERIFIED` | cycle/degrade | — nowhere yet | declared-unimpl |
 | `OCM_BUFFER_FULL` | cycle/refuse | — nowhere yet | declared-unimpl |
-| `OCM_CARRIER_BOUND_TO_SCRAP` | cycle/refuse | — nowhere yet | **store-dependent** |
+| `OCM_CARRIER_BOUND_TO_SCRAP` | cycle/degrade | — nowhere yet | declared-unimpl (Erratum 1) |
 | `OCM_CARRIER_STALE_BINDING` | cycle/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_COMMAND_PARAM_OUT_OF_BOUNDS` | cycle/refuse | — nowhere yet | declared-unimpl |
 | `OCM_DIAGNOSTIC_SOURCE_UNAVAILABLE` | cycle/advise | — nowhere yet | declared-unimpl |
-| `OCM_IDENTITY_MISMATCH` | cycle/refuse | — nowhere yet | **store-dependent** |
+| `OCM_IDENTITY_MISMATCH` | cycle/refuse | — nowhere yet | declared-unimpl (Erratum 1: local half) |
+| `OCM_IDENTITY_STORE_MISMATCH` | cycle/degrade | — nowhere yet | declared-unimpl (Erratum 1: store half) |
 | `OCM_MANUAL_OP_PRECONDITION_UNMET` | cycle/refuse | — nowhere yet | declared-unimpl |
 | `OCM_TAG_READBACK_MISMATCH` | cycle/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 
@@ -117,17 +119,19 @@ has a phase that *could* run it once its schema field or runtime lands (below), 
 have no layer to run in at all. **Fix:** they wait on the line layer (a new ADR), not on a schema
 field.
 
-## 2. Store-dependent in cycle phase
+## 2. Store-dependent in cycle phase — RESOLVED (ADR-0020 Erratum 1)
 
 ADR-0021 D6 permits the record store to be unreachable without stopping the line. A **cycle**
 refusal that needs the store therefore cannot simply `refuse` — it would halt production on a
-store outage, the exact failure ADR-0021 rejects.
+store outage, the exact failure ADR-0021 rejects. **Fixed** in ADR-0020 Erratum 1 (Corrections
+A–C) and reflected in the catalogue:
 
-| Code | Cataloged as | Should it be `degrade`? |
+| Code | Now | Resolution |
 |---|---|---|
-| `OCM_CARRIER_BOUND_TO_SCRAP` | refuse | **Yes → `degrade`**, recording e.g. `scrap_check: skipped`. With the store down the cell cannot know the unit is scrap; refusing would stop the line, absorbing would ship a scrap-bound carrier silently. Degrade-and-record is the legible middle, and a later query over that field finds every unit that ran uncross-checked. This is the same shape as `OCM_BINDING_UNVERIFIED` (already `degrade`). |
-| `OCM_IDENTITY_MISMATCH` | refuse | **Split.** The tag-vs-part-mark half is local (two on-carrier reads) and stays `refuse`. The tag-vs-**store**-binding half is store-dependent and should `degrade` (record `store_binding_checked: false`) when the store is unreachable, matching `OCM_BINDING_UNVERIFIED`. Catalogued as one code today; may need to split into the local and store halves. |
-| `OCM_BINDING_UNVERIFIED` | degrade ✓ | Already correct — the canonical case (records `binding_verified`). |
+| `OCM_CARRIER_BOUND_TO_SCRAP` | degrade (records `scrap_disposition_checked`) | Correction C: still `refuse` when the store **answers** `scrap`; `degrade` and record when the store is **unreachable**, so a database outage no longer stops the line. |
+| `OCM_IDENTITY_MISMATCH` | refuse | Correction A: narrowed to the **local** disagreement (part mark vs carrier tag) — two channels the cell reads directly, needing no store. D4's no-tie-break rule untouched. |
+| `OCM_IDENTITY_STORE_MISMATCH` *(new)* | degrade (records `store_binding_checked`) | Correction B: the store half, split out. Store disagreement or an unreachable store degrades and records, matching `OCM_BINDING_UNVERIFIED`. |
+| `OCM_BINDING_UNVERIFIED` | degrade ✓ | Unchanged — the canonical case (records `binding_verified`). |
 
 ## 3. Cell-layer refusals with no schema to stand on
 
@@ -181,8 +185,9 @@ vocabulary is closed) but have no ADR of record:
 
 1. **Reconcile the namespace** (bare vs `OCM_`) — decide rename-codes vs amend-ADR-0025-D4.
 2. **Author a `cells/` JSON schema** — unblocks the whole of §3 and most of §4.
-3. **Re-classify two store-dependent cycle refusals** to `degrade` (`OCM_CARRIER_BOUND_TO_SCRAP`;
-   the store half of `OCM_IDENTITY_MISMATCH`) with recorded fields.
+3. ~~Re-classify two store-dependent cycle refusals to `degrade`.~~ **Done** — ADR-0020 Erratum 1
+   (`OCM_CARRIER_BOUND_TO_SCRAP` degrades when the store is unreachable; `OCM_IDENTITY_MISMATCH`
+   split into a local `refuse` and a new `OCM_IDENTITY_STORE_MISMATCH` `degrade`).
 4. **The line layer** (new ADR) — the only home for the two unrunnables.
 5. **Give the four generation refusals an ADR of record** (or fold into ADR-0007).
 

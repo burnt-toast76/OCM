@@ -117,11 +117,12 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_REGENERATE_VERIFY_MISMATCH` | load | refuse | cell | ADR-0022 | deferred |
 | `OCM_BINDING_UNVERIFIED` | cycle | degrade | cell | ADR-0021 | deferred |
 | `OCM_BUFFER_FULL` | cycle | refuse | cell | ADR-0021 | deferred |
-| `OCM_CARRIER_BOUND_TO_SCRAP` | cycle | refuse | cell | ADR-0020 | deferred |
+| `OCM_CARRIER_BOUND_TO_SCRAP` | cycle | degrade | cell | ADR-0020 | deferred |
 | `OCM_CARRIER_STALE_BINDING` | cycle | refuse | cell | ADR-0020 | deferred |
 | `OCM_COMMAND_PARAM_OUT_OF_BOUNDS` | cycle | refuse | cell | ADR-0024 | deferred |
 | `OCM_DIAGNOSTIC_SOURCE_UNAVAILABLE` | cycle | advise | cell | ADR-0022 | deferred |
 | `OCM_IDENTITY_MISMATCH` | cycle | refuse | cell | ADR-0020 | deferred |
+| `OCM_IDENTITY_STORE_MISMATCH` | cycle | degrade | cell | ADR-0020 | deferred |
 | `OCM_MANUAL_OP_PRECONDITION_UNMET` | cycle | refuse | cell | ADR-0024 | deferred |
 | `OCM_TAG_READBACK_MISMATCH` | cycle | refuse | cell | ADR-0020 | deferred |
 

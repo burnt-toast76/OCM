@@ -28,7 +28,7 @@ context was.
 | [0017](0017-context-is-layered.md) | Context is layered — component, module, cell | Accepted |
 | [0018](0018-ocm-standard-cellwright-product.md) | OCM is the standard, Cellwright is the product | Accepted |
 | [0019](0019-cell-interconnect.md) | Cells interconnect by discrete I/O, not by fieldbus | Accepted |
-| [0020](0020-carrier-identity.md) | Unit identity travels on the carrier | Accepted |
+| [0020](0020-carrier-identity.md) | Unit identity travels on the carrier | Accepted (Erratum 1) |
 | [0021](0021-record-journal.md) | The journal is the write; the store is declared | Accepted |
 | [0022](0022-lifecycle-and-agent-authority.md) | Lifecycle governs write authority; the agent edits manifests only | Accepted |
 | [0023](0023-plans-are-verbs.md) | The plan is verbs; conditions belong to modules | Accepted |

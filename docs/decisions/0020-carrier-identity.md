@@ -1,6 +1,9 @@
 # ADR-0020 — Unit identity travels on the carrier
 
-**Status:** Accepted
+**Status:** Accepted, with Erratum 1 (2026-08-03) — see the end of this document. It narrows the
+store-dependent identity refusals (D4/D5) from `refuse` to `degrade` when the record store is
+unreachable, so a store outage no longer stops the line (ADR-0021 D2). The decisions below stay
+as written; the erratum carries the correction.
 
 ## Context
 
@@ -204,3 +207,54 @@ Refusals this admits:
 
 ADR-0012 (one refusal engine), ADR-0014 (zero-assumption transcription), ADR-0017 (context
 is layered), ADR-0019 (cell interconnect), ADR-0021 (journal and record sink)
+
+---
+
+## Erratum 1 (2026-08-03) — store-dependent identity refusals stop the line ADR-0021 keeps running
+
+Found by the refusal-catalogue audit (`docs/refusal-audit.md` §2) when ADR-0025 forced every
+refusal to declare a `phase` and an `outcome`. The identity refusals, tagged `phase: cycle`,
+were caught assuming a channel that ADR-0021 explicitly permits to be absent.
+
+**What was wrong.** Decision 4's authority order and Decision 5's scrap check both treat every
+*declared* channel as *readable at cell entry*. The store binding is a declared channel, and
+ADR-0021 Decision 2 permits the record store to be unreachable without stopping the line — that
+is the property ADR-0021 exists to buy. So `OCM_IDENTITY_MISMATCH` and `OCM_CARRIER_BOUND_TO_
+SCRAP`, written as unconditional `refuse`, stop the line on a database outage: the exact failure
+ADR-0021 was built to prevent. This ADR's own headline consequence — *"the line runs correctly
+with the record store unreachable"* — is contradicted by its own refusal list. Two channels the
+cell can physically hold in its hand (the part mark and the carrier tag) are a different case
+from a channel on the far end of a link that may be down, and Decision 4 conflated them.
+
+**Correction A — `OCM_IDENTITY_MISMATCH` is the LOCAL disagreement, and stays `refuse`.**
+Disagreement between two channels the cell reads directly — the part mark on the unit and the
+carrier tag's user memory — remains an unconditional refusal. The part moved between carriers or
+a write went wrong; either is a fact the operator needs, and neither depends on the store being
+up. Decision 4's no-tie-break rule is **untouched here**, and this is the case Decision 4 was
+actually reasoning about.
+
+**Correction B — store disagreement, or an unreachable store, is `degrade`, not `refuse`.**
+Split out as `OCM_IDENTITY_STORE_MISMATCH` (`phase: cycle`, `outcome: degrade`): where the
+carrier tag disagrees with the *store* binding, or the store cannot be reached to compare at
+all, the cell proceeds and records the fact rather than halting. It records
+**`store_binding_checked`** — `true` when the store answered and disagreed, `false` when it was
+unreachable — so a later query finds every unit that ran without a confirmed store cross-check.
+This is `OCM_BINDING_UNVERIFIED` generalised to the identity comparison, and it is what keeps a
+store outage from stopping a line whose local channels agree.
+
+**Correction C — `OCM_CARRIER_BOUND_TO_SCRAP` degrades only when the store is unreachable.**
+When the store **answers** and reports the bound unit dispositioned `scrap`, the cell still
+`refuse`s — building on a known-scrap carrier is exactly the mistake this refusal exists to
+stop, and nothing about it is softened. When the store is **unreachable**, the cell cannot know
+the disposition, so it `degrade`s: it proceeds and records **`scrap_disposition_checked: false`**,
+rather than halting the line because a database is down. The catalogue entry carries
+`outcome: degrade` (the outcome that requires a recorded field) with the conditional stated in
+its message; the refuse-when-answered behaviour is not optional.
+
+**Unchanged.** The authority order itself (part mark › carrier tag › store binding). Decision 5's
+stale-binding refusal — an empty carrier arriving with a live binding — which is read entirely
+from the carrier tag, needs no store, and stays an unconditional `refuse`. Decision 6's write /
+read-back / verify, also local. And the principle behind Decision 4: disagreement is never
+tie-broken silently. What changes is only that a *store-involving* disagreement is recorded and
+survivable instead of line-stopping, because the store is the one channel that is allowed to be
+absent.

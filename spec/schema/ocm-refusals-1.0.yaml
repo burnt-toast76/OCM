@@ -364,14 +364,27 @@ OCM_HANDOFF_PORT_NO_IO:
   message: "Handoff port {port} signals do not resolve to real I/O on a transcribed component"
 
 # --- Carrier identity (ADR-0020). Cycle-phase reads + line-scoped design. ---
+# ADR-0020 Erratum 1 Correction A: the LOCAL disagreement (two channels the cell
+# reads directly) stays refuse -- D4's no-tie-break rule, untouched.
 OCM_IDENTITY_MISMATCH:
   phase: cycle
   outcome: refuse
   adr: ADR-0020
   layer: cell
   status: deferred
-  requires: "cell `identity` port + runtime reader; store for the store-binding half"
-  message: "Carrier {carrier_id} tag unit_id disagrees with the part mark or the store binding"
+  requires: "cell `identity` port + runtime reader (part mark + carrier tag; no store)"
+  message: "Carrier {carrier_id} tag unit_id disagrees with the part mark on the unit"
+# ADR-0020 Erratum 1 Correction B: store disagreement OR an unreachable store
+# degrades and records, so a store outage never stops the line (ADR-0021 D2).
+OCM_IDENTITY_STORE_MISMATCH:
+  phase: cycle
+  outcome: degrade
+  adr: ADR-0020
+  layer: cell
+  status: deferred
+  requires: "cell `identity` port + runtime reader + record store (permitted unreachable, ADR-0021 D2)"
+  records: store_binding_checked
+  message: "Carrier {carrier_id} tag unit_id not confirmed against the store binding (disagreed, or store unreachable)"
 OCM_CARRIER_STALE_BINDING:
   phase: cycle
   outcome: refuse
@@ -380,14 +393,20 @@ OCM_CARRIER_STALE_BINDING:
   status: deferred
   requires: "cell `carriers` fleet declaration + runtime carrier tracking"
   message: "Carrier {carrier_id} arrived at load with live binding {unit_id}"
+# ADR-0020 Erratum 1 Correction C: refuse when the store ANSWERS 'scrap';
+# degrade (recording scrap_disposition_checked=false) when the store is
+# UNREACHABLE, so a store outage doesn't halt the line. Catalogued as the
+# degrade outcome (the one that requires a recorded field); the message carries
+# the refuse-when-answered half, which is not optional.
 OCM_CARRIER_BOUND_TO_SCRAP:
   phase: cycle
-  outcome: refuse
+  outcome: degrade
   adr: ADR-0020
   layer: cell
   status: deferred
-  requires: "runtime record store reachable (see docs/refusal-audit.md: store-dependent)"
-  message: "Carrier {carrier_id} is bound to unit {unit_id} already dispositioned as scrap"
+  requires: "cell `carriers` declaration + record store (permitted unreachable, ADR-0021 D2)"
+  records: scrap_disposition_checked
+  message: "Carrier {carrier_id} bound to unit {unit_id}: REFUSE if the store answers 'scrap'; DEGRADE (records scrap_disposition_checked=false) if the store is unreachable"
 OCM_TAG_READBACK_MISMATCH:
   phase: cycle
   outcome: refuse
