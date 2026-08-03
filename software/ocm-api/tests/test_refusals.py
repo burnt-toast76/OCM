@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """One test per refusal code the envelope can carry (spec/09's own two --
-PARAM_OUT_OF_BOUNDS, HUMAN_SIGNATURE_REQUIRED -- plus every scenario the
+OCM_PARAM_OUT_OF_BOUNDS, OCM_HUMAN_SIGNATURE_REQUIRED -- plus every scenario the
 spec describes narratively without naming a literal code: unknown module,
 dangling mount.on, workspace overhang, ...), the verified_by hard rule,
 and draft-vs-published resolution.
@@ -44,8 +44,8 @@ def test_param_out_of_bounds(api: OcmApi):
     api.place_instance("c1", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"})
 
     e = api.set_plan("c1", [{"step": "fasten", "module": "sd1", "op": "drive_screw", "params": {"torque_nm": 6.0}}])
-    _assert_envelope_shape(e, Codes.PARAM_OUT_OF_BOUNDS)
-    refusal = next(r for r in e.refusals if r.code == Codes.PARAM_OUT_OF_BOUNDS)
+    _assert_envelope_shape(e, Codes.OCM_PARAM_OUT_OF_BOUNDS)
+    refusal = next(r for r in e.refusals if r.code == Codes.OCM_PARAM_OUT_OF_BOUNDS)
     assert refusal.path == "plan[0].params.torque_nm"
     assert refusal.allowed == {"max": 5.0}
 
@@ -56,8 +56,8 @@ def test_human_signature_required_verified_by(api: OcmApi, workspace_root: Path)
     manifest["safety"] = {"verified_by": "Jane Doe, PE"}
 
     e = api.update_module("com.example.pickhead.sig1", manifest=manifest)
-    _assert_envelope_shape(e, Codes.HUMAN_SIGNATURE_REQUIRED)
-    refusal = next(r for r in e.refusals if r.code == Codes.HUMAN_SIGNATURE_REQUIRED)
+    _assert_envelope_shape(e, Codes.OCM_HUMAN_SIGNATURE_REQUIRED)
+    refusal = next(r for r in e.refusals if r.code == Codes.OCM_HUMAN_SIGNATURE_REQUIRED)
     assert refusal.path == "safety.verified_by"
 
     # The hard guarantee: the signature never lands on disk, regardless of
@@ -74,7 +74,7 @@ def test_human_signature_required_verified_by(api: OcmApi, workspace_root: Path)
 
 def test_schema_invalid(api: OcmApi):
     e = api.update_module("com.example.pickhead.bad1", manifest={"ocm_version": "1.1", "id": "com.example.pickhead.bad1"})
-    _assert_envelope_shape(e, Codes.SCHEMA_INVALID)
+    _assert_envelope_shape(e, Codes.OCM_SCHEMA_INVALID)
     # write-anyway: the invalid attempt still landed on disk (spec/09: "so
     # iteration is cheap and the diff shows the attempt").
     assert api.describe_module("com.example.pickhead.bad1").refusals  # still invalid, but readable back
@@ -88,42 +88,42 @@ def test_schema_invalid_name_pattern_hint_suggests_snake_case(api: OcmApi):
     e = api.update_module("com.example.pickhead.bad2", manifest=manifest)
     assert not e.ok
     violation = next(r for r in e.refusals if "IN_3" in r.message)
-    assert violation.code == Codes.SCHEMA_INVALID
+    assert violation.code == Codes.OCM_SCHEMA_INVALID
     assert "snake_case" in violation.hint
     assert "in_3" in violation.hint
 
 
 def test_not_found_describe_module(api: OcmApi):
     e = api.describe_module("com.example.does-not-exist")
-    _assert_envelope_shape(e, Codes.NOT_FOUND)
+    _assert_envelope_shape(e, Codes.OCM_NOT_FOUND)
 
 
 def test_already_exists_create_module_draft(api: OcmApi):
     api.create_module_draft("com.example.pickhead.dup1", "end_effector")
     e = api.create_module_draft("com.example.pickhead.dup1", "end_effector")
-    _assert_envelope_shape(e, Codes.ALREADY_EXISTS)
+    _assert_envelope_shape(e, Codes.OCM_ALREADY_EXISTS)
 
 
 def test_draft_not_publishable(api: OcmApi):
     api.create_module_draft("com.example.pickhead.pub1", "end_effector")
     api.generate_geometry_stub("com.example.pickhead.pub1", (80, 60), 40)
     e = api.publish_module("com.example.pickhead.pub1", "0.2.0")
-    _assert_envelope_shape(e, Codes.DRAFT_NOT_PUBLISHABLE)
+    _assert_envelope_shape(e, Codes.OCM_DRAFT_NOT_PUBLISHABLE)
 
 
 def test_invalid_argument_publish_bad_semver(api: OcmApi):
     api.create_module_draft("com.example.pickhead.pub2", "end_effector")
     e = api.publish_module("com.example.pickhead.pub2", "not-a-version")
-    _assert_envelope_shape(e, Codes.INVALID_ARGUMENT)
+    _assert_envelope_shape(e, Codes.OCM_INVALID_ARGUMENT)
 
 
 def test_invalid_argument_update_module_needs_exactly_one_of_manifest_or_patch(api: OcmApi):
     api.create_module_draft("com.example.pickhead.pub3", "end_effector")
     e = api.update_module("com.example.pickhead.pub3")
-    _assert_envelope_shape(e, Codes.INVALID_ARGUMENT)
+    _assert_envelope_shape(e, Codes.OCM_INVALID_ARGUMENT)
 
     e = api.update_module("com.example.pickhead.pub3", manifest={"a": 1}, patch=[{"op": "replace", "path": "/a", "value": 2}])
-    _assert_envelope_shape(e, Codes.INVALID_ARGUMENT)
+    _assert_envelope_shape(e, Codes.OCM_INVALID_ARGUMENT)
 
 
 # ---------------------------------------------------------------------------
@@ -134,34 +134,34 @@ def test_invalid_argument_update_module_needs_exactly_one_of_manifest_or_patch(a
 def test_unknown_module_place_instance(api: OcmApi):
     api.create_cell("c2", "com.accelsolutions.base.frame1200@2.0.0")
     e = api.place_instance("c2", "robot1", "com.example.totally-unknown@1.0.0", {"pose": {"xyz_mm": [0, 0, 0], "rpy_deg": [0, 0, 0]}})
-    _assert_envelope_shape(e, Codes.UNKNOWN_MODULE)
+    _assert_envelope_shape(e, Codes.OCM_UNKNOWN_MODULE)
 
 
 def test_revision_mismatch_place_instance(api: OcmApi):
     api.create_cell("c3", "com.accelsolutions.base.frame1200@2.0.0")
     e = api.place_instance("c3", "robot1", "com.universal-robots.ur5e@9.9.9", {"pose": {"xyz_mm": [0, 0, 0], "rpy_deg": [0, 0, 0]}})
-    _assert_envelope_shape(e, Codes.REVISION_MISMATCH)
+    _assert_envelope_shape(e, Codes.OCM_REVISION_MISMATCH)
 
 
 def test_dangling_mount(api: OcmApi):
     api.create_cell("c4", "com.accelsolutions.base.frame1200@2.0.0")
     e = api.place_instance("c4", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "no_such_instance.flange"})
-    _assert_envelope_shape(e, Codes.DANGLING_MOUNT)
+    _assert_envelope_shape(e, Codes.OCM_DANGLING_MOUNT)
 
 
 def test_already_exists_place_instance_duplicate(api: OcmApi):
     api.create_cell("c5", "com.accelsolutions.base.frame1200@2.0.0")
     api.place_instance("c5", "robot1", "com.universal-robots.ur5e@3.1.0", {"pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}})
     e = api.place_instance("c5", "robot1", "com.universal-robots.ur5e@3.1.0", {"pose": {"xyz_mm": [0, 0, 0], "rpy_deg": [0, 0, 0]}})
-    _assert_envelope_shape(e, Codes.ALREADY_EXISTS)
+    _assert_envelope_shape(e, Codes.OCM_ALREADY_EXISTS)
 
 
 def test_not_found_move_and_remove_unknown_instance(api: OcmApi):
     api.create_cell("c6", "com.accelsolutions.base.frame1200@2.0.0")
     e = api.move_instance("c6", "ghost", {"pose": {"xyz_mm": [0, 0, 0], "rpy_deg": [0, 0, 0]}})
-    _assert_envelope_shape(e, Codes.NOT_FOUND)
+    _assert_envelope_shape(e, Codes.OCM_NOT_FOUND)
     e = api.remove_instance("c6", "ghost")
-    _assert_envelope_shape(e, Codes.NOT_FOUND)
+    _assert_envelope_shape(e, Codes.OCM_NOT_FOUND)
 
 
 def test_workspace_overhang(api: OcmApi):
@@ -170,8 +170,8 @@ def test_workspace_overhang(api: OcmApi):
         "c7", "nest1", "com.accelsolutions.fixture.pneumatic-nest@1.1.0",
         {"pose": {"xyz_mm": [5000, 300, 0], "rpy_deg": [0, 0, 90]}},
     )
-    _assert_envelope_shape(e, Codes.WORKSPACE_OVERHANG)
-    refusal = next(r for r in e.refusals if r.code == Codes.WORKSPACE_OVERHANG)
+    _assert_envelope_shape(e, Codes.OCM_WORKSPACE_OVERHANG)
+    refusal = next(r for r in e.refusals if r.code == Codes.OCM_WORKSPACE_OVERHANG)
     assert "+X by" in refusal.message
     assert "footprint" in refusal.allowed
 
@@ -180,8 +180,8 @@ def test_unknown_op(api: OcmApi):
     api.create_cell("c8", "com.accelsolutions.base.frame1200@2.0.0")
     api.place_instance("c8", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"pose": {"xyz_mm": [0, 0, 0], "rpy_deg": [0, 0, 0]}})
     e = api.set_plan("c8", [{"step": "x", "module": "sd1", "op": "levitate"}])
-    _assert_envelope_shape(e, Codes.UNKNOWN_OP)
-    refusal = next(r for r in e.refusals if r.code == Codes.UNKNOWN_OP)
+    _assert_envelope_shape(e, Codes.OCM_UNKNOWN_OP)
+    refusal = next(r for r in e.refusals if r.code == Codes.OCM_UNKNOWN_OP)
     assert "values" in refusal.allowed
 
 
@@ -189,7 +189,7 @@ def test_unknown_param(api: OcmApi):
     api.create_cell("c9", "com.accelsolutions.base.frame1200@2.0.0")
     api.place_instance("c9", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"pose": {"xyz_mm": [0, 0, 0], "rpy_deg": [0, 0, 0]}})
     e = api.set_plan("c9", [{"step": "x", "module": "sd1", "op": "drive_screw", "params": {"torque_nm": 2.4, "made_up": 1}}])
-    _assert_envelope_shape(e, Codes.UNKNOWN_PARAM)
+    _assert_envelope_shape(e, Codes.OCM_UNKNOWN_PARAM)
 
 
 def test_cell_invalid_structurally_broken_document(api: OcmApi, ws):
@@ -198,7 +198,7 @@ def test_cell_invalid_structurally_broken_document(api: OcmApi, ws):
     api.create_cell("c10", "com.accelsolutions.base.frame1200@2.0.0")
     write_yaml(ws.cell_path("c10"), {"ocm_version": "1.0", "id": "x", "license": "CERN-OHL-S-2.0"})  # missing base/modules
     e = api.build_scene("c10")
-    _assert_envelope_shape(e, Codes.CELL_INVALID)
+    _assert_envelope_shape(e, Codes.OCM_CELL_INVALID)
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +210,7 @@ def test_draft_module_referenced_blocks_placement(api: OcmApi):
     # dh200 is a real, pre-existing draft in this repo (revision 0.9.1).
     api.create_cell("c11", "com.accelsolutions.base.frame1200@2.0.0")
     e = api.place_instance("c11", "dispense1", "com.accelsolutions.dispense.dh200@0.9.1", {"pose": {"xyz_mm": [0, 0, 0], "rpy_deg": [0, 0, 0]}})
-    _assert_envelope_shape(e, Codes.DRAFT_MODULE_REFERENCED)
+    _assert_envelope_shape(e, Codes.OCM_DRAFT_MODULE_REFERENCED)
 
 
 def test_draft_module_becomes_resolvable_once_published(api: OcmApi):
@@ -219,7 +219,7 @@ def test_draft_module_becomes_resolvable_once_published(api: OcmApi):
 
     api.create_cell("c12", "com.accelsolutions.base.frame1200@2.0.0")
     e = api.place_instance("c12", "pk1", "com.example.pickhead.dr1@0.1.0", {"pose": {"xyz_mm": [0, 0, 0], "rpy_deg": [0, 0, 0]}})
-    _assert_envelope_shape(e, Codes.DRAFT_MODULE_REFERENCED)
+    _assert_envelope_shape(e, Codes.OCM_DRAFT_MODULE_REFERENCED)
 
     published = api.publish_module("com.example.pickhead.dr1", "1.0.0")
     assert published.ok, published.refusals
@@ -238,7 +238,7 @@ def test_draft_base_module_also_blocks_resolution(api: OcmApi):
     e = api.create_cell("c13", "com.accelsolutions.dispense.dh200@0.9.1")
     assert e.ok  # create_cell itself doesn't resolve
     e = api.build_scene("c13")
-    _assert_envelope_shape(e, Codes.DRAFT_MODULE_REFERENCED)
+    _assert_envelope_shape(e, Codes.OCM_DRAFT_MODULE_REFERENCED)
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ def test_no_fastening_step(api: OcmApi):
 
     pytest.importorskip("tesseract_robotics")
     e = api.plan_cell("c14")
-    _assert_envelope_shape(e, Codes.NO_FASTENING_STEP)
+    _assert_envelope_shape(e, Codes.OCM_NO_FASTENING_STEP)
 
 
 def test_pose_unreachable(api: OcmApi):
@@ -278,8 +278,8 @@ def test_pose_unreachable(api: OcmApi):
     api.set_plan("c15", plan, part=part)
 
     e = api.plan_cell("c15")
-    _assert_envelope_shape(e, Codes.POSE_UNREACHABLE)
-    refusal = next(r for r in e.refusals if r.code == Codes.POSE_UNREACHABLE)
+    _assert_envelope_shape(e, Codes.OCM_POSE_UNREACHABLE)
+    refusal = next(r for r in e.refusals if r.code == Codes.OCM_POSE_UNREACHABLE)
     assert "standoff" in refusal.path
 
 
@@ -289,8 +289,8 @@ def test_path_collision(api: OcmApi, workspace_root: Path):
     build_two_hole_cell_with_obstacle(api)
 
     e = api.plan_cell("obstacle-cell")
-    _assert_envelope_shape(e, Codes.PATH_COLLISION)
-    refusal = next(r for r in e.refusals if r.code == Codes.PATH_COLLISION)
+    _assert_envelope_shape(e, Codes.OCM_PATH_COLLISION)
+    refusal = next(r for r in e.refusals if r.code == Codes.OCM_PATH_COLLISION)
     assert refusal.path == "plan.segments['retract_1 -> standoff_2']"
     assert refusal.allowed["instance_a"] == "blocker" or refusal.allowed["instance_b"] == "blocker"
     assert 0.0 < refusal.allowed["t"] < 1.0
@@ -303,7 +303,7 @@ def test_collision_detected(api: OcmApi):
     api.place_instance("c16", "nest1", "com.accelsolutions.fixture.pneumatic-nest@1.1.0", {"pose": {"xyz_mm": [300, 300, 0], "rpy_deg": [0, 0, 0]}})
 
     e = api.check_collision("c16")
-    _assert_envelope_shape(e, Codes.COLLISION_DETECTED)
+    _assert_envelope_shape(e, Codes.OCM_COLLISION_DETECTED)
 
 
 def test_unavailable_plan_cell(api: OcmApi, monkeypatch: pytest.MonkeyPatch):
@@ -340,7 +340,7 @@ def test_unavailable_plan_cell(api: OcmApi, monkeypatch: pytest.MonkeyPatch):
     api.set_plan("c17", plan, part=part)
 
     e = api.plan_cell("c17")
-    _assert_envelope_shape(e, Codes.UNAVAILABLE)
+    _assert_envelope_shape(e, Codes.OCM_UNAVAILABLE)
 
 
 def test_unavailable_check_collision(api: OcmApi, monkeypatch: pytest.MonkeyPatch):
@@ -353,4 +353,4 @@ def test_unavailable_check_collision(api: OcmApi, monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(generation_module, "check_collisions", raise_unavailable)
 
     e = generation_module.check_collision(api.workspace, "bracket-asm-01")
-    _assert_envelope_shape(e, Codes.UNAVAILABLE)
+    _assert_envelope_shape(e, Codes.OCM_UNAVAILABLE)

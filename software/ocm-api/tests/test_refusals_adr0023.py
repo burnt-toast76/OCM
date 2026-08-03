@@ -44,34 +44,34 @@ def _put_module(ws: Workspace, manifest: dict[str, Any]) -> None:
     write_yaml(ws.module_path(manifest["id"]), manifest)
 
 
-# --- CONDITION_UNKNOWN_SIGNAL -----------------------------------------------
+# --- OCM_CONDITION_UNKNOWN_SIGNAL -----------------------------------------------
 
 
 def test_condition_unknown_signal_surfaces_through_validate_module(api: OcmApi, ws: Workspace):
     _put_module(ws, _end_effector_manifest("com.example.tool.badcond", _drive_cap(preconditions=["ghost_signal == true"])))
     e = api.validate_module("com.example.tool.badcond")
     assert not e.ok
-    r = next(r for r in e.refusals if r.code == Codes.CONDITION_UNKNOWN_SIGNAL)
+    r = next(r for r in e.refusals if r.code == Codes.OCM_CONDITION_UNKNOWN_SIGNAL)
     assert "ADR-0023" in (r.hint or "")
 
 
-# --- TIMEOUT_DISPOSITION_CONFLICT -------------------------------------------
+# --- OCM_TIMEOUT_DISPOSITION_CONFLICT -------------------------------------------
 
 
 def test_timeout_disposition_conflict_surfaces_through_validate_module(api: OcmApi, ws: Workspace):
     _put_module(ws, _end_effector_manifest("com.example.tool.badtimeout", _drive_cap(on_timeout="hold"), abort_safe=False))
     e = api.validate_module("com.example.tool.badtimeout")
     assert not e.ok
-    assert any(r.code == Codes.TIMEOUT_DISPOSITION_CONFLICT for r in e.refusals)
+    assert any(r.code == Codes.OCM_TIMEOUT_DISPOSITION_CONFLICT for r in e.refusals)
 
 
 def test_on_timeout_hold_is_fine_when_the_module_is_abort_safe(api: OcmApi, ws: Workspace):
     _put_module(ws, _end_effector_manifest("com.example.tool.oktimeout", _drive_cap(on_timeout="hold"), abort_safe=True))
     e = api.validate_module("com.example.tool.oktimeout")
-    assert not any(r.code == Codes.TIMEOUT_DISPOSITION_CONFLICT for r in e.refusals), e.refusals
+    assert not any(r.code == Codes.OCM_TIMEOUT_DISPOSITION_CONFLICT for r in e.refusals), e.refusals
 
 
-# --- REQUIREMENT_UNBOUND / REQUIREMENT_UNKNOWN_TARGET -----------------------
+# --- OCM_REQUIREMENT_UNBOUND / OCM_REQUIREMENT_UNKNOWN_TARGET -----------------------
 
 
 def _place_robot(api: OcmApi, cell_id: str) -> None:
@@ -85,7 +85,7 @@ def test_requirement_unbound_surfaces_when_sd50_is_placed_without_a_binding(api:
     _place_robot(api, "c-unbound")
     e = api.place_instance("c-unbound", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"})
     assert not e.ok
-    r = next(r for r in e.refusals if r.code == Codes.REQUIREMENT_UNBOUND)
+    r = next(r for r in e.refusals if r.code == Codes.OCM_REQUIREMENT_UNBOUND)
     assert "workpiece_secured" in r.path
     assert "input bool" in (r.hint or "")
 
@@ -97,7 +97,7 @@ def test_requirement_unknown_target_surfaces_for_a_dangling_binding(api: OcmApi)
         requires={"workpiece_secured": "ghost.clamped"},
     )
     assert not e.ok
-    assert any(r.code == Codes.REQUIREMENT_UNKNOWN_TARGET for r in e.refusals)
+    assert any(r.code == Codes.OCM_REQUIREMENT_UNKNOWN_TARGET for r in e.refusals)
 
 
 def test_requirement_bound_to_a_real_peer_signal_resolves(api: OcmApi):

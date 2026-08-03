@@ -179,7 +179,7 @@ def test_precondition_timeout_with_on_timeout_abort_surfaces_for_on_fail(coordin
 
 
 def test_check_condition_still_raises_on_an_unknown_signal_as_a_backstop():
-    # This is the raise CONDITION_UNKNOWN_SIGNAL now pre-empts at resolve time.
+    # This is the raise OCM_CONDITION_UNKNOWN_SIGNAL now pre-empts at resolve time.
     with pytest.raises(PreconditionError):
         _check_condition("bogus == true", {})
 

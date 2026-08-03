@@ -97,7 +97,7 @@ state_machine:
   - stopping
   - stopped
   # ADR-0023 coherence: clamp declares on_timeout: hold, so the nest must be
-  # abort-safe (TIMEOUT_DISPOSITION_CONFLICT otherwise). That is in fact the
+  # abort-safe (OCM_TIMEOUT_DISPOSITION_CONFLICT otherwise). That is in fact the
   # honest reading of this fixture's safe state -- a clamp that times out or
   # aborts HOLDS the part where it is (check valve on the clamp cylinder;
   # see safety.safe_state below), it does not drop it. Recovery is a human

@@ -66,7 +66,7 @@ def write_obstacle_module(workspace_root: Path) -> None:
     known, empirically-verified spot along a two-hole plan's
     retract_1 -> standoff_2 transit (see ocm_generator's own planner test
     suite, which found this exact placement/geometry first). Used to make
-    a PATH_COLLISION refusal deterministic rather than depending on any
+    a OCM_PATH_COLLISION refusal deterministic rather than depending on any
     real cell's own borderline geometry.
     """
     import yaml
@@ -105,7 +105,7 @@ def build_two_hole_cell_with_obstacle(api, cell_id: str = "obstacle-cell") -> No
     two holes far enough apart that `com.example.obstacle.block` (see
     `write_obstacle_module`, must already be in the workspace) sits
     squarely in the straight-line joint-space sweep between them and
-    nowhere else -- a real, deterministic PATH_COLLISION.
+    nowhere else -- a real, deterministic OCM_PATH_COLLISION.
     """
     api.create_cell(cell_id, "com.accelsolutions.base.frame1200@2.0.0")
     api.place_instance(

@@ -157,9 +157,9 @@ def build_server(repo_root: str) -> FastMCP:
         "(`patch`), exactly one of the two. ALWAYS WRITES, even if invalid (ok=false then, with every "
         "schema violation as a refusal) -- validation gates publish_module, not this call, so iteration "
         "is cheap and the diff shows the attempt. Exception: safety.verified_by is a human signature and "
-        "is stripped before the write lands, every time (code HUMAN_SIGNATURE_REQUIRED).",
+        "is stripped before the write lands, every time (code OCM_HUMAN_SIGNATURE_REQUIRED).",
         '  call: update_module(id="com.example.pickhead.pk100", manifest={"ocm_version": "1.1", ...})\n'
-        '  response: {"ok": false, "data": null, "refusals": [{"code": "SCHEMA_INVALID", "path": "capabilities[0].results.part_pose", "message": "\'frame\' is a required property", "hint": "..."}]}',
+        '  response: {"ok": false, "data": null, "refusals": [{"code": "OCM_SCHEMA_INVALID", "path": "capabilities[0].results.part_pose", "message": "\'frame\' is a required property", "hint": "..."}]}',
     ))
     def update_module(id: str, manifest: dict[str, Any] | None = None, patch: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         return api.update_module(id, manifest=manifest, patch=patch).to_dict()
@@ -220,7 +220,7 @@ def build_server(repo_root: str) -> FastMCP:
         "incomplete and report the refusals as the human's completion list -- do not guess to make "
         "validation pass.",
         '  call: update_component(id="com.smc.ejector.zk2-agh", manifest={"ocm_version": "1.1", "vendor": "SMC", "source": {"kind": "datasheet", "ref": "ZK2-AGH catalog page, 2024 ed."}, ...})\n'
-        '  response: {"ok": false, "data": null, "refusals": [{"code": "SCHEMA_INVALID", "path": "source", "message": "\'ref\' is a required property", "hint": "..."}]}',
+        '  response: {"ok": false, "data": null, "refusals": [{"code": "OCM_SCHEMA_INVALID", "path": "source", "message": "\'ref\' is a required property", "hint": "..."}]}',
     ))
     def update_component(id: str, manifest: dict[str, Any] | None = None, patch: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         return api.update_component(id, manifest=manifest, patch=patch).to_dict()
@@ -287,11 +287,11 @@ def build_server(repo_root: str) -> FastMCP:
         "Add a module instance to a cell (mount is {\"pose\": {\"xyz_mm\":[...], \"rpy_deg\":[...]}} or "
         "{\"on\": \"other_instance.attachment_link\"}). ALWAYS writes, then re-resolves and rebuilds the "
         "scene -- live refusals: unknown module, revision mismatch, dangling mount.on, workspace "
-        "overhang (with the exact mm + direction, e.g. \"+X by 2.2 mm\"), or TOOL_SLOT_OCCUPIED if "
+        "overhang (with the exact mm + direction, e.g. \"+X by 2.2 mm\"), or OCM_TOOL_SLOT_OCCUPIED if "
         "mount.on names an attachment another instance already occupies -- this NEVER evicts or swaps "
         "the incumbent; remove_instance it first if that's what you mean.",
         '  call: place_instance(cell="bracket-asm-01", instance="pk1", module="com.example.pickhead.pk100@1.0.0", mount={"pose": {"xyz_mm": [2000, 300, 0], "rpy_deg": [0,0,0]}})\n'
-        '  response: {"ok": false, "refusals": [{"code": "WORKSPACE_OVERHANG", "path": "modules.pk1.mount", "message": "...+X by 800.0 mm", "hint": "Move pk1 inside the base footprint (...)."}]}',
+        '  response: {"ok": false, "refusals": [{"code": "OCM_WORKSPACE_OVERHANG", "path": "modules.pk1.mount", "message": "...+X by 800.0 mm", "hint": "Move pk1 inside the base footprint (...)."}]}',
     ))
     def place_instance(
         cell: str, instance: str, module: str, mount: dict[str, Any], requires: dict[str, str] | None = None
@@ -302,7 +302,7 @@ def build_server(repo_root: str) -> FastMCP:
 
     @mcp.tool(description=_doc(
         "Reposition an already-placed instance's mount. Same live-refusal behavior as place_instance, "
-        "including TOOL_SLOT_OCCUPIED if the new mount.on is already taken by a DIFFERENT instance.",
+        "including OCM_TOOL_SLOT_OCCUPIED if the new mount.on is already taken by a DIFFERENT instance.",
         '  call: move_instance(cell="bracket-asm-01", instance="pk1", mount={"pose": {"xyz_mm": [600, 300, 0], "rpy_deg": [0,0,0]}})\n'
         '  response: {"ok": true, "data": {"cell_id": "bracket-asm-01", "instances": ["cam1","feed1","nest1","pk1","robot1","sd1"]}}',
     ))
@@ -351,7 +351,7 @@ def build_server(repo_root: str) -> FastMCP:
 
     @mcp.tool(description=_doc(
         "A real Tesseract discrete contact check at the cell's composed state -- needs the `tesseract` "
-        "extra (code UNAVAILABLE if it isn't installed). Refusals name each colliding instance pair and penetration depth.",
+        "extra (code OCM_UNAVAILABLE if it isn't installed). Refusals name each colliding instance pair and penetration depth.",
         '  call: check_collision(cell="bracket-asm-01")\n'
         '  response: {"ok": true, "data": {"cell_id": "bracket-asm-01", "margin_mm": 1.0, "contacts": []}}',
     ))
@@ -360,8 +360,8 @@ def build_server(repo_root: str) -> FastMCP:
 
     @mcp.tool(description=_doc(
         "Plan the cell's fastening sequence end to end (IK, collision-checked joint-space path, cycle-time "
-        "table) -- needs the `tesseract` extra. Refusals name the pose (POSE_UNREACHABLE) or the segment + "
-        "colliding pair + fraction along it (PATH_COLLISION).",
+        "table) -- needs the `tesseract` extra. Refusals name the pose (OCM_POSE_UNREACHABLE) or the segment + "
+        "colliding pair + fraction along it (OCM_PATH_COLLISION).",
         '  call: plan_cell(cell="bracket-asm-01")\n'
         '  response: {"ok": true, "data": {"holes": ["hole_1","hole_2","hole_3"], "cycle_table": [...], "naive_serial_total_s": 12.9}}',
     ))

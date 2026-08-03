@@ -54,7 +54,7 @@ def test_describe_schema_component_target(api: OcmApi):
 def test_describe_schema_unknown_target_is_refused(api: OcmApi):
     e = api.describe_schema(target="cell")
     assert not e.ok
-    assert e.refusals[0].code == Codes.INVALID_ARGUMENT
+    assert e.refusals[0].code == Codes.OCM_INVALID_ARGUMENT
 
 
 def test_get_example_for_every_registered_kind(api: OcmApi):
@@ -181,7 +181,7 @@ def test_update_module_rejects_a_malformed_components_pose(api: OcmApi):
         patch=[{"op": "add", "path": "/components/0/pose", "value": {"xyz_mm": [10.0, 20.0], "bogus": True}}],
     )
     assert not e.ok
-    assert any(r.code == Codes.SCHEMA_INVALID for r in e.refusals)
+    assert any(r.code == Codes.OCM_SCHEMA_INVALID for r in e.refusals)
 
 
 def test_generate_geometry_stub(api: OcmApi, workspace_root: Path):
@@ -223,7 +223,7 @@ def test_validate_module_resolves_connectivity(api: OcmApi):
 
     validated = api.validate_module("com.example.fix.conn1")
     assert not validated.ok
-    assert any(r.code == Codes.PORT_UNCONNECTED for r in validated.refusals), [(r.code, r.message) for r in validated.refusals]
+    assert any(r.code == Codes.OCM_PORT_UNCONNECTED for r in validated.refusals), [(r.code, r.message) for r in validated.refusals]
 
 
 def test_publish_requires_geometry_a_draft_may_omit(api: OcmApi):
@@ -235,7 +235,7 @@ def test_publish_requires_geometry_a_draft_may_omit(api: OcmApi):
 
     refused = api.publish_module("com.example.fix.pub1", "1.0.0")
     assert not refused.ok
-    assert any(r.code == Codes.NOT_FOUND and r.path == "mechanical.geometry.collision" for r in refused.refusals)
+    assert any(r.code == Codes.OCM_NOT_FOUND and r.path == "mechanical.geometry.collision" for r in refused.refusals)
 
     api.generate_geometry_stub("com.example.fix.pub1", (100.0, 100.0), 50.0)
     assert api.publish_module("com.example.fix.pub1", "1.0.0").ok

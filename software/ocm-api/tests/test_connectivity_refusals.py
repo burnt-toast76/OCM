@@ -145,7 +145,7 @@ def test_net_too_few_endpoints_code(tmp_path: Path):
         components=[{"refdes": "PS1", "ref": "com.example.psu.demo1@1.0.0"}],
         nets={"electrical": [{"id": "N", "endpoints": [{"refdes": "PS1", "ref": "electrical", "pin": "1"}]}]},
     )
-    assert Codes.NET_TOO_FEW_ENDPOINTS in _codes_for(tmp_path, module, [_psu()])
+    assert Codes.OCM_NET_TOO_FEW_ENDPOINTS in _codes_for(tmp_path, module, [_psu()])
 
 
 def test_pin_on_multiple_nets_code(tmp_path: Path):
@@ -159,7 +159,7 @@ def test_pin_on_multiple_nets_code(tmp_path: Path):
             ]
         },
     )
-    assert Codes.PIN_ON_MULTIPLE_NETS in _codes_for(tmp_path, module, [_psu()])
+    assert Codes.OCM_PIN_ON_MULTIPLE_NETS in _codes_for(tmp_path, module, [_psu()])
 
 
 def test_unresolved_endpoint_code(tmp_path: Path):
@@ -168,7 +168,7 @@ def test_unresolved_endpoint_code(tmp_path: Path):
         ports=[{"id": "PWR", "domain": "electrical"}],
         nets={"electrical": [{"id": "N", "endpoints": [{"port": "PWR", "pin": "1"}, {"refdes": "PS1", "ref": "nope"}]}]},
     )
-    assert Codes.UNRESOLVED_ENDPOINT in _codes_for(tmp_path, module, [_psu()])
+    assert Codes.OCM_UNRESOLVED_ENDPOINT in _codes_for(tmp_path, module, [_psu()])
 
 
 def test_component_has_no_connectors_code(tmp_path: Path):
@@ -180,7 +180,7 @@ def test_component_has_no_connectors_code(tmp_path: Path):
         ports=[{"id": "PWR", "domain": "electrical"}],
         nets={"electrical": [{"id": "N", "endpoints": [{"port": "PWR", "pin": "1"}, {"refdes": "BR1", "ref": "X"}]}]},
     )
-    assert Codes.COMPONENT_HAS_NO_CONNECTORS in _codes_for(tmp_path, module, [_psu(), _bare()])
+    assert Codes.OCM_COMPONENT_HAS_NO_CONNECTORS in _codes_for(tmp_path, module, [_psu(), _bare()])
 
 
 def test_port_unconnected_code(tmp_path: Path):
@@ -189,7 +189,7 @@ def test_port_unconnected_code(tmp_path: Path):
         ports=[{"id": "PWR", "domain": "electrical"}, {"id": "SPARE", "domain": "electrical"}],
         nets={"electrical": [{"id": "N", "endpoints": [{"port": "PWR", "pin": "1"}, {"refdes": "PS1", "ref": "electrical", "pin": "1"}]}]},
     )
-    assert Codes.PORT_UNCONNECTED in _codes_for(tmp_path, module, [_psu()])
+    assert Codes.OCM_PORT_UNCONNECTED in _codes_for(tmp_path, module, [_psu()])
 
 
 def test_link_non_communication_port_code(tmp_path: Path):
@@ -197,7 +197,7 @@ def test_link_non_communication_port_code(tmp_path: Path):
         ports=[{"id": "C", "domain": "communication", "protocol": "ethercat", "role": "port"}, {"id": "E", "domain": "electrical"}],
         links=[{"id": "L", "a": {"port": "C"}, "b": {"port": "E"}}],
     )
-    assert Codes.LINK_NON_COMMUNICATION_PORT in _codes_for(tmp_path, module, [])
+    assert Codes.OCM_LINK_NON_COMMUNICATION_PORT in _codes_for(tmp_path, module, [])
 
 
 def test_link_protocol_mismatch_code(tmp_path: Path):
@@ -208,7 +208,7 @@ def test_link_protocol_mismatch_code(tmp_path: Path):
         ],
         links=[{"id": "L", "a": {"port": "A"}, "b": {"port": "B"}}],
     )
-    assert Codes.LINK_PROTOCOL_MISMATCH in _codes_for(tmp_path, module, [])
+    assert Codes.OCM_LINK_PROTOCOL_MISMATCH in _codes_for(tmp_path, module, [])
 
 
 def test_ethercat_chain_broken_code(tmp_path: Path):
@@ -216,7 +216,7 @@ def test_ethercat_chain_broken_code(tmp_path: Path):
         components=[{"refdes": "DP1", "ref": "com.example.slave.demo1@1.0.0"}, {"refdes": "DP2", "ref": "com.example.slave.demo1@1.0.0"}],
         links=[{"id": "L", "protocol": "ethercat", "a": {"refdes": "DP1", "ref": "X2"}, "b": {"refdes": "DP2", "ref": "X1"}}],
     )
-    assert Codes.ETHERCAT_CHAIN_BROKEN in _codes_for(tmp_path, module, [_slave()])
+    assert Codes.OCM_ETHERCAT_CHAIN_BROKEN in _codes_for(tmp_path, module, [_slave()])
 
 
 # ADR-0015 Erratum 1: pneumatic endpoint refusals keep their stable codes.
@@ -226,7 +226,7 @@ def test_pneumatic_two_ports_without_ref_code(tmp_path: Path):
         ports=[{"id": "AIR", "domain": "pneumatic", "thread": "G1/8", "function": "supply"}],
         nets={"pneumatic": [{"id": "C", "endpoints": [{"port": "AIR"}, {"refdes": "V1"}]}]},
     )
-    assert Codes.UNRESOLVED_ENDPOINT in _codes_for(tmp_path, module, [_valve()])
+    assert Codes.OCM_UNRESOLVED_ENDPOINT in _codes_for(tmp_path, module, [_valve()])
 
 
 def test_pneumatic_unknown_port_code(tmp_path: Path):
@@ -235,4 +235,4 @@ def test_pneumatic_unknown_port_code(tmp_path: Path):
         ports=[{"id": "AIR", "domain": "pneumatic", "thread": "G1/8", "function": "supply"}],
         nets={"pneumatic": [{"id": "C", "endpoints": [{"port": "AIR"}, {"refdes": "V1", "ref": "Z"}]}]},
     )
-    assert Codes.UNRESOLVED_ENDPOINT in _codes_for(tmp_path, module, [_valve()])
+    assert Codes.OCM_UNRESOLVED_ENDPOINT in _codes_for(tmp_path, module, [_valve()])

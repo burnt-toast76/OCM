@@ -113,7 +113,7 @@ def test_acceptance_demo(api: OcmApi, workspace_root: Path):
     assert len(trapped_envelope.refusals) >= 1
     refusals_seen.extend(trapped_envelope.refusals)
     trap_refusal = trapped_envelope.refusals[0]
-    assert trap_refusal.code == Codes.SCHEMA_INVALID
+    assert trap_refusal.code == Codes.OCM_SCHEMA_INVALID
     assert "frame" in trap_refusal.message
     # A pose6d-specific hint, not generic "fix the field" boilerplate --
     # it points the agent at the verb that actually answers "what frame?".
@@ -149,7 +149,7 @@ def test_acceptance_demo(api: OcmApi, workspace_root: Path):
     assert len(overhang_envelope.refusals) >= 1
     refusals_seen.extend(overhang_envelope.refusals)
     overhang_refusal = overhang_envelope.refusals[0]
-    assert overhang_refusal.code == Codes.WORKSPACE_OVERHANG
+    assert overhang_refusal.code == Codes.OCM_WORKSPACE_OVERHANG
     assert "+X" in overhang_refusal.message
 
     # Agent moves it inside the base footprint -- ok.

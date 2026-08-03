@@ -99,7 +99,7 @@ describe("placeComponentInstance", () => {
     const before = useModulesStore.getState().detail;
     vi.mocked(api.updateModule).mockResolvedValue({
       ok: false,
-      refusals: [{ code: "SCHEMA_INVALID", path: "components/0/pose", message: "'xyz_mm' is a required property", allowed: null, hint: null }],
+      refusals: [{ code: "OCM_SCHEMA_INVALID", path: "components/0/pose", message: "'xyz_mm' is a required property", allowed: null, hint: null }],
       warnings: [],
       data: null,
     });
@@ -177,7 +177,7 @@ describe("setElectricalNets", () => {
     const before = useModulesStore.getState().detail;
     vi.mocked(api.updateModule).mockResolvedValue({
       ok: false,
-      refusals: [{ code: "NET_TOO_FEW_ENDPOINTS", path: "modules['x'].nets.electrical['N1']", message: "net 'N1' has fewer than two endpoints", allowed: null, hint: null }],
+      refusals: [{ code: "OCM_NET_TOO_FEW_ENDPOINTS", path: "modules['x'].nets.electrical['N1']", message: "net 'N1' has fewer than two endpoints", allowed: null, hint: null }],
       warnings: [],
       data: null,
     });
@@ -220,7 +220,7 @@ describe("setLinks", () => {
     const before = useModulesStore.getState().detail;
     vi.mocked(api.updateModule).mockResolvedValue({
       ok: false,
-      refusals: [{ code: "LINK_PROTOCOL_MISMATCH", path: "modules['x'].links['L1']", message: "link 'L1' has mismatched protocols", allowed: null, hint: null }],
+      refusals: [{ code: "OCM_LINK_PROTOCOL_MISMATCH", path: "modules['x'].links['L1']", message: "link 'L1' has mismatched protocols", allowed: null, hint: null }],
       warnings: [],
       data: null,
     });
@@ -235,7 +235,7 @@ describe("setLinks", () => {
 
 describe("refreshChecklist", () => {
   it("clears the checklist when validate_module reports ok", async () => {
-    useModulesStore.setState({ checklist: [{ code: "PORT_UNCONNECTED", path: "x", message: "old refusal", allowed: null, hint: null }] });
+    useModulesStore.setState({ checklist: [{ code: "OCM_PORT_UNCONNECTED", path: "x", message: "old refusal", allowed: null, hint: null }] });
     vi.mocked(api.validateModule).mockResolvedValue({ ok: true, refusals: [], warnings: [], data: null });
 
     await useModulesStore.getState().refreshChecklist();
@@ -244,7 +244,7 @@ describe("refreshChecklist", () => {
   });
 
   it("stores validate_module's refusals verbatim, never reinterpreted", async () => {
-    const refusals = [{ code: "PORT_UNCONNECTED", path: "modules['x'].ports['PWR_IN']", message: "port 'PWR_IN' is unconnected", allowed: null, hint: null }];
+    const refusals = [{ code: "OCM_PORT_UNCONNECTED", path: "modules['x'].ports['PWR_IN']", message: "port 'PWR_IN' is unconnected", allowed: null, hint: null }];
     vi.mocked(api.validateModule).mockResolvedValue({ ok: false, refusals, warnings: [], data: null });
 
     await useModulesStore.getState().refreshChecklist();

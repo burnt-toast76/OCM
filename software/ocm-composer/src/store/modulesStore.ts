@@ -5,7 +5,7 @@
 // instance placement goes through update_module's own generic patch/
 // manifest write -- NEVER place_instance/move_instance (those are
 // cell-specific verbs with cell-specific refusal codes like
-// WORKSPACE_OVERHANG/TOOL_SLOT_OCCUPIED that don't apply to placing a
+// OCM_WORKSPACE_OVERHANG/OCM_TOOL_SLOT_OCCUPIED that don't apply to placing a
 // component inside a module's own local assembly scene).
 
 import { create } from "zustand";
@@ -122,7 +122,7 @@ export const useModulesStore = create<ModulesState>((set, get) => ({
         const componentsEnv = await api.listComponents();
         // Published only (revision >= 1.0.0, draft: false) -- a draft
         // component is refusable at cell-resolution time either way
-        // (DRAFT_MODULE_REFERENCED), so offering it in the picker would
+        // (OCM_DRAFT_MODULE_REFERENCED), so offering it in the picker would
         // just be a save that's guaranteed to bite later.
         const published = (componentsEnv.data ?? []).filter((c) => !c.draft);
         set(() => ({ componentOptions: published }));

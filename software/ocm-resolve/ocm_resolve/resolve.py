@@ -275,7 +275,7 @@ def _condition_lhs(expr: str) -> str:
     identifier means those still resolve against a real signal instead of
     being misreported as an unknown one. A grammar the coordinator can't yet
     evaluate is a separate concern (the runtime `PreconditionError` backstop),
-    not a CONDITION_UNKNOWN_SIGNAL. Signal/requirement names match
+    not a OCM_CONDITION_UNKNOWN_SIGNAL. Signal/requirement names match
     `^[a-z][a-z0-9_]*`, so the leading identifier is unambiguous.
     """
     m = _LHS_IDENT.match(expr)
@@ -286,12 +286,12 @@ def _check_module_capabilities(location: str, module: Module, errors: list[str])
     """ADR-0023 module-scoped refusals, surfaced by validate_module and
     (per instance) set_plan:
 
-    - CONDITION_UNKNOWN_SIGNAL: a pre/postcondition names something that is
+    - OCM_CONDITION_UNKNOWN_SIGNAL: a pre/postcondition names something that is
       neither a `comms.signals` name nor a declared `requires` key. This is
       the resolve-time replacement for the coordinator's runtime
       `PreconditionError` (Decision 5); a manifest that would fault the
       coordinator on first contact must not validate clean.
-    - TIMEOUT_DISPOSITION_CONFLICT: `on_timeout: hold` on a capability whose
+    - OCM_TIMEOUT_DISPOSITION_CONFLICT: `on_timeout: hold` on a capability whose
       module is not abort-safe -- a held op cannot resume a compromised part
       (Decision 6).
     """
@@ -319,7 +319,7 @@ def _check_module_capabilities(location: str, module: Module, errors: list[str])
 def _input_bool_instances(loaded: dict[str, ResolvedModuleInstance]) -> list[str]:
     """Instance names whose module declares at least one input bool signal --
     the candidate targets a `requires` key can be bound to. Named in the
-    REQUIREMENT_UNBOUND hint so the human's next move is obvious."""
+    OCM_REQUIREMENT_UNBOUND hint so the human's next move is obvious."""
     out = []
     for name, ri in loaded.items():
         comms = ri.module.comms
@@ -335,9 +335,9 @@ def _check_requirement_bindings(
     instance's capabilities declare must be bound by the cell to a real
     `instance.signal`.
 
-    - REQUIREMENT_UNBOUND: the instance carries a capability with a requires
+    - OCM_REQUIREMENT_UNBOUND: the instance carries a capability with a requires
       key the cell binds nothing to.
-    - REQUIREMENT_UNKNOWN_TARGET: a binding names an instance not in the cell,
+    - OCM_REQUIREMENT_UNKNOWN_TARGET: a binding names an instance not in the cell,
       or a signal that instance doesn't declare.
     """
     for name, ri in loaded.items():

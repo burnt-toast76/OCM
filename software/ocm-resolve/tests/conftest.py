@@ -107,7 +107,7 @@ def minimal_tool_manifest(
                     },
                     # ADR-0023: timeout_s/on_timeout are required on every capability.
                     # abort_safe is False below, so on_timeout must be "abort"
-                    # (hold would be a TIMEOUT_DISPOSITION_CONFLICT).
+                    # (hold would be a OCM_TIMEOUT_DISPOSITION_CONFLICT).
                     "timeout_s": 6.0,
                     "on_timeout": "abort",
                 }

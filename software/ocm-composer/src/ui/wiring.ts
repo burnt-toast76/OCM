@@ -78,8 +78,8 @@ export function applyWireClick(nets: ModuleNetRow[], a: ModuleEndpoint, b: Modul
 // segment addressed by its own declared id, never an array index -- so
 // this is a dedicated parser, not a reuse of refusalField.ts's
 // first-path-segment heuristic (which assumes a component-schema path
-// with no "modules['id'].' prefix at all). Two codes (PIN_ON_MULTIPLE_NETS,
-// UNRESOLVED_ENDPOINT) have a coarse path -- the specific pin only lives
+// with no "modules['id'].' prefix at all). Two codes (OCM_PIN_ON_MULTIPLE_NETS,
+// OCM_UNRESOLVED_ENDPOINT) have a coarse path -- the specific pin only lives
 // in the message text, single-quoted, same as ocm_resolve's own
 // _describe_pin already renders it.
 
@@ -97,12 +97,12 @@ const RE_MSG_UNRESOLVED_PORT = /references pin '([^']+)' not on port '([^']+)'/;
  * `data-field` value a matching rendered element (a pin, a net row, a
  * rail, a component card, a link row) carries -- see WiringCanvas.tsx for
  * where each is actually set. Null when a refusal names nothing this
- * canvas renders anything specific for (e.g. ETHERCAT_CHAIN_BROKEN names
+ * canvas renders anything specific for (e.g. OCM_ETHERCAT_CHAIN_BROKEN names
  * the whole links list, not one link).
  */
 export function moduleRefusalFieldKey(refusal: Refusal): string | null {
   // Message-derived pin identity takes priority -- strictly more specific
-  // than what PIN_ON_MULTIPLE_NETS/UNRESOLVED_ENDPOINT's own coarse paths
+  // than what OCM_PIN_ON_MULTIPLE_NETS/OCM_UNRESOLVED_ENDPOINT's own coarse paths
   // ("modules['id'].nets" / "modules['id']") can address.
   let m = refusal.message.match(RE_MSG_PIN_ON_COMPONENT) ?? refusal.message.match(RE_MSG_UNRESOLVED_COMPONENT);
   if (m) return `pin:${m[3]}:${m[2]}:${m[1]}`; // refdes, connector ref, pin

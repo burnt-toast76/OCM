@@ -43,7 +43,7 @@ def describe_schema(ws: Workspace, section: str | None = None, target: str = "mo
     """
     if target not in ("module", "component"):
         return single_refusal(
-            Codes.INVALID_ARGUMENT,
+            Codes.OCM_INVALID_ARGUMENT,
             path="target",
             message=f"target={target!r} is not 'module' or 'component'",
             allowed={"values": ["module", "component"]},
@@ -56,7 +56,7 @@ def describe_schema(ws: Workspace, section: str | None = None, target: str = "mo
         if subtree is None:
             known = sorted(set(schema.get("properties", {})) | set(schema.get("$defs", {})))
             return single_refusal(
-                Codes.NOT_FOUND,
+                Codes.OCM_NOT_FOUND,
                 path=f"section='{section}'",
                 message=f"no schema section {section!r} for target={target!r} (known: {known})",
                 allowed={"values": known},
@@ -78,7 +78,7 @@ def get_example(ws: Workspace, kind: str) -> Envelope:
     module_id = EXAMPLE_MODULE_BY_KIND.get(kind)
     if module_id is None or not ws.module_exists(module_id):
         return single_refusal(
-            Codes.NOT_FOUND,
+            Codes.OCM_NOT_FOUND,
             path=f"kind='{kind}'",
             message=f"no worked example registered for kind {kind!r} (known: {sorted(EXAMPLE_MODULE_BY_KIND)})",
             allowed={"values": sorted(EXAMPLE_MODULE_BY_KIND)},
@@ -195,7 +195,7 @@ def _component_aggregates(ws: Workspace, module_data: dict[str, Any]) -> tuple[d
 
 def describe_module(ws: Workspace, module_id: str) -> Envelope:
     if not ws.module_exists(module_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
 
     data = read_yaml(ws.module_path(module_id)) or {}
     schema = load_schema(ws.schema_path)
@@ -224,7 +224,7 @@ def describe_cell(ws: Workspace, cell_id: str) -> Envelope:
     from ocm_core.cell import Cell
 
     if not ws.cell_exists(cell_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"cells['{cell_id}']", message=f"no cell {cell_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"cells['{cell_id}']", message=f"no cell {cell_id!r} in this workspace")
 
     data = read_yaml(ws.cell_path(cell_id)) or {}
     payload: dict[str, Any] = {"cell_id": cell_id, "id": data.get("id"), "name": data.get("name"), "cell": data}
@@ -257,7 +257,7 @@ def list_frames(ws: Workspace, cell_id: str) -> Envelope:
     from ocm_core.cell import Cell
 
     if not ws.cell_exists(cell_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"cells['{cell_id}']", message=f"no cell {cell_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"cells['{cell_id}']", message=f"no cell {cell_id!r} in this workspace")
 
     data = read_yaml(ws.cell_path(cell_id)) or {}
     cell = Cell.from_dict(data)

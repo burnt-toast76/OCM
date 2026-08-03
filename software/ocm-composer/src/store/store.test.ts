@@ -29,7 +29,7 @@ function refusalEnvelope(): Envelope<CompositionResult> {
     data: null,
     refusals: [
       {
-        code: "WORKSPACE_OVERHANG",
+        code: "OCM_WORKSPACE_OVERHANG",
         path: "modules.feed1.mount",
         message: "module feed1: extends beyond the workspace footprint (X:[-50,1250] Y:[-50,950] mm): +X by 100.0 mm",
         allowed: { footprint: "X:[-50,1250] Y:[-50,950] mm" },
@@ -94,7 +94,7 @@ describe("moveExistingInstance", () => {
 
     const state = useComposerStore.getState();
     expect(state.refusals).toHaveLength(1);
-    expect(state.refusals[0].code).toBe("WORKSPACE_OVERHANG");
+    expect(state.refusals[0].code).toBe("OCM_WORKSPACE_OVERHANG");
     expect(state.ghost).toEqual({
       moduleId: "com.accelsolutions.screwfeeder.sf20@1.0.0",
       position: [5, 0.64, 0],

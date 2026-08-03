@@ -2,7 +2,7 @@
 """spec/09 "Agent orchestrator": the tool-use loop (tool call -> the real
 in-process OcmApi facade -> envelope -> a real next turn), the toolset
 scoping rule (component + discovery verbs only -- no cell, module-write,
-or publish verb), and the AGENT_UNAVAILABLE degraded path. STEP-upload
+or publish verb), and the OCM_AGENT_UNAVAILABLE degraded path. STEP-upload
 fallback behavior lives in test_attachments.py.
 
 The fake Anthropic client below models only the small slice of the SDK's
@@ -79,7 +79,7 @@ def test_every_tool_definition_has_a_matching_ocm_api_method():
 # System prompt: a component_id means the Components page already created
 # that draft (its own "New draft" action, a direct REST call the agent
 # never sees) before any chat message reaches the model -- the model must
-# not re-discover this the hard way via an ALREADY_EXISTS refusal.
+# not re-discover this the hard way via an OCM_ALREADY_EXISTS refusal.
 # ---------------------------------------------------------------------------
 
 
@@ -241,7 +241,7 @@ def test_tool_call_reaches_the_real_facade_and_a_real_next_turn_follows(api: Ocm
 
 def test_a_refused_tool_call_still_streams_its_envelope_and_continues(api: OcmApi):
     # A patch against a component that was never create_component_draft'd
-    # first -- a real NOT_FOUND refusal from the real facade (patching, as
+    # first -- a real OCM_NOT_FOUND refusal from the real facade (patching, as
     # opposed to a full manifest write, requires something to patch).
     client = _FakeClient(
         [
@@ -258,7 +258,7 @@ def test_a_refused_tool_call_still_streams_its_envelope_and_continues(api: OcmAp
 
     assert tool_call["ok"] is False
     assert tool_call["refusal_count"] >= 1
-    assert tool_call["envelope"]["refusals"][0]["code"] == Codes.NOT_FOUND
+    assert tool_call["envelope"]["refusals"][0]["code"] == Codes.OCM_NOT_FOUND
 
 
 def test_a_model_call_failure_mid_stream_becomes_a_real_error_event_not_a_silent_hang(api: OcmApi):
@@ -279,7 +279,7 @@ def test_a_model_call_failure_mid_stream_becomes_a_real_error_event_not_a_silent
     assert kinds == ["text", "error"]
     assert events[0][1]["delta"] == "I'll transcribe this now..."
     refusal = events[1][1]["envelope"]["refusals"][0]
-    assert refusal["code"] == Codes.INVALID_ARGUMENT
+    assert refusal["code"] == Codes.OCM_INVALID_ARGUMENT
     assert "claude-sonnet-4-6" in refusal["message"]
 
 
@@ -360,7 +360,7 @@ def test_a_refusal_stop_reason_becomes_a_real_error_event_not_a_silent_done(api:
     kinds = [e for e, _ in events]
     assert kinds == ["error"]
     refusal = events[0][1]["envelope"]["refusals"][0]
-    assert refusal["code"] == Codes.INVALID_ARGUMENT
+    assert refusal["code"] == Codes.OCM_INVALID_ARGUMENT
     assert "refusal" in refusal["message"]
 
 
@@ -389,12 +389,12 @@ def test_loop_terminates_and_reports_itself_if_the_model_never_stops_calling_too
 
     events = _parse_sse("".join(run_agent_chat(client, api, [{"role": "user", "content": "loop forever"}])))
     assert events[-1][0] == "error"
-    assert events[-1][1]["envelope"]["refusals"][0]["code"] == Codes.INVALID_ARGUMENT
+    assert events[-1][1]["envelope"]["refusals"][0]["code"] == Codes.OCM_INVALID_ARGUMENT
     assert "tool-call turns" in events[-1][1]["envelope"]["refusals"][0]["message"]
 
 
 # ---------------------------------------------------------------------------
-# AGENT_UNAVAILABLE
+# OCM_AGENT_UNAVAILABLE
 # ---------------------------------------------------------------------------
 
 
@@ -407,7 +407,7 @@ def test_agent_chat_returns_agent_unavailable_when_api_key_is_unset(workspace_ro
     assert response.status_code == 200  # SSE itself always 200s -- the refusal is IN the stream, not the transport
     events = _parse_sse(response.text)
     assert events[0][0] == "error"
-    assert events[0][1]["envelope"]["refusals"][0]["code"] == Codes.AGENT_UNAVAILABLE
+    assert events[0][1]["envelope"]["refusals"][0]["code"] == Codes.OCM_AGENT_UNAVAILABLE
 
 
 def test_agent_chat_does_not_reach_anthropic_at_all_when_unavailable(workspace_root, monkeypatch: pytest.MonkeyPatch):
@@ -415,12 +415,12 @@ def test_agent_chat_does_not_reach_anthropic_at_all_when_unavailable(workspace_r
     # environment happens to export a real key, this test's own explicit
     # deletion must be what the route sees -- assert against os.environ
     # directly so a real key elsewhere in CI can't silently mask a broken
-    # AGENT_UNAVAILABLE check.
+    # OCM_AGENT_UNAVAILABLE check.
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     assert "ANTHROPIC_API_KEY" not in os.environ
     client = TestClient(build_app(str(workspace_root)))
     response = client.post("/agent/chat", json={"messages": [{"role": "user", "content": "hi"}]})
-    assert "AGENT_UNAVAILABLE" in response.text
+    assert "OCM_AGENT_UNAVAILABLE" in response.text
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +441,7 @@ def test_agent_models_lists_every_allowed_model_and_the_default(workspace_root):
 def test_agent_chat_rejects_an_unknown_model_before_ever_checking_for_an_api_key(workspace_root, monkeypatch: pytest.MonkeyPatch):
     # No ANTHROPIC_API_KEY is set here either -- an invalid model is a bad
     # request regardless of whether the server could otherwise reach
-    # Anthropic, so it must be caught first, not masked by AGENT_UNAVAILABLE.
+    # Anthropic, so it must be caught first, not masked by OCM_AGENT_UNAVAILABLE.
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     client = TestClient(build_app(str(workspace_root)))
 
@@ -451,6 +451,6 @@ def test_agent_chat_rejects_an_unknown_model_before_ever_checking_for_an_api_key
     events = _parse_sse(response.text)
     assert events[0][0] == "error"
     refusal = events[0][1]["envelope"]["refusals"][0]
-    assert refusal["code"] == Codes.INVALID_ARGUMENT
+    assert refusal["code"] == Codes.OCM_INVALID_ARGUMENT
     assert "gpt-not-a-claude-model" in refusal["message"]
     assert set(refusal["allowed"]["values"]) == set(ALLOWED_MODELS)

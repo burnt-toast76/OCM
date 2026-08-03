@@ -36,7 +36,7 @@ def _todo_capability() -> dict[str, Any]:
     # not omitted -- ADR-0016 Decision 3's omit-rather-than-fake rule is for
     # geometry artifact PATHS to files that don't exist, not scalar facts.
     # on_timeout is "abort" to match the skeleton's abort_safe: false
-    # (a "hold" there would be a TIMEOUT_DISPOSITION_CONFLICT).
+    # (a "hold" there would be a OCM_TIMEOUT_DISPOSITION_CONFLICT).
     return {
         "name": "todo_op",
         "summary": "TODO: describe what this capability does (the agent-facing surface).",
@@ -112,11 +112,11 @@ def _skeleton_manifest(module_id: str, kind: str) -> dict[str, Any]:
 
 def create_module_draft(ws: Workspace, module_id: str, kind: str) -> Envelope:
     if ws.module_exists(module_id):
-        return single_refusal(Codes.ALREADY_EXISTS, path=f"modules['{module_id}']", message=f"a module {module_id!r} already exists")
+        return single_refusal(Codes.OCM_ALREADY_EXISTS, path=f"modules['{module_id}']", message=f"a module {module_id!r} already exists")
 
     known_kinds = load_schema(ws.schema_path)["properties"]["kind"]["enum"]
     if kind not in known_kinds:
-        return single_refusal(Codes.INVALID_ARGUMENT, path="kind", message=f"{kind!r} is not a known kind", allowed={"values": known_kinds})
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="kind", message=f"{kind!r} is not a known kind", allowed={"values": known_kinds})
 
     doc = _skeleton_manifest(module_id, kind)
     write_yaml(ws.module_path(module_id), doc)
@@ -125,7 +125,7 @@ def create_module_draft(ws: Workspace, module_id: str, kind: str) -> Envelope:
 
 def _strip_verified_by(doc: dict[str, Any]) -> Refusal | None:
     """Spec/09 hard rule: "The API refuses to write `safety.verified_by`."
-    That field is a human signature (spec/06); code HUMAN_SIGNATURE_REQUIRED.
+    That field is a human signature (spec/06); code OCM_HUMAN_SIGNATURE_REQUIRED.
     Mutates `doc` in place (removes the field) so the caller's subsequent
     write genuinely never persists it -- not merely reports an error while
     still saving it.
@@ -134,7 +134,7 @@ def _strip_verified_by(doc: dict[str, Any]) -> Refusal | None:
     if isinstance(safety, dict) and safety.get("verified_by"):
         del safety["verified_by"]
         return Refusal(
-            code=Codes.HUMAN_SIGNATURE_REQUIRED,
+            code=Codes.OCM_HUMAN_SIGNATURE_REQUIRED,
             path="safety.verified_by",
             message="safety.verified_by is a human signature (spec/06) -- the API will not write it.",
             hint="Have a qualified person sign off out of band and commit that edit directly, not through this API.",
@@ -144,11 +144,11 @@ def _strip_verified_by(doc: dict[str, Any]) -> Refusal | None:
 
 def update_module(ws: Workspace, module_id: str, manifest: dict[str, Any] | None = None, patch: list[dict[str, Any]] | None = None) -> Envelope:
     if (manifest is None) == (patch is None):
-        return single_refusal(Codes.INVALID_ARGUMENT, path="$", message="update_module needs exactly one of `manifest` or `patch`")
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="$", message="update_module needs exactly one of `manifest` or `patch`")
 
     if patch is not None:
         if not ws.module_exists(module_id):
-            return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} to patch")
+            return single_refusal(Codes.OCM_NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} to patch")
         current = read_yaml(ws.module_path(module_id)) or {}
         try:
             doc = jsonpatch.apply_patch(current, patch)
@@ -159,7 +159,7 @@ def update_module(ws: Workspace, module_id: str, manifest: dict[str, Any] | None
             # bare TypeError/KeyError/IndexError (patching into the wrong
             # document shape) all come from the same untrusted input and
             # must land as a refusal, not an exception escaping the API.
-            return single_refusal(Codes.INVALID_ARGUMENT, path="$", message=f"invalid RFC-6902 patch: {e}")
+            return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="$", message=f"invalid RFC-6902 patch: {e}")
     else:
         doc = dict(manifest)  # type: ignore[arg-type]
 
@@ -187,7 +187,7 @@ def generate_geometry_stub(ws: Workspace, module_id: str, footprint_mm: tuple[fl
     hand-write URDF -- this is the generator.
     """
     if not ws.module_exists(module_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
 
     x_mm, y_mm = footprint_mm
     x_m, y_m, z_m = x_mm / 1000.0, y_mm / 1000.0, height_mm / 1000.0
@@ -233,7 +233,7 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
     file that exists -- a claim nothing backs is exactly what this catches.
     """
     if not ws.module_exists(module_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
 
     doc = read_yaml(ws.module_path(module_id)) or {}
     schema = load_schema(ws.schema_path)
@@ -248,7 +248,7 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
     if collision and not (module_dir / collision).is_file():
         refusals.append(
             Refusal(
-                code=Codes.NOT_FOUND,
+                code=Codes.OCM_NOT_FOUND,
                 path="mechanical.geometry.collision",
                 message=f"{collision!r} does not exist under {module_dir}",
                 hint="generate_geometry_stub(...) first, or point at a real collision mesh file.",
@@ -258,7 +258,7 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
         # ADR-0016 Decision 3: a draft may omit this; a published module cannot.
         refusals.append(
             Refusal(
-                code=Codes.NOT_FOUND,
+                code=Codes.OCM_NOT_FOUND,
                 path="mechanical.geometry.collision",
                 message=f"a published module must declare mechanical.geometry.collision; {module_id!r} does not",
                 hint="generate_geometry_stub(...) before publishing, or keep it a 0.x draft.",
@@ -268,7 +268,7 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
     if urdf_fragment and not (module_dir / urdf_fragment).is_file():
         refusals.append(
             Refusal(
-                code=Codes.NOT_FOUND,
+                code=Codes.OCM_NOT_FOUND,
                 path="mechanical.geometry.urdf_fragment",
                 message=f"{urdf_fragment!r} does not exist under {module_dir}",
                 hint="generate_geometry_stub(...) first, or point at a real file.",
@@ -276,7 +276,7 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
         )
     esi = doc.get("comms", {}).get("esi")
     if esi and not (module_dir / esi).is_file():
-        refusals.append(Refusal(code=Codes.NOT_FOUND, path="comms.esi", message=f"{esi!r} does not exist under {module_dir}"))
+        refusals.append(Refusal(code=Codes.OCM_NOT_FOUND, path="comms.esi", message=f"{esi!r} does not exist under {module_dir}"))
 
     # ADR-0016 Decision 1: resolve this module's nets/links/ports against the
     # components they reference -- the same check resolve_cell runs per
@@ -298,12 +298,12 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
 
 def publish_module(ws: Workspace, module_id: str, revision: str) -> Envelope:
     if not ws.module_exists(module_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
     if not _REVISION_RE.match(revision):
-        return single_refusal(Codes.INVALID_ARGUMENT, path="revision", message=f"{revision!r} is not a valid SemVer (X.Y.Z)")
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="revision", message=f"{revision!r} is not a valid SemVer (X.Y.Z)")
     if is_draft_revision(revision):
         return single_refusal(
-            Codes.DRAFT_NOT_PUBLISHABLE,
+            Codes.OCM_DRAFT_NOT_PUBLISHABLE,
             path="revision",
             message=f"{revision!r} is itself a 0.x draft revision -- publishing requires a real (>=1.0.0) release",
             hint="Choose a revision whose major version is >= 1.",
@@ -320,7 +320,7 @@ def publish_module(ws: Workspace, module_id: str, revision: str) -> Envelope:
     # file exists; here we require it be declared at all.
     if not doc.get("mechanical", {}).get("geometry", {}).get("collision"):
         return single_refusal(
-            Codes.NOT_FOUND,
+            Codes.OCM_NOT_FOUND,
             path="mechanical.geometry.collision",
             message=f"cannot publish {module_id!r}: it declares no mechanical.geometry.collision",
             hint="generate_geometry_stub(...) first, then publish.",

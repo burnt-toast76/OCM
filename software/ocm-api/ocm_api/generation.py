@@ -3,7 +3,7 @@
 one of these is a thin translation over `ocm_generator`'s own scene/
 planner/emitters -- `check_collision`/`plan_cell` need the `tesseract`
 extra (same as the underlying `ocm scene --collision`/`ocm plan`); a
-missing extra becomes an `UNAVAILABLE` refusal, not an exception the
+missing extra becomes an `OCM_UNAVAILABLE` refusal, not an exception the
 caller has to catch.
 """
 
@@ -45,13 +45,13 @@ def _resolve_and_build(ws: Workspace, cell_id: str) -> tuple[Any, Any, list[Refu
     `refusals` is non-empty.
     """
     if not ws.cell_exists(cell_id):
-        return None, None, [Refusal(code=Codes.NOT_FOUND, path=f"cells['{cell_id}']", message=f"no cell {cell_id!r} in this workspace")]
+        return None, None, [Refusal(code=Codes.OCM_NOT_FOUND, path=f"cells['{cell_id}']", message=f"no cell {cell_id!r} in this workspace")]
 
     doc = read_yaml(ws.cell_path(cell_id)) or {}
     try:
         cell = Cell.from_dict(doc)
     except (KeyError, ValueError) as e:
-        return None, None, [Refusal(code=Codes.CELL_INVALID, path="$", message=f"cell document is structurally incomplete: {e}")]
+        return None, None, [Refusal(code=Codes.OCM_CELL_INVALID, path="$", message=f"cell document is structurally incomplete: {e}")]
 
     resolved, refusals = resolve_with_refusals(cell, ws)
     if resolved is None:
@@ -100,9 +100,9 @@ def check_collision(ws: Workspace, cell_id: str, collision_margin_mm: float = 1.
     try:
         result = check_collisions(scene, contact_distance_mm=collision_margin_mm)
     except CollisionCheckUnavailable as e:
-        return single_refusal(Codes.UNAVAILABLE, path="$", message=str(e))
+        return single_refusal(Codes.OCM_UNAVAILABLE, path="$", message=str(e))
     except CollisionCheckError as e:
-        return single_refusal(Codes.CELL_INVALID, path="$", message=str(e))
+        return single_refusal(Codes.OCM_CELL_INVALID, path="$", message=str(e))
 
     contacts = [
         {
@@ -129,15 +129,15 @@ def plan_cell(ws: Workspace, cell_id: str, collision_margin_mm: float = 1.0, pat
     try:
         plan = plan_fastening_sequence(resolved, scene, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
     except NoDriveScrewStepError as e:
-        return single_refusal(Codes.NO_FASTENING_STEP, path="plan", message=str(e), hint="Add a for_each fastening step with a drive_screw op to the plan.")
+        return single_refusal(Codes.OCM_NO_FASTENING_STEP, path="plan", message=str(e), hint="Add a for_each fastening step with a drive_screw op to the plan.")
     except PoseUnreachableError as e:
         return Envelope.refuse([pose_unreachable_to_refusal(e.pose_name, str(e))])
     except PathCollisionError as e:
         return Envelope.refuse([path_collision_to_refusal(e.segment, e.instance_a, e.instance_b, e.link_a, e.link_b, e.fraction, str(e))])
     except PlanningUnavailable as e:
-        return single_refusal(Codes.UNAVAILABLE, path="$", message=str(e))
+        return single_refusal(Codes.OCM_UNAVAILABLE, path="$", message=str(e))
     except PlanningError as e:
-        return single_refusal(Codes.CELL_INVALID, path="plan", message=str(e))
+        return single_refusal(Codes.OCM_CELL_INVALID, path="plan", message=str(e))
 
     report = estimate_cycle_time(plan)
     cycle_table = [
@@ -187,15 +187,15 @@ def emit(
         try:
             plan = plan_fastening_sequence(resolved, scene, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
         except NoDriveScrewStepError as e:
-            return single_refusal(Codes.NO_FASTENING_STEP, path="plan", message=str(e))
+            return single_refusal(Codes.OCM_NO_FASTENING_STEP, path="plan", message=str(e))
         except PoseUnreachableError as e:
             return Envelope.refuse([pose_unreachable_to_refusal(e.pose_name, str(e))])
         except PathCollisionError as e:
             return Envelope.refuse([path_collision_to_refusal(e.segment, e.instance_a, e.instance_b, e.link_a, e.link_b, e.fraction, str(e))])
         except PlanningUnavailable as e:
-            return single_refusal(Codes.UNAVAILABLE, path="$", message=str(e))
+            return single_refusal(Codes.OCM_UNAVAILABLE, path="$", message=str(e))
         except PlanningError as e:
-            return single_refusal(Codes.CELL_INVALID, path="plan", message=str(e))
+            return single_refusal(Codes.OCM_CELL_INVALID, path="plan", message=str(e))
 
         if urscript is not None:
             Path(urscript).write_text(emit_urscript(plan), encoding="utf-8")

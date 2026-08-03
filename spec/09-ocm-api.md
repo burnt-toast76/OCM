@@ -13,7 +13,7 @@ verbs. **The refusal engine lives behind this surface and nowhere else.**
 {
   "ok": false,
   "refusals": [{
-    "code": "PARAM_OUT_OF_BOUNDS",
+    "code": "OCM_PARAM_OUT_OF_BOUNDS",
     "path": "plan[2].sequence[1].params.torque_nm",
     "message": "torque_nm=6.0 exceeds drive_screw limit on sd1 (com.accelsolutions.screwdriver.sd50@1.2.0)",
     "allowed": {"min": 0.2, "max": 5.0, "unit": "N.m"},
@@ -64,8 +64,8 @@ verbs. **The refusal engine lives behind this surface and nowhere else.**
 | Verb | Behavior |
 |---|---|
 | `create_cell(id, base_module)` | Scaffolds cell.yaml with the base + datum conventions. |
-| `place_instance(cell, instance, module@rev, mount, requires?)` / `move_instance` / `remove_instance` | Each call re-resolves and returns the envelope — **live refusals**: unknown module, revision mismatch, dangling `mount.on`, workspace overhang (with mm + direction). `requires` binds a capability's abstract requirement to a concrete `instance.signal` (ADR-0023); `REQUIREMENT_UNBOUND` if a placed instance carries a requirement the cell binds to nothing, `REQUIREMENT_UNKNOWN_TARGET` if a binding names an instance/signal that isn't there. This is the GUI's drag handler and the agent's placement tool: same verb. |
-| `set_plan(cell, plan)` | Writes + resolves: unknown ops, param bounds, and **conditions** (ADR-0023). A capability's `preconditions`/`postconditions` and `requires` keys resolve statically here — `CONDITION_UNKNOWN_SIGNAL` if a condition names neither a `comms.signals` name nor a declared `requires` key, `TIMEOUT_DISPOSITION_CONFLICT` if a capability declares `on_timeout: hold` while its module is not `abort_safe`. The plan itself is verbs only: there is no wait/guard/`when` key, because the wait lives inside the verb (ADR-0023 Decision 1). |
+| `place_instance(cell, instance, module@rev, mount, requires?)` / `move_instance` / `remove_instance` | Each call re-resolves and returns the envelope — **live refusals**: unknown module, revision mismatch, dangling `mount.on`, workspace overhang (with mm + direction). `requires` binds a capability's abstract requirement to a concrete `instance.signal` (ADR-0023); `OCM_REQUIREMENT_UNBOUND` if a placed instance carries a requirement the cell binds to nothing, `OCM_REQUIREMENT_UNKNOWN_TARGET` if a binding names an instance/signal that isn't there. This is the GUI's drag handler and the agent's placement tool: same verb. |
+| `set_plan(cell, plan)` | Writes + resolves: unknown ops, param bounds, and **conditions** (ADR-0023). A capability's `preconditions`/`postconditions` and `requires` keys resolve statically here — `OCM_CONDITION_UNKNOWN_SIGNAL` if a condition names neither a `comms.signals` name nor a declared `requires` key, `OCM_TIMEOUT_DISPOSITION_CONFLICT` if a capability declares `on_timeout: hold` while its module is not `abort_safe`. The plan itself is verbs only: there is no wait/guard/`when` key, because the wait lives inside the verb (ADR-0023 Decision 1). |
 | `set_joint_state(cell, instance, joints)` | Robot home pose. |
 
 ### Checking & generation (wrapping what exists)
@@ -80,7 +80,7 @@ verbs. **The refusal engine lives behind this surface and nowhere else.**
 ## Hard rules
 
 - **The API refuses to write `safety.verified_by`.** That field is a human signature
-  (spec/06). Code: `HUMAN_SIGNATURE_REQUIRED`. The agent may fill every other safety field
+  (spec/06). Code: `OCM_HUMAN_SIGNATURE_REQUIRED`. The agent may fill every other safety field
   (hazards, PL, guarding) — declaring hazards is authoring; signing off is not.
 - **No transport I/O.** This surface ends at generated artifacts. Going live (coordinator,
   drivers) is a separate, later surface with its own authz story.
@@ -108,7 +108,7 @@ An Anthropic Messages API tool-use loop (model `claude-sonnet-4-6`, key from
 |---|---|
 | `text` | `{"delta": str}` -- a text token as it streams |
 | `tool_call` | `{"name", "ok", "refusal_count", "envelope"}` -- compact enough for the UI to render a chip ("update_component ✓" / "update_component ✗ 2 refusals"), full envelope included for an expand-to-detail view |
-| `error` | `{"envelope"}` -- a terminal refusal (AGENT_UNAVAILABLE, or the loop exceeding its own turn ceiling) |
+| `error` | `{"envelope"}` -- a terminal refusal (OCM_AGENT_UNAVAILABLE, or the loop exceeding its own turn ceiling) |
 | `done` | `{}` -- the turn finished normally |
 
 **Toolset scoping is the load-bearing rule here, not an implementation detail.** Tools are
@@ -133,7 +133,7 @@ same rule in the same words, not two paraphrases that can drift.
 
 **Degraded mode:** if `ANTHROPIC_API_KEY` isn't set in the server's environment, `/agent/chat`
 never calls Anthropic at all -- it streams one `error` event carrying an envelope refused with
-code `AGENT_UNAVAILABLE` and a hint to set the key and restart. Still HTTP 200 and still
+code `OCM_AGENT_UNAVAILABLE` and a hint to set the key and restart. Still HTTP 200 and still
 SSE-shaped (the refusal is IN the stream), so a client only needs one parsing path regardless
 of availability.
 

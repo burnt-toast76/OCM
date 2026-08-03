@@ -26,7 +26,7 @@ class PreconditionError(CoordinatorError):
 
     ADR-0023 Decision 5: this is now a *backstop*. The same defect --
     a condition naming a signal the module doesn't declare -- is refused at
-    resolve time (CONDITION_UNKNOWN_SIGNAL), so a validated manifest should
+    resolve time (OCM_CONDITION_UNKNOWN_SIGNAL), so a validated manifest should
     never reach this raise. It stays as a guard against an unvalidated
     manifest driven straight into the coordinator.
     """

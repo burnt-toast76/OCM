@@ -75,15 +75,15 @@ interface, the cell wires it. It makes cross-module interlocks expressible witho
 plan any condition syntax, and without sd50's manifest acquiring knowledge of a nest.
 
 An instance carrying a capability with an unbound requirement refuses at resolve
-(`REQUIREMENT_UNBOUND`), with a hint naming the instances that declare a bool of the right
+(`OCM_REQUIREMENT_UNBOUND`), with a hint naming the instances that declare a bool of the right
 shape. A binding pointing at an instance or signal that does not exist refuses
-(`REQUIREMENT_UNKNOWN_TARGET`).
+(`OCM_REQUIREMENT_UNKNOWN_TARGET`).
 
 ## Decision 5 — Conditions resolve statically
 
 A `precondition`, `postcondition`, or `requires` reference naming a signal the module does not
 declare in `comms.signals` — and does not bind, per Decision 4 — is a **resolve-time refusal**
-(`CONDITION_UNKNOWN_SIGNAL`), surfaced by `validate_module` and `set_plan`. It is not a runtime
+(`OCM_CONDITION_UNKNOWN_SIGNAL`), surfaced by `validate_module` and `set_plan`. It is not a runtime
 `PreconditionError`.
 
 Per ADR-0016, there is one validation surface. A manifest that will fault the coordinator on
@@ -99,7 +99,7 @@ of `hold` or `abort`.
 - `abort` → the part is compromised and routes to reject.
 
 `on_timeout: hold` on a capability declaring `abort_safe: false` is incoherent and refuses at
-validate (`TIMEOUT_DISPOSITION_CONFLICT`).
+validate (`OCM_TIMEOUT_DISPOSITION_CONFLICT`).
 
 **A plan may not override `timeout_s`.** A part that legitimately needs a longer clamp travel
 is a module revision, not a plan tweak. One source of truth for how long the hardware takes.
@@ -184,8 +184,8 @@ plan:                        # unchanged: verbs only
 - `simulated_module.py` must stop deriving its behavior from `postconditions`, or the new
   verification tests nothing. The simulator drives signals from its own script; the
   coordinator checks them against the manifest.
-- Four new refusal codes: `REQUIREMENT_UNBOUND`, `REQUIREMENT_UNKNOWN_TARGET`,
-  `CONDITION_UNKNOWN_SIGNAL`, `TIMEOUT_DISPOSITION_CONFLICT`.
+- Four new refusal codes: `OCM_REQUIREMENT_UNBOUND`, `OCM_REQUIREMENT_UNKNOWN_TARGET`,
+  `OCM_CONDITION_UNKNOWN_SIGNAL`, `OCM_TIMEOUT_DISPOSITION_CONFLICT`.
 - Existing committed modules become incomplete — none declares `timeout_s`. Per ADR-0014 the
   refusals are the completion list, not a reason to default the value.
 - spec/09's `set_plan` row becomes true rather than aspirational. spec/08 gains a paragraph on

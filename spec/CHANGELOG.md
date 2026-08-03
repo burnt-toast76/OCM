@@ -1,5 +1,17 @@
 # Spec changelog
 
+## Refusal codes namespaced `OCM_` (ADR-0025 D4) — **breaking** for the API surface
+
+Every refusal code is now prefixed `OCM_`. The 37 codes the engines emitted bare
+(`SCHEMA_INVALID` → `OCM_SCHEMA_INVALID`, `PARAM_OUT_OF_BOUNDS` → `OCM_PARAM_OUT_OF_BOUNDS`, …)
+were renamed everywhere they appear: `ocm-api`'s `Codes` and every emitted string, the
+`ocm-composer` frontend that switches on them, tests, spec text, and the catalogue keys. This
+is a breaking change to the API's refusal contract — a client matching on `"SCHEMA_INVALID"`
+will no longer match. Nothing external consumes it yet (ADR-0012 scopes v1 as a single-user
+local service), which is why the rename is cheap now and would not be later; it is filed as a
+breaking change regardless, not a tidy-up. The catalogue (`spec/schema/ocm-refusals-1.0.yaml`)
+is now single-namespace.
+
 ## Conditions belong to modules (ADR-0023) — **breaking** for capabilities
 
 The plan is verbs; everything a step must wait for is declared on the capability whose module

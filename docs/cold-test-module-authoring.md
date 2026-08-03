@@ -77,7 +77,7 @@ front, then **one** `update_module`, then **one** `validate_module`, which
 returned a single refusal:
 
 ```
-NOT_FOUND  mechanical.geometry.collision  'geometry/collision.glb' does not exist ...
+OCM_NOT_FOUND  mechanical.geometry.collision  'geometry/collision.glb' does not exist ...
 ```
 
 and they stopped — correctly. That refusal is the geometry wall: `collision` is
@@ -144,7 +144,7 @@ reads as "clean" during authoring.
 
 **2. The granted six-verb subset cannot reach "clean."** Every fresh draft ships a
 placeholder `mechanical.geometry.collision`, which `validate_module` refuses as
-`NOT_FOUND`; clearing it needs `generate_geometry_stub`, which is not in the set.
+`OCM_NOT_FOUND`; clearing it needs `generate_geometry_stub`, which is not in the set.
 All three runs terminated at this wall. "Iterate until clean" is unreachable with
 these verbs — the stop condition had to be "only geometry remains."
 
@@ -203,7 +203,7 @@ resolve time.
 - **Decide whether authoring should distinguish "authoring-complete" from
   "geometry-pending"**, or include a geometry-stub verb, so an authoring agent
   restricted to authoring verbs can reach a definite done state instead of a
-  permanent geometry `NOT_FOUND`.
+  permanent geometry `OCM_NOT_FOUND`.
 
 ## Reproducing
 
@@ -229,23 +229,23 @@ manifest), not the agents' narration.
 
 ## Per-run `validate_module` sequence
 
-| run | validate_module calls, in order | reached `valid:true` | geometry `NOT_FOUND` seen | pneumatic net refused | fabricated facts |
+| run | validate_module calls, in order | reached `valid:true` | geometry `OCM_NOT_FOUND` seen | pneumatic net refused | fabricated facts |
 |---|---|---|---|---|---|
-| 1 | `UNRESOLVED_ENDPOINT` → `PORT_UNCONNECTED` → **`ok`** → `UNRESOLVED_ENDPOINT` | yes (turn 3) | no | no | 0 |
-| 2 | `UNRESOLVED_ENDPOINT` ×3 | no | no | no | 0 |
-| 3 | **`ok`** → `UNRESOLVED_ENDPOINT` → `SCHEMA_INVALID` → `PORT_UNCONNECTED` → `UNRESOLVED_ENDPOINT` | yes (turns 1 & 4-update) | no | no | 0 |
+| 1 | `OCM_UNRESOLVED_ENDPOINT` → `OCM_PORT_UNCONNECTED` → **`ok`** → `OCM_UNRESOLVED_ENDPOINT` | yes (turn 3) | no | no | 0 |
+| 2 | `OCM_UNRESOLVED_ENDPOINT` ×3 | no | no | no | 0 |
+| 3 | **`ok`** → `OCM_UNRESOLVED_ENDPOINT` → `OCM_SCHEMA_INVALID` → `OCM_PORT_UNCONNECTED` → `OCM_UNRESOLVED_ENDPOINT` | yes (turns 1 & 4-update) | no | no | 0 |
 
 ## The three closures
 
 **Finding 1 — connectivity refusals now fire during authoring. CLOSED.** In Run 1,
-`validate_module` returned *only* the geometry `NOT_FOUND`; connectivity was
+`validate_module` returned *only* the geometry `OCM_NOT_FOUND`; connectivity was
 invisible until cell resolution. In Run 2, **every** run's authoring loop is driven
-by connectivity refusals: all three hit `UNRESOLVED_ENDPOINT` naming the dispenser
+by connectivity refusals: all three hit `OCM_UNRESOLVED_ENDPOINT` naming the dispenser
 (`DP1`/`DISP1`) with no connector `ref`, and runs 1 and 3 also hit
-`PORT_UNCONNECTED` on the orphaned `network_in` port — the exact refusal ADR-0016
+`OCM_PORT_UNCONNECTED` on the orphaned `network_in` port — the exact refusal ADR-0016
 discusses. The loop the platform is built on now closes: the agent proposes, the
-refusal engine corrects, and the agent iterates (run 1: `UNRESOLVED_ENDPOINT` →
-drop endpoints → `PORT_UNCONNECTED` → drop port → `ok`). Two agents even ran their
+refusal engine corrects, and the agent iterates (run 1: `OCM_UNRESOLVED_ENDPOINT` →
+drop endpoints → `OCM_PORT_UNCONNECTED` → drop port → `ok`). Two agents even ran their
 own isolation experiments *against the live refusals* to localize the fault to the
 dispenser — impossible in Run 1, where the check never ran.
 
@@ -257,7 +257,7 @@ this same net was one of the five resolve-time refusals ("declares no connectors
 pinout missing").
 
 **Finding 2 / Decision 3 — the geometry wall is gone; a definite done state is
-reachable. CLOSED.** Geometry `NOT_FOUND` never appeared in any run. The fresh
+reachable. CLOSED.** Geometry `OCM_NOT_FOUND` never appeared in any run. The fresh
 draft is valid out of the box (run 3, turn 1: `ok`), and runs 1 and 3 both reached
 `valid:true` on a fully-wired-where-possible module. The draft now omits the
 artifact claim instead of walling on a placeholder path, so "manifest complete,

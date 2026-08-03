@@ -124,7 +124,7 @@ def test_publish_component_gates_on_validity_same_as_modules(api: OcmApi):
     api.create_component_draft("com.example.ejector.demo2", "vacuum_ejector")
     e = api.publish_component("com.example.ejector.demo2", "1.0.0")
     assert not e.ok
-    assert any(r.code == Codes.SCHEMA_INVALID for r in e.refusals)
+    assert any(r.code == Codes.OCM_SCHEMA_INVALID for r in e.refusals)
 
 
 def test_draft_component_cannot_publish_at_a_0x_revision(api: OcmApi):
@@ -132,7 +132,7 @@ def test_draft_component_cannot_publish_at_a_0x_revision(api: OcmApi):
     api.update_component("com.example.ejector.demo3", manifest=_ejector_manifest("com.example.ejector.demo3"))
     e = api.publish_component("com.example.ejector.demo3", "0.2.0")
     assert not e.ok
-    assert e.refusals[0].code == Codes.DRAFT_NOT_PUBLISHABLE
+    assert e.refusals[0].code == Codes.OCM_DRAFT_NOT_PUBLISHABLE
 
 
 # ---------------------------------------------------------------------------
@@ -332,7 +332,7 @@ def _place_tool(api: OcmApi, cell_id: str, module_id: str, components: list[dict
 def test_unknown_component_is_refused(api: OcmApi):
     e = _place_tool(api, "c-unknown", "com.example.pickhead.unknown1", [{"refdes": "VG1", "ref": "com.example.ejector.doesnotexist@1.0.0"}])
     assert not e.ok
-    assert e.refusals[0].code == Codes.UNKNOWN_COMPONENT
+    assert e.refusals[0].code == Codes.OCM_UNKNOWN_COMPONENT
 
 
 def test_duplicate_refdes_is_refused(api: OcmApi):
@@ -345,7 +345,7 @@ def test_duplicate_refdes_is_refused(api: OcmApi):
         ],
     )
     assert not e.ok
-    assert e.refusals[0].code == Codes.DUPLICATE_REFDES
+    assert e.refusals[0].code == Codes.OCM_DUPLICATE_REFDES
 
 
 def test_source_unknown_refdes_is_refused(api: OcmApi):
@@ -356,7 +356,7 @@ def test_source_unknown_refdes_is_refused(api: OcmApi):
         signal_source="VG9.vacuum_switch",
     )
     assert not e.ok
-    assert e.refusals[0].code == Codes.INVALID_SOURCE
+    assert e.refusals[0].code == Codes.OCM_INVALID_SOURCE
     assert "VG9" in e.refusals[0].message
 
 
@@ -368,7 +368,7 @@ def test_source_unknown_signal_on_component_is_refused(api: OcmApi):
         signal_source="VG1.not_a_real_signal",
     )
     assert not e.ok
-    assert e.refusals[0].code == Codes.INVALID_SOURCE
+    assert e.refusals[0].code == Codes.OCM_INVALID_SOURCE
     assert "not_a_real_signal" in e.refusals[0].message
 
 
@@ -379,7 +379,7 @@ def test_draft_component_referenced_by_a_published_module_blocks_resolution(api:
 
     e = _place_tool(api, "c-draftcomp", "com.example.pickhead.draftcomp1", [{"refdes": "VG1", "ref": "com.example.ejector.draft1@0.1.0"}])
     assert not e.ok
-    assert e.refusals[0].code == Codes.DRAFT_MODULE_REFERENCED
+    assert e.refusals[0].code == Codes.OCM_DRAFT_MODULE_REFERENCED
 
 
 # ---------------------------------------------------------------------------
@@ -403,13 +403,13 @@ def test_delete_component_removes_it_from_the_workspace(api: OcmApi, workspace_r
 
     described = api.describe_component("com.example.ejector.deleteme1")
     assert not described.ok
-    assert described.refusals[0].code == Codes.NOT_FOUND
+    assert described.refusals[0].code == Codes.OCM_NOT_FOUND
 
 
 def test_delete_nonexistent_component_is_not_found(api: OcmApi):
     e = api.delete_component("com.example.ejector.doesnotexist")
     assert not e.ok
-    assert e.refusals[0].code == Codes.NOT_FOUND
+    assert e.refusals[0].code == Codes.OCM_NOT_FOUND
 
 
 def test_delete_component_warns_but_still_deletes_when_referenced_by_a_module(api: OcmApi):
@@ -431,4 +431,4 @@ def test_delete_component_warns_but_still_deletes_when_referenced_by_a_module(ap
 
     described = api.describe_component("com.example.ejector.referenced1")
     assert not described.ok
-    assert described.refusals[0].code == Codes.NOT_FOUND
+    assert described.refusals[0].code == Codes.OCM_NOT_FOUND

@@ -11,7 +11,7 @@
 #
 # NAMING (ADR-0025 D4 says codes are namespaced `OCM_`). Two namespaces live
 # here, deliberately, and the split is the honest state of the repo today:
-#   * BARE codes (SCHEMA_INVALID, NET_TOO_FEW_ENDPOINTS, ...) are the codes
+#   * BARE codes (OCM_SCHEMA_INVALID, OCM_NET_TOO_FEW_ENDPOINTS, ...) are the codes
 #     `ocm-resolve` / `ocm-api` ALREADY emit (see software/ocm-api/ocm_api/
 #     envelope.py `Codes`). The task keeps the existing names rather than
 #     inventing a parallel `OCM_`-prefixed scheme; the CI check matches emitted
@@ -29,43 +29,43 @@
 # ===========================================================================
 
 # --- Schema & authoring plumbing (ADR-0012 / ADR-0016) ---------------------
-SCHEMA_INVALID:
+OCM_SCHEMA_INVALID:
   phase: design
   outcome: refuse
   adr: ADR-0016
   layer: module
   message: "Manifest failed schema validation: {detail}"
-DRAFT_NOT_PUBLISHABLE:
+OCM_DRAFT_NOT_PUBLISHABLE:
   phase: design
   outcome: refuse
   adr: ADR-0016
   layer: module
   message: "Draft {id} is not publishable: {reason}"
-CELL_INVALID:
+OCM_CELL_INVALID:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: cell
   message: "Cell failed structural validation: {detail}"
-NOT_FOUND:
+OCM_NOT_FOUND:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: api
   message: "No {kind} {id}"
-ALREADY_EXISTS:
+OCM_ALREADY_EXISTS:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: api
   message: "A {kind} {id} already exists"
-INVALID_ARGUMENT:
+OCM_INVALID_ARGUMENT:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: api
   message: "{detail}"
-HUMAN_SIGNATURE_REQUIRED:
+OCM_HUMAN_SIGNATURE_REQUIRED:
   phase: design
   outcome: refuse
   adr: ADR-0012
@@ -73,19 +73,19 @@ HUMAN_SIGNATURE_REQUIRED:
   message: "safety.verified_by is a human signature (spec/06); the API will not write it"
 
 # --- Component transcription (ADR-0014) ------------------------------------
-UNKNOWN_COMPONENT:
+OCM_UNKNOWN_COMPONENT:
   phase: design
   outcome: refuse
   adr: ADR-0014
   layer: module
   message: "components entry {refdes} references unknown component {ref}"
-DUPLICATE_REFDES:
+OCM_DUPLICATE_REFDES:
   phase: design
   outcome: refuse
   adr: ADR-0014
   layer: module
   message: "two components entries share refdes {refdes}"
-INVALID_SOURCE:
+OCM_INVALID_SOURCE:
   phase: design
   outcome: refuse
   adr: ADR-0014
@@ -93,49 +93,49 @@ INVALID_SOURCE:
   message: "signal {signal} source provenance does not check out: {detail}"
 
 # --- Module connectivity, structural / implementable (ADR-0015 D5, table 1) -
-NET_TOO_FEW_ENDPOINTS:
+OCM_NET_TOO_FEW_ENDPOINTS:
   phase: design
   outcome: refuse
   adr: ADR-0015
   layer: module
   message: "Net {net_id} has {n} endpoint(s); a net requires at least 2"
-PIN_ON_MULTIPLE_NETS:
+OCM_PIN_ON_MULTIPLE_NETS:
   phase: design
   outcome: refuse
   adr: ADR-0015
   layer: module
   message: "Pin {pin} appears on more than one net"
-UNRESOLVED_ENDPOINT:
+OCM_UNRESOLVED_ENDPOINT:
   phase: design
   outcome: refuse
   adr: ADR-0015
   layer: module
   message: "Endpoint {endpoint} names an unknown refdes/ref/pin/port"
-COMPONENT_HAS_NO_CONNECTORS:
+OCM_COMPONENT_HAS_NO_CONNECTORS:
   phase: design
   outcome: refuse
   adr: ADR-0015
   layer: module
   message: "Wired instance {refdes} whose component declares no {domain_noun}"  # ADR-0015 Erratum 1 D: domain-fit noun
-PORT_UNCONNECTED:
+OCM_PORT_UNCONNECTED:
   phase: design
   outcome: refuse
   adr: ADR-0015
   layer: module
   message: "Module port {port} is declared but on no net or link"
-LINK_NON_COMMUNICATION_PORT:
+OCM_LINK_NON_COMMUNICATION_PORT:
   phase: design
   outcome: refuse
   adr: ADR-0015
   layer: module
   message: "Link {link} endpoint {endpoint} is on an electrical/pneumatic port, not a communication one"
-LINK_PROTOCOL_MISMATCH:
+OCM_LINK_PROTOCOL_MISMATCH:
   phase: design
   outcome: refuse
   adr: ADR-0015
   layer: module
   message: "Link {link}'s two ends speak different protocols ({a} vs {b})"
-ETHERCAT_CHAIN_BROKEN:
+OCM_ETHERCAT_CHAIN_BROKEN:
   phase: design
   outcome: refuse
   adr: ADR-0015
@@ -143,55 +143,55 @@ ETHERCAT_CHAIN_BROKEN:
   message: "EtherCAT chain reaches no master, loops, or leaves slave(s) unreached: {detail}"
 
 # --- Cell composition & placement (ADR-0012) -------------------------------
-UNKNOWN_MODULE:
+OCM_UNKNOWN_MODULE:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: cell
   message: "Instance {instance} references unknown module {ref}"
-REVISION_MISMATCH:
+OCM_REVISION_MISMATCH:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: cell
   message: "Module {id} found but declares {found}, not {requested}"
-DANGLING_MOUNT:
+OCM_DANGLING_MOUNT:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: cell
   message: "mount.on {target} names no instance in this cell"
-DRAFT_MODULE_REFERENCED:
+OCM_DRAFT_MODULE_REFERENCED:
   phase: design
   outcome: refuse
   adr: ADR-0016
   layer: cell
   message: "Cell references draft (0.x) module {id}; only published modules resolve"
-WORKSPACE_OVERHANG:
+OCM_WORKSPACE_OVERHANG:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: cell
   message: "Instance {instance} extends beyond the workspace footprint ({direction} by {mm} mm)"
-TOOL_SLOT_OCCUPIED:
+OCM_TOOL_SLOT_OCCUPIED:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: cell
   message: "mount.on {mount_on} is already carrying {incumbent}; place never evicts"
-UNKNOWN_OP:
+OCM_UNKNOWN_OP:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: cell
   message: "Plan step names unknown op {op} on {instance} (available: {known})"
-UNKNOWN_PARAM:
+OCM_UNKNOWN_PARAM:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: cell
   message: "Op {op} has no parameter {param} (declared: {known})"
-PARAM_OUT_OF_BOUNDS:
+OCM_PARAM_OUT_OF_BOUNDS:
   phase: design
   outcome: refuse
   adr: ADR-0013
@@ -199,25 +199,25 @@ PARAM_OUT_OF_BOUNDS:
   message: "Parameter {param}={value} is outside the capability's declared bounds [{min}, {max}]"
 
 # --- Generation: fastening plan, IK, collision (ADR-0007) ------------------
-NO_FASTENING_STEP:
+OCM_NO_FASTENING_STEP:
   phase: design
   outcome: refuse
   adr: ADR-0012
   layer: cell
   message: "Plan declares no fastening step for the coordinator to sequence"
-POSE_UNREACHABLE:
+OCM_POSE_UNREACHABLE:
   phase: design
   outcome: refuse
   adr: ADR-0007
   layer: cell
   message: "Pose at {feature} is unreachable by {robot}"
-PATH_COLLISION:
+OCM_PATH_COLLISION:
   phase: design
   outcome: refuse
   adr: ADR-0007
   layer: cell
   message: "Path segment {segment} collides ({pair}) at t={t}"
-COLLISION_DETECTED:
+OCM_COLLISION_DETECTED:
   phase: design
   outcome: refuse
   adr: ADR-0007
@@ -225,25 +225,25 @@ COLLISION_DETECTED:
   message: "Scene contact at the composed state: {pair} (depth {depth} mm)"
 
 # --- Conditions belong to modules (ADR-0023, plans-are-verbs) --------------
-CONDITION_UNKNOWN_SIGNAL:
+OCM_CONDITION_UNKNOWN_SIGNAL:
   phase: design
   outcome: refuse
   adr: ADR-0023
   layer: module
   message: "Capability {cap} {kind}condition {expr} names {name}, neither a comms signal nor a declared requires key"
-TIMEOUT_DISPOSITION_CONFLICT:
+OCM_TIMEOUT_DISPOSITION_CONFLICT:
   phase: design
   outcome: refuse
   adr: ADR-0023
   layer: module
   message: "Capability {cap} declares on_timeout 'hold' but state_machine.abort_safe is false"
-REQUIREMENT_UNBOUND:
+OCM_REQUIREMENT_UNBOUND:
   phase: design
   outcome: refuse
   adr: ADR-0023
   layer: cell
   message: "Instance {instance} capability {cap} requires {req}, which the cell binds to nothing (candidates: {candidates})"
-REQUIREMENT_UNKNOWN_TARGET:
+OCM_REQUIREMENT_UNKNOWN_TARGET:
   phase: design
   outcome: refuse
   adr: ADR-0023
@@ -251,13 +251,13 @@ REQUIREMENT_UNKNOWN_TARGET:
   message: "Instance {instance} binds requirement {req} to {target}, which does not resolve to a real instance.signal"
 
 # --- Infrastructure gates (emitted, but not a manifest refusal — see audit) -
-UNAVAILABLE:
+OCM_UNAVAILABLE:
   phase: load
   outcome: refuse
   adr: ADR-0012
   layer: api
   message: "A required optional extra ({extra}) is not installed; this operation cannot run here"
-AGENT_UNAVAILABLE:
+OCM_AGENT_UNAVAILABLE:
   phase: load
   outcome: refuse
   adr: ADR-0012
@@ -541,7 +541,7 @@ OCM_COMMAND_PARAM_OUT_OF_BOUNDS:
   adr: ADR-0024
   layer: cell
   status: deferred
-  requires: "runtime command path (the design-phase twin is PARAM_OUT_OF_BOUNDS)"
+  requires: "runtime command path (the design-phase twin is OCM_PARAM_OUT_OF_BOUNDS)"
   message: "Command parameter {param}={value} is outside the capability's declared bounds [{min}, {max}]"
 OCM_MANUAL_OP_PRECONDITION_UNMET:
   phase: cycle

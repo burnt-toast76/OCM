@@ -8,15 +8,12 @@ essay.
 no engine emits them yet). (ADR-0020 Erratum 1 split `OCM_IDENTITY_MISMATCH` into a local and a
 store code, +1 deferred.)
 
-## Namespace discrepancy (must reconcile)
+## Namespace — RESOLVED by rename
 
-ADR-0025 D4 says codes are namespaced `OCM_`. The 37 codes engines emit today are **un-prefixed**
-(`SCHEMA_INVALID`, `NET_TOO_FEW_ENDPOINTS`, … — `software/ocm-api/ocm_api/envelope.py::Codes`).
-This pass keeps the emitted names verbatim (so the CI check matches real strings) and reserves
-`OCM_` for not-yet-emitted vocabulary. The result is a two-namespace catalogue. Reconciliation —
-either rename the live codes to `OCM_*` (an engine-behaviour change, out of scope for this
-doc-only pass) or amend ADR-0025 D4 to bless the bare design-phase names — is **open** and needs
-its own decision. Until then the split is intentional and documented here.
+The catalogue once carried two namespaces (bare live codes, `OCM_` deferred vocabulary). The
+37 live codes were renamed to `OCM_<NAME>` — every engine, the composer, tests, spec, and the
+catalogue keys — so ADR-0025 D4 now holds without exception. Done in this commit; there is one
+namespace.
 
 ## Flag legend
 
@@ -34,41 +31,41 @@ its own decision. Until then the split is intentional and documented here.
 
 | Code | Phase/Outcome | Evaluated today | Flag |
 |---|---|---|---|
-| `ALREADY_EXISTS` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
-| `CELL_INVALID` | design/refuse | ocm-core loader → ocm-api/translate.py | — |
-| `COLLISION_DETECTED` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
-| `COMPONENT_HAS_NO_CONNECTORS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `CONDITION_UNKNOWN_SIGNAL` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `DANGLING_MOUNT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `DRAFT_MODULE_REFERENCED` | design/refuse | ocm-api verb (direct) | — |
-| `DRAFT_NOT_PUBLISHABLE` | design/refuse | ocm-api verb (direct) | — |
-| `DUPLICATE_REFDES` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `ETHERCAT_CHAIN_BROKEN` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `HUMAN_SIGNATURE_REQUIRED` | design/refuse | ocm-api verb (direct) | — |
-| `INVALID_ARGUMENT` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
-| `INVALID_SOURCE` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `LINK_NON_COMMUNICATION_PORT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `LINK_PROTOCOL_MISMATCH` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `NET_TOO_FEW_ENDPOINTS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `NOT_FOUND` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
-| `NO_FASTENING_STEP` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
-| `PARAM_OUT_OF_BOUNDS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `PATH_COLLISION` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
-| `PIN_ON_MULTIPLE_NETS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `PORT_UNCONNECTED` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `POSE_UNREACHABLE` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
-| `REQUIREMENT_UNBOUND` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `REQUIREMENT_UNKNOWN_TARGET` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `REVISION_MISMATCH` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `SCHEMA_INVALID` | design/refuse | ocm-core loader → ocm-api/translate.py | — |
-| `TIMEOUT_DISPOSITION_CONFLICT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `TOOL_SLOT_OCCUPIED` | design/refuse | ocm-api verb (direct) | — |
-| `UNKNOWN_COMPONENT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `UNKNOWN_MODULE` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `UNKNOWN_OP` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `UNKNOWN_PARAM` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `UNRESOLVED_ENDPOINT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
-| `WORKSPACE_OVERHANG` | design/refuse | ocm-api verb (direct) | — |
+| `OCM_ALREADY_EXISTS` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `OCM_CELL_INVALID` | design/refuse | ocm-core loader → ocm-api/translate.py | — |
+| `OCM_COLLISION_DETECTED` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
+| `OCM_COMPONENT_HAS_NO_CONNECTORS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_CONDITION_UNKNOWN_SIGNAL` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_DANGLING_MOUNT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_DRAFT_MODULE_REFERENCED` | design/refuse | ocm-api verb (direct) | — |
+| `OCM_DRAFT_NOT_PUBLISHABLE` | design/refuse | ocm-api verb (direct) | — |
+| `OCM_DUPLICATE_REFDES` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_ETHERCAT_CHAIN_BROKEN` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_HUMAN_SIGNATURE_REQUIRED` | design/refuse | ocm-api verb (direct) | — |
+| `OCM_INVALID_ARGUMENT` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `OCM_INVALID_SOURCE` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_LINK_NON_COMMUNICATION_PORT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_LINK_PROTOCOL_MISMATCH` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_NET_TOO_FEW_ENDPOINTS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_NOT_FOUND` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `OCM_NO_FASTENING_STEP` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
+| `OCM_PARAM_OUT_OF_BOUNDS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_PATH_COLLISION` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
+| `OCM_PIN_ON_MULTIPLE_NETS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_PORT_UNCONNECTED` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_POSE_UNREACHABLE` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
+| `OCM_REQUIREMENT_UNBOUND` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_REQUIREMENT_UNKNOWN_TARGET` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_REVISION_MISMATCH` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_SCHEMA_INVALID` | design/refuse | ocm-core loader → ocm-api/translate.py | — |
+| `OCM_TIMEOUT_DISPOSITION_CONFLICT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_TOOL_SLOT_OCCUPIED` | design/refuse | ocm-api verb (direct) | — |
+| `OCM_UNKNOWN_COMPONENT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_UNKNOWN_MODULE` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_UNKNOWN_OP` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_UNKNOWN_PARAM` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_UNRESOLVED_ENDPOINT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_WORKSPACE_OVERHANG` | design/refuse | ocm-api verb (direct) | — |
 | `OCM_CARRIER_ENDURANCE_EXCEEDED` | design/refuse | — nowhere yet | **unrunnable** |
 | `OCM_COMMS_CHAIN_BROKEN` | design/refuse | — nowhere yet | declared-unimpl |
 | `OCM_HANDOFF_DIRECTION_MISMATCH` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
@@ -87,8 +84,8 @@ its own decision. Until then the split is intentional and documented here.
 | `OCM_PNEUMATIC_PORT_MISMATCH` | design/refuse | — nowhere yet | declared-unimpl |
 | `OCM_SAFETY_NET_UNRATED` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
 | `OCM_SIGNAL_NO_ACTIVE_STATE` | design/refuse | — nowhere yet | cell-no-schema · declared-unimpl |
-| `AGENT_UNAVAILABLE` | load/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
-| `UNAVAILABLE` | load/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `OCM_AGENT_UNAVAILABLE` | load/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
+| `OCM_UNAVAILABLE` | load/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_COMMISSIONING_EXIT_KEY_IN_EDIT` | load/refuse | — nowhere yet | declared-unimpl |
 | `OCM_COMMISSIONING_NO_KEYSWITCH` | load/refuse | — nowhere yet | declared-unimpl |
 | `OCM_JOURNAL_PATH_UNWRITABLE` | load/refuse | — nowhere yet | declared-unimpl |
@@ -177,13 +174,14 @@ vocabulary is closed) but have no ADR of record:
 
 | Code | Emitted by | Note |
 |---|---|---|
-| `NOT_FOUND`, `ALREADY_EXISTS`, `INVALID_ARGUMENT` | ocm-api verbs | API plumbing, not manifest refusals. Fine as-is; flagged so no one mistakes them for standardised vocabulary. |
-| `UNAVAILABLE`, `AGENT_UNAVAILABLE` | ocm-api verbs | Environment/infra gates (a missing optional extra; no API key), not manifest defects. `phase: load` is the closest fit. |
-| `POSE_UNREACHABLE`, `PATH_COLLISION`, `COLLISION_DETECTED`, `NO_FASTENING_STEP` | ocm-generator (plan/scene) | Described narratively in spec/09's `plan_cell` row but in **no ADR refusal list**. Nearest ADR of record: ADR-0007 (Tesseract). Candidate for a short "generation refusals" note in an ADR. |
+| `OCM_NOT_FOUND`, `OCM_ALREADY_EXISTS`, `OCM_INVALID_ARGUMENT` | ocm-api verbs | API plumbing, not manifest refusals. Fine as-is; flagged so no one mistakes them for standardised vocabulary. |
+| `OCM_UNAVAILABLE`, `OCM_AGENT_UNAVAILABLE` | ocm-api verbs | Environment/infra gates (a missing optional extra; no API key), not manifest defects. `phase: load` is the closest fit. |
+| `OCM_POSE_UNREACHABLE`, `OCM_PATH_COLLISION`, `OCM_COLLISION_DETECTED`, `OCM_NO_FASTENING_STEP` | ocm-generator (plan/scene) | Described narratively in spec/09's `plan_cell` row but in **no ADR refusal list**. Nearest ADR of record: ADR-0007 (Tesseract). Candidate for a short "generation refusals" note in an ADR. |
 
 ## Summary worklist
 
-1. **Reconcile the namespace** (bare vs `OCM_`) — decide rename-codes vs amend-ADR-0025-D4.
+1. ~~Reconcile the namespace (bare vs `OCM_`).~~ **Done** — the 37 live codes were renamed to
+   `OCM_<NAME>` in this commit; one namespace now.
 2. **Author a `cells/` JSON schema** — unblocks the whole of §3 and most of §4.
 3. ~~Re-classify two store-dependent cycle refusals to `degrade`.~~ **Done** — ADR-0020 Erratum 1
    (`OCM_CARRIER_BOUND_TO_SCRAP` degrades when the store is unreachable; `OCM_IDENTITY_MISMATCH`

@@ -32,7 +32,7 @@ def _never_raise(fn: _F) -> _F:
     malformed argument reaching some third-party parser (jsonpatch,
     jsonschema, ...) in a shape nothing here anticipated. Genuine
     programming bugs still show up in `message` (via `str(e)`), just as an
-    INVALID_ARGUMENT refusal instead of a crash.
+    OCM_INVALID_ARGUMENT refusal instead of a crash.
     """
 
     @functools.wraps(fn)
@@ -40,7 +40,7 @@ def _never_raise(fn: _F) -> _F:
         try:
             return fn(*args, **kwargs)
         except Exception as e:  # noqa: BLE001 -- deliberately broad, see docstring
-            return single_refusal(Codes.INVALID_ARGUMENT, path="$", message=f"{type(e).__name__}: {e}")
+            return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="$", message=f"{type(e).__name__}: {e}")
 
     return wrapper  # type: ignore[return-value]
 
@@ -150,7 +150,7 @@ class OcmApi:
         # cell binds each to a concrete `instance.signal`. This is where a cell
         # composed through the API expresses that binding -- without it, an
         # instance carrying a requires-capable capability (e.g. sd50's
-        # drive_screw) would resolve straight to REQUIREMENT_UNBOUND.
+        # drive_screw) would resolve straight to OCM_REQUIREMENT_UNBOUND.
         return composition.place_instance(self.workspace, cell, instance, module, mount, requires=requires)
 
     @_never_raise

@@ -3,8 +3,8 @@
 statically, not at runtime. Each of the four codes, positive and negative.
 
 The refusals here are plain strings (ocm-resolve's contract); ocm-api's
-translate.py maps them to the CONDITION_UNKNOWN_SIGNAL / REQUIREMENT_UNBOUND /
-REQUIREMENT_UNKNOWN_TARGET / TIMEOUT_DISPOSITION_CONFLICT codes. These tests
+translate.py maps them to the OCM_CONDITION_UNKNOWN_SIGNAL / OCM_REQUIREMENT_UNBOUND /
+OCM_REQUIREMENT_UNKNOWN_TARGET / OCM_TIMEOUT_DISPOSITION_CONFLICT codes. These tests
 assert the detection; the code mapping is exercised in ocm-api's own suite.
 """
 
@@ -29,7 +29,7 @@ from .conftest import (
 
 def _cap(**overrides: Any) -> dict[str, Any]:
     # torque_nm matches the op params build_cell_dict's default plan passes,
-    # so a resolve that's meant to be clean isn't polluted by UNKNOWN_PARAM.
+    # so a resolve that's meant to be clean isn't polluted by OCM_UNKNOWN_PARAM.
     cap: dict[str, Any] = {
         "name": "drive_screw",
         "summary": "Drive a screw.",
@@ -66,7 +66,7 @@ def _resolve(root, cell_dict: dict[str, Any]) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# CONDITION_UNKNOWN_SIGNAL
+# OCM_CONDITION_UNKNOWN_SIGNAL
 # ---------------------------------------------------------------------------
 
 
@@ -110,7 +110,7 @@ def test_condition_naming_a_requires_key_is_accepted(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# REQUIREMENT_UNBOUND
+# OCM_REQUIREMENT_UNBOUND
 # ---------------------------------------------------------------------------
 
 
@@ -146,7 +146,7 @@ def test_requirement_bound_to_a_real_signal_resolves(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# REQUIREMENT_UNKNOWN_TARGET
+# OCM_REQUIREMENT_UNKNOWN_TARGET
 # ---------------------------------------------------------------------------
 
 
@@ -186,7 +186,7 @@ def test_requirement_bound_to_unknown_signal_is_refused(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# TIMEOUT_DISPOSITION_CONFLICT
+# OCM_TIMEOUT_DISPOSITION_CONFLICT
 # ---------------------------------------------------------------------------
 
 
@@ -204,7 +204,7 @@ def test_on_timeout_hold_on_an_abort_safe_capability_resolves(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Every committed module resolves without a CONDITION_UNKNOWN_SIGNAL -- the
+# Every committed module resolves without a OCM_CONDITION_UNKNOWN_SIGNAL -- the
 # resolve-time replacement for the runtime PreconditionError is satisfied by
 # the real manifests (including dh200's `>` conditions).
 # ---------------------------------------------------------------------------

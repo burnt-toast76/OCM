@@ -86,7 +86,7 @@ On expiry the part is disposed by the capability's own declaration, never the pl
 
 - `on_timeout: hold` → PackML **Held**. Nothing is damaged and the part is where it was; an
   operator clears the cause and resumes. `on_timeout: hold` on a module that is not
-  `abort_safe` is incoherent and refuses at validate (`TIMEOUT_DISPOSITION_CONFLICT`).
+  `abort_safe` is incoherent and refuses at validate (`OCM_TIMEOUT_DISPOSITION_CONFLICT`).
 - `on_timeout: abort` → **Abort** (`hs_abort`); the part is compromised and surfaces for the
   plan's `on_fail` routing.
 

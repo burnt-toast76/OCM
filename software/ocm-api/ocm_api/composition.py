@@ -27,11 +27,11 @@ from .workspace import Workspace, read_yaml, write_yaml
 
 def create_cell(ws: Workspace, cell_id: str, base_module: str) -> Envelope:
     if ws.cell_exists(cell_id):
-        return single_refusal(Codes.ALREADY_EXISTS, path=f"cells['{cell_id}']", message=f"a cell {cell_id!r} already exists")
+        return single_refusal(Codes.OCM_ALREADY_EXISTS, path=f"cells['{cell_id}']", message=f"a cell {cell_id!r} already exists")
     try:
         ModuleRef.parse(base_module)
     except ValueError as e:
-        return single_refusal(Codes.INVALID_ARGUMENT, path="base_module", message=str(e))
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="base_module", message=str(e))
 
     doc: dict[str, Any] = {
         "ocm_version": "1.0",
@@ -49,7 +49,7 @@ def create_cell(ws: Workspace, cell_id: str, base_module: str) -> Envelope:
 
 def _workspace_bounds_mm(scene: Any) -> dict[str, Any] | None:
     """The base module's own X/Y footprint, in mm -- exactly what a
-    WORKSPACE_OVERHANG refusal's `allowed.footprint` already names, but
+    OCM_WORKSPACE_OVERHANG refusal's `allowed.footprint` already names, but
     surfaced on every composition call (not just a failing one) so an
     agent's mental model of "how much room do I have" comes from data,
     not from tripping the tolerance once and reading the refusal message.
@@ -80,11 +80,11 @@ def _find_tool_slot_incumbent(modules: list[dict[str, Any]], mount_on: str, excl
 
 def _tool_slot_refusal(instance: str, mount_on: str, incumbent: str) -> Refusal:
     return Refusal(
-        code=Codes.TOOL_SLOT_OCCUPIED,
+        code=Codes.OCM_TOOL_SLOT_OCCUPIED,
         path=f"modules['{instance}'].mount.on",
         message=f"{mount_on} is already occupied by {incumbent!r} -- cannot also place {instance!r} there",
         # Structured, not just named in the message -- a client (the
-        # composer's own TOOL_SLOT_OCCUPIED highlight, e.g.) shouldn't
+        # composer's own OCM_TOOL_SLOT_OCCUPIED highlight, e.g.) shouldn't
         # have to parse prose to find out who the incumbent is.
         allowed={"incumbent": incumbent, "mount_on": mount_on},
         hint=f"remove_instance({incumbent!r}) first if you mean to swap tools -- place_instance never evicts or swaps automatically.",
@@ -98,7 +98,7 @@ def _orphan_warnings(doc: dict[str, Any], removed_instance: str) -> list[str]:
     (never by mount position, which is free to be reused):
 
     - A plan step naming `removed_instance` as its `module` -- this also
-      trips resolve_cell's own hard UNKNOWN_MODULE check (same
+      trips resolve_cell's own hard OCM_UNKNOWN_MODULE check (same
       iter_op_steps walk), so it typically coincides with ok=false; the
       warning still adds the human-readable "you just removed X, here's
       the blast radius" summary a bare per-step refusal list doesn't.
@@ -125,7 +125,7 @@ def _orphan_warnings(doc: dict[str, Any], removed_instance: str) -> list[str]:
 
 def _mutate_and_resolve(ws: Workspace, cell_id: str, mutate: Callable[[dict[str, Any], list[str]], Refusal | None]) -> Envelope:
     if not ws.cell_exists(cell_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"cells['{cell_id}']", message=f"no cell {cell_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"cells['{cell_id}']", message=f"no cell {cell_id!r} in this workspace")
 
     doc = read_yaml(ws.cell_path(cell_id)) or {}
     warnings: list[str] = []
@@ -138,7 +138,7 @@ def _mutate_and_resolve(ws: Workspace, cell_id: str, mutate: Callable[[dict[str,
     try:
         cell = Cell.from_dict(doc)
     except (KeyError, ValueError) as e:
-        return single_refusal(Codes.CELL_INVALID, path="$", message=f"cell document is structurally incomplete: {e}")
+        return single_refusal(Codes.OCM_CELL_INVALID, path="$", message=f"cell document is structurally incomplete: {e}")
 
     resolved, refusals = resolve_with_refusals(cell, ws)
     if resolved is None:
@@ -172,7 +172,7 @@ def place_instance(
         modules = doc.setdefault("modules", [])
         if any(m.get("instance") == instance for m in modules):
             return Refusal(
-                code=Codes.ALREADY_EXISTS,
+                code=Codes.OCM_ALREADY_EXISTS,
                 path=f"modules['{instance}']",
                 message=f"instance {instance!r} is already placed in {cell_id!r} -- use move_instance to reposition it",
             )
@@ -199,7 +199,7 @@ def move_instance(ws: Workspace, cell_id: str, instance: str, mount: dict[str, A
         modules = doc.get("modules", [])
         target = next((m for m in modules if m.get("instance") == instance), None)
         if target is None:
-            return Refusal(code=Codes.NOT_FOUND, path=f"modules['{instance}']", message=f"no instance {instance!r} placed in {cell_id!r}")
+            return Refusal(code=Codes.OCM_NOT_FOUND, path=f"modules['{instance}']", message=f"no instance {instance!r} placed in {cell_id!r}")
         mount_on = mount.get("on") if isinstance(mount, dict) else None
         if mount_on is not None:
             incumbent = _find_tool_slot_incumbent(modules, mount_on, exclude_instance=instance)
@@ -216,7 +216,7 @@ def remove_instance(ws: Workspace, cell_id: str, instance: str) -> Envelope:
         modules = doc.get("modules", [])
         kept = [m for m in modules if m.get("instance") != instance]
         if len(kept) == len(modules):
-            return Refusal(code=Codes.NOT_FOUND, path=f"modules['{instance}']", message=f"no instance {instance!r} placed in {cell_id!r}")
+            return Refusal(code=Codes.OCM_NOT_FOUND, path=f"modules['{instance}']", message=f"no instance {instance!r} placed in {cell_id!r}")
         warnings.extend(_orphan_warnings(doc, instance))
         doc["modules"] = kept
         return None
@@ -249,6 +249,6 @@ def set_joint_state(ws: Workspace, cell_id: str, instance: str, joints: dict[str
             if m.get("instance") == instance:
                 m["joint_state"] = joints
                 return None
-        return Refusal(code=Codes.NOT_FOUND, path=f"modules['{instance}']", message=f"no instance {instance!r} placed in {cell_id!r}")
+        return Refusal(code=Codes.OCM_NOT_FOUND, path=f"modules['{instance}']", message=f"no instance {instance!r} placed in {cell_id!r}")
 
     return _mutate_and_resolve(ws, cell_id, mutate)

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Published modules only (drafts aren't resolvable into a cell --
-// DRAFT_MODULE_REFERENCED -- so offering them here would just be a
+// OCM_DRAFT_MODULE_REFERENCED -- so offering them here would just be a
 // guaranteed refusal; the store already filters list_modules() to
 // !draft). Drag an item onto the deck to place it (SceneCanvas's drop
 // handler does the actual place_instance call).

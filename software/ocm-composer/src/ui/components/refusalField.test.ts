@@ -4,7 +4,7 @@ import { groupRefusalsByField, refusalFieldKey } from "./refusalField";
 import type { Refusal } from "../../api/types";
 
 function refusal(overrides: Partial<Refusal>): Refusal {
-  return { code: "SCHEMA_INVALID", path: "$", message: "", allowed: null, hint: null, ...overrides };
+  return { code: "OCM_SCHEMA_INVALID", path: "$", message: "", allowed: null, hint: null, ...overrides };
 }
 
 describe("refusalFieldKey", () => {

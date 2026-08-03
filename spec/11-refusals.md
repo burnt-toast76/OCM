@@ -32,19 +32,15 @@ One source of rules; three phases evaluate it. A code belongs to exactly one pha
 - **advise** — surfaced to a human, no gating. Not a refusal; catalogued so it cannot drift into
   gating behaviour by proximity.
 
-## Namespaces (transitional)
+## Namespace
 
-ADR-0025 D4 namespaces codes `OCM_`. Two namespaces currently coexist, and the split is
-deliberate and honest:
-
-- **Bare codes** (`SCHEMA_INVALID`, `NET_TOO_FEW_ENDPOINTS`, …) are the codes `ocm-resolve` and
-  `ocm-api` already emit today. Their existing names are kept rather than renamed to a parallel
-  scheme.
-- **`OCM_` codes** are vocabulary an ADR names but no engine emits yet. Each is `status:
-  deferred` with a `requires:` note stating what must land first.
-
-The migration of the live codes onto the `OCM_` prefix, and the per-code gaps, are tracked in
-**[`docs/refusal-audit.md`](../docs/refusal-audit.md)**.
+Every code is namespaced `OCM_` (ADR-0025 D4), with no exceptions: the codes `ocm-resolve` and
+`ocm-api` emit today (`OCM_SCHEMA_INVALID`, `OCM_NET_TOO_FEW_ENDPOINTS`, …) carry the same prefix
+as the not-yet-emitted vocabulary an ADR names (`status: deferred`, with a `requires:` note
+stating what must land first). The live codes were renamed onto the prefix rather than the
+standard amended to bless bare names — ADR-0012 scopes v1 as a single-user local service, so
+there were no external consumers and the rename was cheap. Per-code implementation gaps are
+tracked in **[`docs/refusal-audit.md`](../docs/refusal-audit.md)**.
 
 ## Catalogue
 
@@ -53,41 +49,41 @@ field, a layer, or a runtime that does not exist yet).
 
 | Code | Phase | Outcome | Layer | ADR | Status |
 |---|---|---|---|---|---|
-| `ALREADY_EXISTS` | design | refuse | api | ADR-0012 | live |
-| `CELL_INVALID` | design | refuse | cell | ADR-0012 | live |
-| `COLLISION_DETECTED` | design | refuse | cell | ADR-0007 | live |
-| `COMPONENT_HAS_NO_CONNECTORS` | design | refuse | module | ADR-0015 | live |
-| `CONDITION_UNKNOWN_SIGNAL` | design | refuse | module | ADR-0023 | live |
-| `DANGLING_MOUNT` | design | refuse | cell | ADR-0012 | live |
-| `DRAFT_MODULE_REFERENCED` | design | refuse | cell | ADR-0016 | live |
-| `DRAFT_NOT_PUBLISHABLE` | design | refuse | module | ADR-0016 | live |
-| `DUPLICATE_REFDES` | design | refuse | module | ADR-0014 | live |
-| `ETHERCAT_CHAIN_BROKEN` | design | refuse | module | ADR-0015 | live |
-| `HUMAN_SIGNATURE_REQUIRED` | design | refuse | cell | ADR-0012 | live |
-| `INVALID_ARGUMENT` | design | refuse | api | ADR-0012 | live |
-| `INVALID_SOURCE` | design | refuse | module | ADR-0014 | live |
-| `LINK_NON_COMMUNICATION_PORT` | design | refuse | module | ADR-0015 | live |
-| `LINK_PROTOCOL_MISMATCH` | design | refuse | module | ADR-0015 | live |
-| `NET_TOO_FEW_ENDPOINTS` | design | refuse | module | ADR-0015 | live |
-| `NOT_FOUND` | design | refuse | api | ADR-0012 | live |
-| `NO_FASTENING_STEP` | design | refuse | cell | ADR-0012 | live |
-| `PARAM_OUT_OF_BOUNDS` | design | refuse | cell | ADR-0013 | live |
-| `PATH_COLLISION` | design | refuse | cell | ADR-0007 | live |
-| `PIN_ON_MULTIPLE_NETS` | design | refuse | module | ADR-0015 | live |
-| `PORT_UNCONNECTED` | design | refuse | module | ADR-0015 | live |
-| `POSE_UNREACHABLE` | design | refuse | cell | ADR-0007 | live |
-| `REQUIREMENT_UNBOUND` | design | refuse | cell | ADR-0023 | live |
-| `REQUIREMENT_UNKNOWN_TARGET` | design | refuse | cell | ADR-0023 | live |
-| `REVISION_MISMATCH` | design | refuse | cell | ADR-0012 | live |
-| `SCHEMA_INVALID` | design | refuse | module | ADR-0016 | live |
-| `TIMEOUT_DISPOSITION_CONFLICT` | design | refuse | module | ADR-0023 | live |
-| `TOOL_SLOT_OCCUPIED` | design | refuse | cell | ADR-0012 | live |
-| `UNKNOWN_COMPONENT` | design | refuse | module | ADR-0014 | live |
-| `UNKNOWN_MODULE` | design | refuse | cell | ADR-0012 | live |
-| `UNKNOWN_OP` | design | refuse | cell | ADR-0012 | live |
-| `UNKNOWN_PARAM` | design | refuse | cell | ADR-0012 | live |
-| `UNRESOLVED_ENDPOINT` | design | refuse | module | ADR-0015 | live |
-| `WORKSPACE_OVERHANG` | design | refuse | cell | ADR-0012 | live |
+| `OCM_ALREADY_EXISTS` | design | refuse | api | ADR-0012 | live |
+| `OCM_CELL_INVALID` | design | refuse | cell | ADR-0012 | live |
+| `OCM_COLLISION_DETECTED` | design | refuse | cell | ADR-0007 | live |
+| `OCM_COMPONENT_HAS_NO_CONNECTORS` | design | refuse | module | ADR-0015 | live |
+| `OCM_CONDITION_UNKNOWN_SIGNAL` | design | refuse | module | ADR-0023 | live |
+| `OCM_DANGLING_MOUNT` | design | refuse | cell | ADR-0012 | live |
+| `OCM_DRAFT_MODULE_REFERENCED` | design | refuse | cell | ADR-0016 | live |
+| `OCM_DRAFT_NOT_PUBLISHABLE` | design | refuse | module | ADR-0016 | live |
+| `OCM_DUPLICATE_REFDES` | design | refuse | module | ADR-0014 | live |
+| `OCM_ETHERCAT_CHAIN_BROKEN` | design | refuse | module | ADR-0015 | live |
+| `OCM_HUMAN_SIGNATURE_REQUIRED` | design | refuse | cell | ADR-0012 | live |
+| `OCM_INVALID_ARGUMENT` | design | refuse | api | ADR-0012 | live |
+| `OCM_INVALID_SOURCE` | design | refuse | module | ADR-0014 | live |
+| `OCM_LINK_NON_COMMUNICATION_PORT` | design | refuse | module | ADR-0015 | live |
+| `OCM_LINK_PROTOCOL_MISMATCH` | design | refuse | module | ADR-0015 | live |
+| `OCM_NET_TOO_FEW_ENDPOINTS` | design | refuse | module | ADR-0015 | live |
+| `OCM_NOT_FOUND` | design | refuse | api | ADR-0012 | live |
+| `OCM_NO_FASTENING_STEP` | design | refuse | cell | ADR-0012 | live |
+| `OCM_PARAM_OUT_OF_BOUNDS` | design | refuse | cell | ADR-0013 | live |
+| `OCM_PATH_COLLISION` | design | refuse | cell | ADR-0007 | live |
+| `OCM_PIN_ON_MULTIPLE_NETS` | design | refuse | module | ADR-0015 | live |
+| `OCM_PORT_UNCONNECTED` | design | refuse | module | ADR-0015 | live |
+| `OCM_POSE_UNREACHABLE` | design | refuse | cell | ADR-0007 | live |
+| `OCM_REQUIREMENT_UNBOUND` | design | refuse | cell | ADR-0023 | live |
+| `OCM_REQUIREMENT_UNKNOWN_TARGET` | design | refuse | cell | ADR-0023 | live |
+| `OCM_REVISION_MISMATCH` | design | refuse | cell | ADR-0012 | live |
+| `OCM_SCHEMA_INVALID` | design | refuse | module | ADR-0016 | live |
+| `OCM_TIMEOUT_DISPOSITION_CONFLICT` | design | refuse | module | ADR-0023 | live |
+| `OCM_TOOL_SLOT_OCCUPIED` | design | refuse | cell | ADR-0012 | live |
+| `OCM_UNKNOWN_COMPONENT` | design | refuse | module | ADR-0014 | live |
+| `OCM_UNKNOWN_MODULE` | design | refuse | cell | ADR-0012 | live |
+| `OCM_UNKNOWN_OP` | design | refuse | cell | ADR-0012 | live |
+| `OCM_UNKNOWN_PARAM` | design | refuse | cell | ADR-0012 | live |
+| `OCM_UNRESOLVED_ENDPOINT` | design | refuse | module | ADR-0015 | live |
+| `OCM_WORKSPACE_OVERHANG` | design | refuse | cell | ADR-0012 | live |
 | `OCM_CARRIER_ENDURANCE_EXCEEDED` | design | refuse | line | ADR-0020 | deferred |
 | `OCM_COMMS_CHAIN_BROKEN` | design | refuse | module | ADR-0015 | deferred |
 | `OCM_HANDOFF_DIRECTION_MISMATCH` | design | refuse | cell | ADR-0019 | deferred |
@@ -106,8 +102,8 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_PNEUMATIC_PORT_MISMATCH` | design | refuse | module | ADR-0015 | deferred |
 | `OCM_SAFETY_NET_UNRATED` | design | refuse | cell | ADR-0019 | deferred |
 | `OCM_SIGNAL_NO_ACTIVE_STATE` | design | refuse | cell | ADR-0019 | deferred |
-| `AGENT_UNAVAILABLE` | load | refuse | api | ADR-0012 | live |
-| `UNAVAILABLE` | load | refuse | api | ADR-0012 | live |
+| `OCM_AGENT_UNAVAILABLE` | load | refuse | api | ADR-0012 | live |
+| `OCM_UNAVAILABLE` | load | refuse | api | ADR-0012 | live |
 | `OCM_COMMISSIONING_EXIT_KEY_IN_EDIT` | load | refuse | cell | ADR-0024 | deferred |
 | `OCM_COMMISSIONING_NO_KEYSWITCH` | load | refuse | cell | ADR-0022 | deferred |
 | `OCM_JOURNAL_PATH_UNWRITABLE` | load | refuse | cell | ADR-0021 | deferred |
