@@ -20,8 +20,10 @@ namespace.
 - **unrunnable** — no phase/layer can evaluate it (the layer it needs does not exist).
 - **store-dependent** — a cycle-phase refusal that needs the record store, which ADR-0021 D6
   permits to be unreachable.
-- **cell-no-schema** — needs a field of a `cells/` JSON schema that does not exist
-  (`spec/schema/` has only component + module schemas).
+- **cell-no-schema** — needs a field of the `cells/` JSON schema. **As of ADR-0026 that schema
+  now exists** (`spec/schema/ocm-cell-1.0.schema.json`); these entries are no longer
+  schema-blocked and now await *resolve logic* (the cross-check into contained modules). The
+  label is kept so the family stays greppable until that logic lands.
 - **declared-unimpl** — named by an ADR, in the catalogue, emitted by no engine.
 - **emitted-uncatalogued** — an engine emits it; no ADR describes it.
 - **spec/09-only** — an engine emits it; described narratively in spec/09 but in no ADR refusal
@@ -135,12 +137,17 @@ A–C) and reflected in the catalogue:
 | `OCM_IDENTITY_STORE_MISMATCH` *(new)* | degrade (records `store_binding_checked`) | Correction B: the store half, split out. Store disagreement or an unreachable store degrades and records, matching `OCM_BINDING_UNVERIFIED`. |
 | `OCM_BINDING_UNVERIFIED` | degrade ✓ | Unchanged — the canonical case (records `binding_verified`). |
 
-## 3. Cell-layer refusals with no schema to stand on
+## 3. Cell-layer refusals — schema now authored (ADR-0026)
 
-`spec/schema/` has only `ocm-component-1.0` and `ocm-module-1.0`. There is **no cell schema** —
-`cells/*.yaml` is validated by Python (`ocm-core/ocm_core/cell.py`) structurally. Four ADRs each
-say "cell manifests gain X"; every field they need is below. (Authoring the schema is out of
-scope here — this is the list it must cover.)
+**Update:** `spec/schema/ocm-cell-1.0.schema.json` now exists (ADR-0026); `load_cell` validates
+against it, and `cell.py` models every block. The fields below are all covered. So these
+cell-layer refusals are **no longer blocked on a schema** — they now await *resolve logic* (the
+cross-checks into contained modules), which is the next pass, not this one. The four structural
+ADR-0026 refusals (`OCM_PORT_HAS_SIGNALS_LIST`, `OCM_PORT_DOMAIN_IDENTIFICATION`,
+`OCM_ACTIVE_NOT_ON_NET`, `OCM_DIRECTION_AT_CELL_LAYER`) are already enforced by the schema
+structurally, surfacing as `OCM_SCHEMA_INVALID`.
+
+The fields the schema now covers, for the record:
 
 | ADR | Cell field | For |
 |---|---|---|
@@ -187,7 +194,9 @@ vocabulary is closed) but have no ADR of record:
 
 1. ~~Reconcile the namespace (bare vs `OCM_`).~~ **Done** — the 37 live codes were renamed to
    `OCM_<NAME>` in this commit; one namespace now.
-2. **Author a `cells/` JSON schema** — unblocks the whole of §3 and most of §4.
+2. ~~Author a `cells/` JSON schema.~~ **Done** — `spec/schema/ocm-cell-1.0.schema.json` (ADR-0026);
+   `load_cell` validates against it and `cell.py` models every block. The §3 refusals now await
+   resolve logic, not a schema.
 3. ~~Re-classify two store-dependent cycle refusals to `degrade`.~~ **Done** — ADR-0020 Erratum 1
    (`OCM_CARRIER_BOUND_TO_SCRAP` degrades when the store is unreachable; `OCM_IDENTITY_MISMATCH`
    split into a local `refuse` and a new `OCM_IDENTITY_STORE_MISMATCH` `degrade`).

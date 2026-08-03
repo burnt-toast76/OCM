@@ -23,6 +23,9 @@ DEFAULT_SCHEMA_PATH = (
 DEFAULT_COMPONENT_SCHEMA_PATH = (
     Path(__file__).resolve().parents[3] / "spec" / "schema" / "ocm-component-1.0.schema.json"
 )
+DEFAULT_CELL_SCHEMA_PATH = (
+    Path(__file__).resolve().parents[3] / "spec" / "schema" / "ocm-cell-1.0.schema.json"
+)
 
 
 class _Loader(yaml.SafeLoader):
@@ -99,16 +102,21 @@ def load_component(path: Path | str, schema_path: Path | str = DEFAULT_COMPONENT
     return Component.from_dict(data)
 
 
-def load_cell(path: Path | str) -> Cell:
-    """Load a cell composition YAML file into a typed Cell.
+def load_cell(path: Path | str, schema_path: Path | str = DEFAULT_CELL_SCHEMA_PATH) -> Cell:
+    """Load a cell composition YAML file, validate it against the OCM cell
+    schema (ADR-0026), and return a typed Cell -- the same path load_module
+    takes for modules.
 
-    No JSON Schema exists yet for the cell-composition shape, so this
-    performs structural checks (see cell.validate_cell_dict) rather than
-    full schema validation.
+    Raises CellLoadError (carrying every violation, not just the first) if the
+    cell doesn't conform. Schema validation is the primary check; the structural
+    `validate_cell_dict` pass is kept for the one thing JSON Schema can't express
+    -- duplicate instance names -- and its messages concatenate with the schema's.
     """
     path = Path(path)
     data = _read_yaml(path)
-    errors = validate_cell_dict(data)
+    schema = load_schema(schema_path)
+    errors = validate_module_dict(data, schema)  # schema-agnostic validator, reused
+    errors += validate_cell_dict(data)
     if errors:
         raise CellLoadError(path, errors)
     return Cell.from_dict(data)
