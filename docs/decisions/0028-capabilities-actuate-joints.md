@@ -1,7 +1,7 @@
 # ADR-0028 — A capability declares the joints it actuates
 
 **Status:** Accepted (Erratum 1). Extends ADR-0023 (plans are verbs) with the geometric half of a verb.
-Prerequisite for the verb-driven timeline (ADR-0029, not yet written).
+Prerequisite for the verb-driven timeline (ADR-0029).
 
 ## Context
 
