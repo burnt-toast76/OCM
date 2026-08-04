@@ -1,11 +1,13 @@
 # ADR-0026 — A port is what a net can name. Everything else is a subsystem block.
 
-**Status:** Accepted, with Erratum 1 (2026-08-03) — see the end of this document. The Shape
-block's `{sink: record_sink}` link endpoint contradicted D1's own test (a link named a
-non-port); the erratum retires it — the `traceability` port is the endpoint, and the sink is
-reached from the port via `record_sink.port`. Supersedes the `ports` shapes in ADR-0019 and
-ADR-0020; retroactively justifies ADR-0024's `mode_selector`. Prerequisite to the `cells/`
-schema.
+**Status:** Accepted, with Errata 1–2 — see the end of this document. Erratum 1 (2026-08-03):
+the Shape block's `{sink: record_sink}` link endpoint contradicted D1's own test (a link named
+a non-port); the erratum retires it — the `traceability` port is the endpoint, and the sink is
+reached from the port via `record_sink.port`. Erratum 2 (2026-08-04, from ADR-0034): D5's
+premise — a safety chain netted between cells — no longer holds; the Shape block's
+`safety-chain` port is withdrawn, and `domain: safety` names no cell port. Supersedes the
+`ports` shapes in ADR-0019 and ADR-0020; retroactively justifies ADR-0024's `mode_selector`.
+Prerequisite to the `cells/` schema.
 
 ## Context
 
@@ -94,6 +96,10 @@ the catalogue should say so.
 
 ## Decision 5 — `safety` stays a port; the FSoE question is untouched
 
+*(Erratum 2: the premise below no longer holds — ADR-0034 makes the safety domain internal to
+a cell, so no safety chain is netted between cells and `domain: safety` names no cell port.
+The decision record this section anticipated is ADR-0034. See the end of this document.)*
+
 A safety chain is netted between cells, so by D1 it is a port. Nothing here settles ADR-0019
 D1's offer of FSoE against D2's prohibition on EtherCAT crossing a boundary, or against
 spec/06's "FSoE… not for v1." That is a separate, real contradiction and it gets its own
@@ -106,7 +112,7 @@ decision record. This ADR is about shape, not transport.
 ports:
   - {id: upstream-handoff,   domain: electrical,    type: smema-14,  role: smema-downstream}
   - {id: downstream-handoff, domain: electrical,    type: smema-14,  role: smema-upstream}
-  - {id: safety-chain,       domain: safety,        role: fsoe-slave}
+  - {id: safety-chain,       domain: safety,        role: fsoe-slave}   # withdrawn — see Erratum 2
   - {id: traceability,       domain: communication, protocol: opc-ua}
 
 nets:
@@ -193,3 +199,31 @@ enforces this structurally (`additionalProperties: false` on the endpoint), surf
 **Unchanged.** Decision 1's test, verbatim — this erratum exists to keep it intact rather than
 carve out an exception. Decision 2's block list (`record_sink` stays a subsystem block).
 Decision 3's downward pin resolution. The `endpoint` shape's other fields.
+
+## Erratum 2 (2026-08-04) — D5's premise no longer holds: no safety chain is netted between cells
+
+Recorded when ADR-0034 landed. This is the "separate, real contradiction" D5 itself deferred
+to its own decision record; ADR-0034 is that record, and it resolves the question by removing
+the premise rather than choosing a transport.
+
+**What was wrong.** D5 reasoned soundly from a shape it inherited: ADR-0026 modelled the
+safety chain as a net between cells, and by D1's own test anything netted across a boundary
+is a port. But a net is N unordered endpoints sharing one common node, and the manifest has no
+partitioning vocabulary — so `safety-chain` on every cell in a line resolves to a single node,
+and an E-stop anywhere drops power everywhere. That contradicts ADR-0019's own consequence
+that a cell is an independently shippable machine, and it left ADR-0019 D1's FSoE offer,
+ADR-0019 D2's prohibition on EtherCAT crossing a boundary, and spec/06's v1 exclusion in a
+standing three-way contradiction.
+
+**Correction — the safety domain is internal to a cell (ADR-0034 D1).** Every safety net
+endpoint resolves within the declaring cell; no safety net, port, or shared node crosses a
+boundary. The Shape block's `{id: safety-chain, domain: safety, role: fsoe-slave}` entry is
+**withdrawn** (annotated above, not silently rewritten). A cell boundary carries the handoff
+interlock and the data link, and an E-stop reaches neighbours as deasserted handoff signals —
+information, never loss of power, and never a safety function (ADR-0034 D2).
+
+**Unchanged.** D5's reasoning about port-vs-net SHAPE stands for every other domain: what a
+net can name is a port, and the test partitions exactly as D1 states it. D1–D4 and both
+Shape-block handoff/traceability ports are untouched. The FSoE question closes by removal —
+nothing needs a safety transport across a boundary — so spec/06's v1 exclusion and ADR-0019 D2
+stand without exception.

@@ -27,14 +27,14 @@ context was.
 | [0016](0016-one-validation-surface.md) | One validation surface: authoring sees what resolution sees | Accepted |
 | [0017](0017-context-is-layered.md) | Context is layered — component, module, cell | Accepted |
 | [0018](0018-ocm-standard-cellwright-product.md) | OCM is the standard, Cellwright is the product | Accepted |
-| [0019](0019-cell-interconnect.md) | Cells interconnect by discrete I/O, not by fieldbus | Accepted |
+| [0019](0019-cell-interconnect.md) | Cells interconnect by discrete I/O, not by fieldbus | Accepted (D1 superseded in part by 0034) |
 | [0020](0020-carrier-identity.md) | Unit identity travels on the carrier | Accepted (Erratum 1) |
 | [0021](0021-record-journal.md) | The journal is the write; the store is declared | Accepted |
 | [0022](0022-lifecycle-and-agent-authority.md) | Lifecycle governs write authority; the agent edits manifests only | Accepted |
 | [0023](0023-plans-are-verbs.md) | The plan is verbs; conditions belong to modules | Accepted |
 | [0024](0024-manifest-authority-vs-command-authority.md) | Manifest authority and command authority are different axes | Accepted |
 | [0025](0025-refusal-phases-and-catalogue.md) | One refusal source, three evaluation phases | Accepted |
-| [0026](0026-a-port-is-what-a-net-can-name.md) | A port is what a net can name; everything else is a subsystem block | Accepted (Erratum 1) |
+| [0026](0026-a-port-is-what-a-net-can-name.md) | A port is what a net can name; everything else is a subsystem block | Accepted (Errata 1–2) |
 | [0027](0027-collision-geometry-derived-or-checked.md) | Collision geometry is derived from posed components, or authored and checked | Accepted |
 | [0028](0028-capabilities-actuate-joints.md) | A capability declares the joints it actuates | Accepted (Erratum 1) |
 | [0029](0029-plan-is-the-timeline.md) | The plan is the timeline | Accepted |

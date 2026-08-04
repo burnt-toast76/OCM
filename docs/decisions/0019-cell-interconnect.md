@@ -4,7 +4,10 @@
 is superseded by ADR-0026: a cell port is ADR-0015's flat shape, and the SMEMA signals become
 pins named by nets, with `active` on the net and `direction` derived, not declared. The
 decisions stand; the YAML written under the old Shape does not. (House pattern — cf. ADR-0015
-Erratum 1.)
+Erratum 1.) **D1 is superseded in part by ADR-0034:** the safety channel no longer crosses the
+boundary — every safety net endpoint resolves within its own cell, so a cell boundary carries
+two channels, the handoff interlock and the data link. D1's prohibition on safety being
+inferred from or carried by a lower channel stands unchanged, as do D2–D5.
 
 ## Context
 
@@ -22,6 +25,11 @@ That leaves three real options, and they differ in how tightly they bind the two
 together — which is the actual decision, not the wire.
 
 ## Decision 1 — Three independent channels cross the boundary
+
+*(Superseded in part by ADR-0034: the safety channel is withdrawn from the boundary — the
+safety domain is internal to a cell, and a boundary carries the two channels below it. The
+last sentence of the Safety paragraph — safety never inferred from, or carried by, a lower
+channel — stands unchanged.)*
 
 A cell boundary carries three things, and they do not share a medium:
 
