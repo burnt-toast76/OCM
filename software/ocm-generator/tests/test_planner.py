@@ -382,8 +382,14 @@ def test_a_transit_that_collides_is_refused_naming_the_segment(modules_root_with
     }
     resolved, scene = _planner_scene(modules_root_with_obstacle, features, ["hole_1", "hole_2"], extra_modules=[obstacle])
 
+    # The check pass lives in the timeline walk now (ADR-0029 D5):
+    # plan_fastening_sequence hands back unchecked segments, and
+    # build_timeline is what refuses the colliding transit.
+    plan = plan_fastening_sequence(resolved, scene)
+    assert all(s.frames == () for s in plan.segments)
+
     with pytest.raises(PathCollisionError) as exc:
-        plan_fastening_sequence(resolved, scene)
+        build_timeline(resolved, scene, plan)
 
     assert exc.value.segment == "retract_1 -> standoff_2"
     assert {exc.value.instance_a, exc.value.instance_b} == {"blocker", "robot1"}

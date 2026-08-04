@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Plan the full for_each fastening sequence's motion: standoff/contact/
 retract flange poses for every item (not just the first), IK-checked and
-branch-consistent across the whole chain, and a collision-checked
-straight-line joint-space path for every segment between them --
+branch-consistent across the whole chain, as straight-line joint-space
+segments --
 
     home -> standoff_1 -> contact_1 -> retract_1
           -> standoff_2 -> contact_2 -> retract_2
@@ -29,26 +29,34 @@ from `home`. See test_planner.py's own branch-consistency test, which
 pins this down by asserting no consecutive pair in the resulting chain
 swings any single joint by more than ~90 degrees.
 
-## Why contact/retract are IK-solved and collision-checked too
+## Why contact/retract are IK-solved too
 
 They're emitted as `movel` (Cartesian) moves, which the controller solves
 its own IK for online -- so their joint config isn't textually needed in
-the emitted script. It's still solved and checked here because (1) IK
-reachability is itself a refusal-worthy fact about a pose no differently
-than standoff's, and (2) it's the seed the NEXT pose in the chain needs
-for its own branch selection -- a real UR controller executing a sequence
-of movels also picks the IK branch closest to its actual current joint
-position, so chaining the same way here keeps this plan's assumptions in
-step with what the controller will actually do, not just internally
-self-consistent. Both are collision-checked with the same joint-space
-linear-interpolation machinery as every other segment (see .path); short,
-but not skipped.
+the emitted script. It's still solved here because (1) IK reachability is
+itself a refusal-worthy fact about a pose no differently than standoff's,
+and (2) it's the seed the NEXT pose in the chain needs for its own branch
+selection -- a real UR controller executing a sequence of movels also
+picks the IK branch closest to its actual current joint position, so
+chaining the same way here keeps this plan's assumptions in step with
+what the controller will actually do, not just internally
+self-consistent.
+
+## Collision checking happens in the timeline, not here (ADR-0029 D5)
+
+This module produces UNCHECKED segments (`frames=()`). The straight-line
+collision check runs in `.timeline`'s walk, one motion row at a time,
+against the module state in effect at that point in the plan -- jaws
+closed after `clamp`, open after `unclamp`. Checking here would check
+every segment against the cell's authored joint_state, which is exactly
+the assumption ADR-0029 D5 exists to remove: the checker would run
+before the state it should check against is known.
 """
 
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from ocm_resolve import ResolvedCell
 
@@ -57,7 +65,6 @@ from ocm_generator.scene.build import WORLD_LINK
 
 from .errors import PlanningError
 from .ik import UR_JOINT_ORDER, solve_ur_ik
-from .path import DEFAULT_PATH_SAMPLES, check_joint_segment
 from .poses import compute_flange_poses, compute_part_datum_world, find_fastening_plan
 
 DEFAULT_COLLISION_MARGIN_MM = 1.0
@@ -92,10 +99,12 @@ class PathSegment:
     # collision-free for this exact segment, in travel order -- each one a
     # full namespaced joint-state dict (ADR-0029 D2: the same shape
     # Scene.joint_state and compute_world_poses speak; frames[0]/[-1]
-    # carry start_joints/end_joints overlaid on the scene's own state).
-    # `.emitters.animation` reuses these directly for `--view-animation`,
-    # never re-interpolating its own. Empty until plan_fastening_sequence
-    # runs the check (see that function's own two-pass construction).
+    # carry start_joints/end_joints overlaid on the state in effect).
+    # EMPTY as produced by plan_fastening_sequence: the check runs in
+    # `.timeline`'s walk (ADR-0029 D5), the one place that knows the
+    # module state each segment must be checked against; `Timeline.
+    # segments` carries the checked copies, and the matching motion row
+    # carries the same frames.
     frames: tuple[dict[str, float], ...] = ()
 
 
@@ -131,18 +140,18 @@ def _pos_label(kind: str, index: int | None) -> str:
 def plan_fastening_sequence(
     resolved: ResolvedCell,
     scene: Scene,
-    collision_margin_mm: float = DEFAULT_COLLISION_MARGIN_MM,
-    path_samples: int = DEFAULT_PATH_SAMPLES,
 ) -> FasteningPlan:
     """Plan the full for_each fastening sequence end to end -- every item,
     in listed order, chained continuously (no return home between holes).
+    Segments come back UNCHECKED (`frames=()`); `.timeline.build_timeline`
+    collision-checks each one against the module state in effect at that
+    point in the plan (ADR-0029 D5), and it is what raises
+    PathCollisionError.
 
     Raises NoDriveScrewStepError if the plan has no fastening for_each,
     PoseUnreachableError (naming the pose, e.g. "standoff_2") if the UR IK
-    solver can't reach it, PathCollisionError (naming the segment, e.g.
-    "retract_1 -> standoff_2", and the colliding pair) if any segment's
-    straight-line joint-space path collides, or PlanningUnavailable if the
-    `tesseract` extra isn't installed.
+    solver can't reach it, or PlanningUnavailable if the `tesseract` extra
+    isn't installed.
     """
     fasten = find_fastening_plan(resolved.cell)
     tool_instance = fasten.steps[0].tool_instance
@@ -234,20 +243,6 @@ def plan_fastening_sequence(
         start_joints=previous_joints,
         end_joints=home_joints,
     ))
-
-    checked_segments: list[PathSegment] = []
-    for segment in segments:
-        frames = check_joint_segment(
-            scene=scene,
-            robot_instance=robot_instance,
-            label=segment.label,
-            start_joints=segment.start_joints,
-            end_joints=segment.end_joints,
-            samples=path_samples,
-            collision_margin_mm=collision_margin_mm,
-        )
-        checked_segments.append(replace(segment, frames=frames))
-    segments = checked_segments
 
     load_screw_nominal_duration_s = None
     if fasten.load_screw_module is not None:

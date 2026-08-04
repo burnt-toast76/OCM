@@ -356,12 +356,12 @@ def test_plan_cell_and_emit(api: OcmApi, workspace_root: Path, tmp_path: Path):
     for row in e.data["cycle_table"]:
         assert row["kind"] in ("motion", "actuation", "dwell")
     assert e.data["cycle_table"][0]["label"] == "nest1.clamp"
-    assert e.data["cycle_table"][0]["held_at_segment"] is None
+    assert e.data["cycle_table"][0]["held_at"] is None
     drive_rows = [row for row in e.data["cycle_table"] if row["label"].startswith("drive_screw @ ")]
     assert len(drive_rows) == 3
     for row in drive_rows:
         assert row["kind"] == "dwell"
-        assert row["held_at_segment"]
+        assert row["held_at"]
 
     script_path = tmp_path / "out.script"
     view_path = tmp_path / "view.html"

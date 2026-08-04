@@ -4,13 +4,15 @@
 Generalises the fastening-shaped planner ADR-0007 built. Prerequisite for
 ADR-0030 (`ocm-viewer`, not yet written).
 
-**Phase.** D1–D4 are implemented (`planner/timeline.py` walks `cell.plan` in order; frames are
-namespaced joint-state dicts; rows are typed and carry `module_state`; the timeline is strictly
-serial and the `load_screw` overlap is gone). **D5–D7 are not**: robot segments still check
-against the cell's authored `joint_state`, actuation rows carry no swept frames and are not
-collision-checked (they hold one frame for their declared duration — emitting an unchecked
-sweep would violate D6's own invariant), and there is no JSON trace artifact. Do not mistake
-this ADR for fully realised.
+**Phase.** D1–D7 are all implemented. Phase 1 delivered D1–D4 (`planner/timeline.py` walks
+`cell.plan` in order; frames are namespaced joint-state dicts; rows are typed; the timeline is
+strictly serial and the `load_screw` overlap is gone). Phase 2 delivered D5–D7: the collision
+check pass moved out of `plan_fastening_sequence` and into the timeline walk, so every motion
+row is checked against the module state in effect at that point; actuation rows carry a full
+collision-checked sweep (`check_actuation_segment`), and a dwell holds its immediate
+predecessor's final frame, never a stale one; `ocm plan --emit-trace` writes the timeline as a
+JSON trace and `--view-animation` is a renderer over that same trace, with the dynamic set
+derived from which joints actually vary in the frames rather than from mount topology.
 
 ## Context
 

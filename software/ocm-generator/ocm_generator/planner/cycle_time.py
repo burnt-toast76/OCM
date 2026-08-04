@@ -47,20 +47,28 @@ class CycleTimeRow:
     duration_s: float
     source: str  # "ESTIMATE" (motion) | "nominal_duration_s" (a declared stationary/actuation duration)
     kind: str  # "motion" | "actuation" | "dwell" -- what produced the row's frames (ADR-0029 D3)
-    # The PathSegment.label whose LAST frame is this row's own held pose,
-    # if this row is stationary (kind != "motion") -- None for a motion
-    # row (which owns real per-frame motion), and None for a stationary
-    # row that precedes ALL motion (held at the scene's own initial
-    # state). `.emitters.animation` uses this directly, so a held frame is
-    # always looked up, never assumed from row order.
-    held_at_segment: str | None = None
+    # The label of the row IMMEDIATELY PRECEDING this one, whose final
+    # frame is this dwell's own held pose -- set only on dwell rows; None
+    # for motion/actuation rows (which own real per-frame motion of their
+    # own) and for a dwell that precedes every other row (held at the
+    # scene's own initial authored state). Renamed from phase 1's
+    # `held_at_segment`: with actuation rows now carrying checked frames
+    # (D6), the predecessor a dwell holds is not necessarily a
+    # PathSegment -- a dwell after `clamp` holds the clamp sweep's final
+    # frame, jaws closed, never a frame captured before the jaws moved.
+    held_at: str | None = None
     # The non-robot joint state in effect at the START of this row, keyed
     # `instance__joint` in URDF-native units, accumulated by the timeline
-    # walk as actuation rows move module joints. NOTHING consumes it in
-    # ADR-0029 phase 1 -- it is built now because it is the walk's natural
-    # output and D5 (state-aware collision checking) is the thing that
-    # reads it; building it later would mean walking twice.
+    # walk as actuation rows move module joints. D5 checks each motion
+    # row against it (via the scene the walk hands to the checker).
     module_state: dict[str, float] = field(default_factory=dict)
+    # Every state this row puts on screen, in order, each one already
+    # collision-checked (ADR-0029 D6's invariant: there is only one grade
+    # of frame). Motion rows carry check_joint_segment's samples,
+    # actuation rows carry check_actuation_segment's sweep, and a dwell
+    # carries exactly ONE frame -- its predecessor's final state. This is
+    # what the trace serialises (D7).
+    frames: tuple[dict[str, float], ...] = ()
 
 
 @dataclass(frozen=True)

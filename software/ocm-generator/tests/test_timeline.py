@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""ADR-0029 D1-D4: planner/timeline's in-order walk of cell.plan. The
+"""ADR-0029 D1-D6: planner/timeline's in-order walk of cell.plan. The
 fastening MOTION producer (plan_fastening_sequence) needs the tesseract
-extra, so these tests hand it a synthetic, pre-built FasteningPlan -- the
-walk itself is pure Python over the resolved cell, the scene, and that
-plan, which is exactly the seam being tested. Modules are the conftest's
-synthetic ones with obviously-synthetic capabilities (ADR-0014: real
-durations/strokes are the owner's to state)."""
+extra, so these tests hand it a synthetic, pre-built FasteningPlan; the
+Bullet backend is stubbed out (`no_collision_backend`) so the REAL
+check_joint_segment / check_actuation_segment interpolation and the REAL
+walk run everywhere -- CI never installs the extra. Modules are the
+conftest's synthetic ones with obviously-synthetic capabilities
+(ADR-0014: real durations/strokes are the owner's to state)."""
 
 from __future__ import annotations
 
@@ -32,7 +33,7 @@ from .conftest import base_fragment_xml, build_cell_dict, fragment_xml, minimal_
 _FIX_FRAGMENT = """<?xml version="1.0"?>
 <robot name="frag">
   <link name="origin"><collision><geometry><box size="0.05 0.05 0.05"/></geometry></collision></link>
-  <link name="jaw"/>
+  <link name="jaw"><collision><geometry><box size="0.01 0.01 0.01"/></geometry></collision></link>
   <joint name="jaw" type="prismatic">
     <parent link="origin"/><child link="jaw"/>
     <axis xyz="1 0 0"/>
@@ -138,6 +139,10 @@ def _resolved_scene(tmp_path: Path, plan: list[Any], for_each_features: list[str
     return resolved, scene
 
 
+# Small sample count: enough to see interpolation, cheap to assert on.
+_SAMPLES = 5
+
+
 def _joints(x: float, y: float = 0.0) -> tuple[float, ...]:
     return (x, y, 0.0, 0.0, 0.0, 0.0)
 
@@ -178,9 +183,9 @@ def _fake_plan(holes: list[str]) -> FasteningPlan:
     )
 
 
-def test_rows_read_in_plan_order(tmp_path: Path):
+def test_rows_read_in_plan_order(tmp_path: Path, no_collision_backend: None):
     resolved, scene = _resolved_scene(tmp_path, _DOGFOOD_SHAPE_PLAN)
-    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]))
+    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
 
     # clamp before fasten before release; for_each in listed order; each
     # hole reads load -> transit -> approach -> drive -> withdraw, and the
@@ -202,9 +207,9 @@ def test_rows_read_in_plan_order(tmp_path: Path):
     ]
 
 
-def test_each_step_kind_produces_the_right_row_kind(tmp_path: Path):
+def test_each_step_kind_produces_the_right_row_kind(tmp_path: Path, no_collision_backend: None):
     resolved, scene = _resolved_scene(tmp_path, _DOGFOOD_SHAPE_PLAN)
-    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]))
+    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
 
     kinds = {r.label: r.kind for r in timeline.rows}
     assert kinds["fix1.clamp"] == "actuation"  # actuates + nominal_duration_s
@@ -218,9 +223,9 @@ def test_each_step_kind_produces_the_right_row_kind(tmp_path: Path):
         assert row.source == ("ESTIMATE" if row.kind == "motion" else "nominal_duration_s")
 
 
-def test_total_is_the_plain_serial_sum(tmp_path: Path):
+def test_total_is_the_plain_serial_sum(tmp_path: Path, no_collision_backend: None):
     resolved, scene = _resolved_scene(tmp_path, _DOGFOOD_SHAPE_PLAN)
-    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]))
+    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
 
     # Motion (joint swings / 1.0 rad/s): transits 1.0 + 1.0, approaches
     # 0.2 * 2, withdraws 0.2 * 2, final home 2.0  -> 4.8 s.
@@ -230,36 +235,99 @@ def test_total_is_the_plain_serial_sum(tmp_path: Path):
     assert timeline.report.total_s == timeline.total_s
 
 
-def test_for_each_expands_in_listed_order(tmp_path: Path):
+def test_for_each_expands_in_listed_order(tmp_path: Path, no_collision_backend: None):
     plan = [dict(_DOGFOOD_SHAPE_PLAN[0]), dict(_DOGFOOD_SHAPE_PLAN[1]), dict(_DOGFOOD_SHAPE_PLAN[2])]
     plan[1] = {**plan[1], "for_each": ["hole_2", "hole_1"]}
     resolved, scene = _resolved_scene(tmp_path, plan)
     # The producer visits items in the same listed order, so index 1 IS hole_2.
-    timeline = build_timeline(resolved, scene, _fake_plan(["hole_2", "hole_1"]))
+    timeline = build_timeline(resolved, scene, _fake_plan(["hole_2", "hole_1"]), path_samples=_SAMPLES)
 
     labels = [r.label for r in timeline.rows]
     assert labels.index("drive_screw @ hole_2") < labels.index("drive_screw @ hole_1")
     assert labels.index("load_screw @ hole_2") < labels.index("load_screw @ hole_1")
 
 
-def test_held_at_segment_points_at_the_previous_motion(tmp_path: Path):
+def test_held_at_points_at_the_immediately_preceding_row(tmp_path: Path, no_collision_backend: None):
     resolved, scene = _resolved_scene(tmp_path, _DOGFOOD_SHAPE_PLAN)
-    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]))
+    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
 
-    held = {r.label: r.held_at_segment for r in timeline.rows if r.kind != "motion"}
-    # Rows that precede ALL motion hold the scene's own initial state.
-    assert held["fix1.clamp"] is None
-    assert held["load_screw @ hole_1"] is None
-    # drive_screw is held at contact -- the approach segment's last frame.
+    held = {r.label: r.held_at for r in timeline.rows}
+    # held_at is a dwell's pointer at its IMMEDIATE predecessor, whatever
+    # kind that row is (D6 renamed it from held_at_segment: the
+    # predecessor here is the clamp ACTUATION row, not a PathSegment).
+    assert held["load_screw @ hole_1"] == "fix1.clamp"
+    # drive_screw is held at contact -- the approach row precedes it.
     assert held["drive_screw @ hole_1"] == "standoff_1 -> contact_1"
     # load_screw for the NEXT hole is held where the plan left the robot.
     assert held["load_screw @ hole_2"] == "contact_1 -> retract_1"
-    assert held["fix1.unclamp"] == "retract_2 -> home"
+    # Motion and actuation rows own real frames; they hold nothing.
+    assert held["fix1.clamp"] is None
+    assert held["fix1.unclamp"] is None
+    assert held["home -> standoff_1"] is None
 
 
-def test_module_state_accumulates_actuation_targets(tmp_path: Path):
+def test_motion_rows_are_checked_against_the_module_state_in_effect(tmp_path: Path, no_collision_backend: None):
+    # D5, observable: a transit planned AFTER clamp is checked (and its
+    # frames built) with the jaws closed; the same transit in a plan where
+    # fastening precedes clamp carries them open.
     resolved, scene = _resolved_scene(tmp_path, _DOGFOOD_SHAPE_PLAN)
-    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]))
+    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
+    rows = {r.label: r for r in timeline.rows}
+    for frame in rows["home -> standoff_1"].frames:
+        assert frame["fix1__jaw"] == pytest.approx(0.008)  # clamped: 8 mm
+
+    plan_fasten_first = [_DOGFOOD_SHAPE_PLAN[1], dict(_DOGFOOD_SHAPE_PLAN[0])]
+    resolved2, scene2 = _resolved_scene(tmp_path, plan_fasten_first)
+    timeline2 = build_timeline(resolved2, scene2, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
+    rows2 = {r.label: r for r in timeline2.rows}
+    for frame in rows2["home -> standoff_1"].frames:
+        assert "fix1__jaw" not in frame  # still at the authored state: never moved yet
+
+
+def test_actuation_rows_carry_a_full_checked_sweep(tmp_path: Path, no_collision_backend: None):
+    # D6: an actuation row is real swept motion now, not one held frame.
+    resolved, scene = _resolved_scene(tmp_path, _DOGFOOD_SHAPE_PLAN)
+    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
+
+    clamp = next(r for r in timeline.rows if r.label == "fix1.clamp")
+    assert len(clamp.frames) == _SAMPLES
+    values = [frame["fix1__jaw"] for frame in clamp.frames]
+    assert values[0] == pytest.approx(0.0)
+    assert values[-1] == pytest.approx(0.008)
+    assert values == sorted(values)  # linear sweep from open to closed
+
+    # unclamp sweeps back down, starting from where clamp left the jaw.
+    unclamp = next(r for r in timeline.rows if r.label == "fix1.unclamp")
+    assert unclamp.frames[0]["fix1__jaw"] == pytest.approx(0.008)
+    assert unclamp.frames[-1]["fix1__jaw"] == pytest.approx(0.0)
+
+
+def test_dwell_after_actuation_holds_the_post_actuation_state(tmp_path: Path, no_collision_backend: None):
+    # Regression for the stale-held-frame hazard D6 creates: the dwell
+    # right after clamp must show the jaws CLOSED -- its held frame is the
+    # clamp sweep's FINAL frame, never one captured before the jaws moved.
+    resolved, scene = _resolved_scene(tmp_path, _DOGFOOD_SHAPE_PLAN)
+    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
+
+    rows = {r.label: r for r in timeline.rows}
+    clamp, load = rows["fix1.clamp"], rows["load_screw @ hole_1"]
+    assert len(load.frames) == 1
+    assert load.frames[0] == clamp.frames[-1]
+    assert load.frames[0]["fix1__jaw"] == pytest.approx(0.008)
+
+
+def test_every_stationary_row_holds_its_predecessors_final_frame(tmp_path: Path, no_collision_backend: None):
+    resolved, scene = _resolved_scene(tmp_path, _DOGFOOD_SHAPE_PLAN)
+    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
+
+    for previous, row in zip(timeline.rows, timeline.rows[1:]):
+        if row.kind == "dwell":
+            assert row.frames == (previous.frames[-1],), (row.label, previous.label)
+
+
+def test_module_state_accumulates_actuation_targets(tmp_path: Path, no_collision_backend: None):
+    resolved, scene = _resolved_scene(tmp_path, _DOGFOOD_SHAPE_PLAN)
+    timeline = build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
 
     rows = {r.label: r for r in timeline.rows}
     # Snapshot is the state at the row's START: clamp itself still sees the
@@ -274,7 +342,7 @@ def test_module_state_accumulates_actuation_targets(tmp_path: Path):
     assert not any(k.startswith("robot1__") for k in rows["fix1.unclamp"].module_state)
 
 
-def test_unplannable_step_refuses(tmp_path: Path):
+def test_unplannable_step_refuses(tmp_path: Path, no_collision_backend: None):
     plan = [
         {"step": "vent", "module": "fix1", "op": "vent"},  # no at, no actuates, no nominal_duration_s
         _DOGFOOD_SHAPE_PLAN[1],
@@ -282,14 +350,14 @@ def test_unplannable_step_refuses(tmp_path: Path):
     resolved, scene = _resolved_scene(tmp_path, plan)
 
     with pytest.raises(PlanStepUnplannableError) as exc:
-        build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]))
+        build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
 
     assert exc.value.instance == "fix1"
     assert exc.value.op == "vent"
     assert "nothing to place on a timeline" in str(exc.value)
 
 
-def test_actuates_without_duration_refuses(tmp_path: Path):
+def test_actuates_without_duration_refuses(tmp_path: Path, no_collision_backend: None):
     plan = [
         {"step": "surge", "module": "fix1", "op": "surge"},  # actuates, no nominal_duration_s
         _DOGFOOD_SHAPE_PLAN[1],
@@ -297,7 +365,7 @@ def test_actuates_without_duration_refuses(tmp_path: Path):
     resolved, scene = _resolved_scene(tmp_path, plan)
 
     with pytest.raises(ActuationDurationMissingError) as exc:
-        build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]))
+        build_timeline(resolved, scene, _fake_plan(["hole_1", "hole_2"]), path_samples=_SAMPLES)
 
     assert exc.value.capability == "surge"
     assert "will not be invented" in str(exc.value)

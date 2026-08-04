@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from ocm_core.cell import Cell
-from ocm_generator.emitters import emit_urscript, render_html_animation
+from ocm_generator.emitters import build_trace, emit_urscript, render_html_animation
 from ocm_generator.planner import (
     ActuationDurationMissingError,
     NoDriveScrewStepError,
@@ -136,8 +136,8 @@ def plan_cell(ws: Workspace, cell_id: str, collision_margin_mm: float = 1.0, pat
         return Envelope.refuse(refusals)
 
     try:
-        plan = plan_fastening_sequence(resolved, scene, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
-        timeline = build_timeline(resolved, scene, plan)
+        plan = plan_fastening_sequence(resolved, scene)
+        timeline = build_timeline(resolved, scene, plan, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
     except NoDriveScrewStepError as e:
         return single_refusal(Codes.OCM_NO_FASTENING_STEP, path="plan", message=str(e), hint="Add a for_each fastening step with a drive_screw op to the plan.")
     except PoseUnreachableError as e:
@@ -160,7 +160,10 @@ def plan_cell(ws: Workspace, cell_id: str, collision_margin_mm: float = 1.0, pat
             "duration_s": row.duration_s,
             "source": row.source,
             "kind": row.kind,
-            "held_at_segment": row.held_at_segment,
+            # Renamed from phase 1's held_at_segment (ADR-0029 D6): the
+            # predecessor a dwell holds can be an actuation row, not just
+            # a PathSegment.
+            "held_at": row.held_at,
         }
         for row in report.rows
     ]
@@ -200,8 +203,8 @@ def emit(
 
     if urscript is not None or animation is not None:
         try:
-            plan = plan_fastening_sequence(resolved, scene, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
-            timeline = build_timeline(resolved, scene, plan)
+            plan = plan_fastening_sequence(resolved, scene)
+            timeline = build_timeline(resolved, scene, plan, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
         except NoDriveScrewStepError as e:
             return single_refusal(Codes.OCM_NO_FASTENING_STEP, path="plan", message=str(e))
         except PoseUnreachableError as e:
@@ -221,7 +224,8 @@ def emit(
             Path(urscript).write_text(emit_urscript(plan), encoding="utf-8")
             written["urscript"] = str(urscript)
         if animation is not None:
-            Path(animation).write_text(render_html_animation(scene, resolved, plan, timeline.report), encoding="utf-8")
+            # D7: the HTML is a renderer over the trace, not a producer.
+            Path(animation).write_text(render_html_animation(build_trace(scene, resolved, timeline)), encoding="utf-8")
             written["animation"] = str(animation)
 
     return Envelope.succeed({"cell_id": cell_id, "written": written})

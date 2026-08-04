@@ -14,20 +14,27 @@ op-step is dispatched by what its capability declares:
 `load_screw` needs no placement logic once it stops being special (D4):
 the cell lists it before `drive_screw` inside the `for_each` sequence, so
 this in-order walk emits it as a dwell exactly where the manifest says it
-happens, held at the previous segment's last frame.
+happens, held at its predecessor's last frame.
 
-## Actuation rows in phase 1: duration only, no motion
+## The walk is where checking happens (D5, D6)
 
-An actuation row carries its `nominal_duration_s` and its kind, and for
-animation purposes behaves exactly like a dwell -- one held frame, at the
-state in effect when the row starts. It does NOT carry an interpolated
-sweep: D6 requires every frame in an emitted trace to have been
-collision-checked, and the checker for actuation sweeps is phase 2.
-Emitting unchecked interpolated frames now would put unverified motion on
-screen looking identical to verified motion -- the exact failure D6 exists
-to prevent. A capability that declares `actuates` with no
-`nominal_duration_s` refuses (ActuationDurationMissingError): the endpoint
-is stated, the time is not, and it will not be invented.
+`plan_fastening_sequence` produces UNCHECKED segments; this walk checks
+each motion row via `check_joint_segment` against the state accumulated
+so far -- so a transit planned after `clamp` is checked with the jaws
+closed, and one planned before it with them open. Each actuation row is
+checked via `check_actuation_segment` the same way (D6): every joint the
+capability actuates sweeps linearly together, each sample collision-
+checked with the robot at its accumulated pose, refusing with the same
+PathCollisionError a robot segment uses -- an actuation row is a segment,
+and it needs no code of its own. One place checks, and it is the place
+that knows the state. A capability that declares `actuates` with no
+`nominal_duration_s` refuses (ActuationDurationMissingError): the
+endpoint is stated, the time is not, and it will not be invented.
+
+What D6's check does not catch (stated in check_actuation_segment's own
+docstring too): same-instance contact (two jaws of one nest closing on
+each other) and the workpiece (`cell.part` is not in the collision
+scene). It catches a module joint sweeping into a DIFFERENT instance.
 
 ## Sequencing lives here, nowhere else
 
@@ -39,6 +46,7 @@ recovery, not the forward path, and is not walked.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
@@ -51,18 +59,22 @@ from ocm_core.units import (
 from ocm_resolve import ResolvedCell
 
 from ocm_generator.scene import Scene
+from ocm_generator.scene.errors import CollisionCheckUnavailable
 
 from .cycle_time import DEFAULT_JOINT_SPEED_RAD_S, CycleTimeReport, CycleTimeRow, joint_distance
-from .errors import ActuationDurationMissingError, PlanningError, PlanStepUnplannableError
-from .plan import FasteningPlan, PathSegment
+from .errors import ActuationDurationMissingError, PlanningError, PlanningUnavailable, PlanStepUnplannableError
+from .path import DEFAULT_PATH_SAMPLES, check_actuation_segment, check_joint_segment
+from .plan import DEFAULT_COLLISION_MARGIN_MM, FasteningPlan, PathSegment
 
 
 @dataclass(frozen=True)
 class Timeline:
-    """The ordered rows the in-order walk produced, plus the checked
-    segments the motion rows refer to (by `PathSegment.label`) and the
-    FasteningPlan that produced them (`.emitters.urscript` still consumes
-    it directly -- it is one row producer, no longer the plan).
+    """The ordered rows the in-order walk produced -- every row carrying
+    its own already-checked frames -- plus the checked segments the motion
+    rows correspond to (by `PathSegment.label`) and the FasteningPlan that
+    produced them (`.emitters.urscript` still consumes it directly -- it
+    is one row producer, no longer the plan). The trace (`.emitters.
+    trace`, ADR-0029 D7) is this, serialised.
     """
 
     rows: tuple[CycleTimeRow, ...]
@@ -96,16 +108,23 @@ def build_timeline(
     scene: Scene,
     plan: FasteningPlan,
     joint_speed_rad_s: float = DEFAULT_JOINT_SPEED_RAD_S,
+    collision_margin_mm: float = DEFAULT_COLLISION_MARGIN_MM,
+    path_samples: int = DEFAULT_PATH_SAMPLES,
 ) -> Timeline:
     """Walk `resolved.cell.plan` in order and place every step on one
-    strictly serial timeline (ADR-0029 D1/D4). `plan` is
-    `plan_fastening_sequence`'s own output for this cell -- the motion-row
-    producer's segments, already IK-solved and collision-checked.
+    strictly serial timeline (ADR-0029 D1/D4), collision-checking each
+    motion and actuation row against the state in effect at that point
+    (D5/D6). `plan` is `plan_fastening_sequence`'s own output for this
+    cell -- the motion-row producer's segments, IK-solved and UNCHECKED;
+    this walk is what checks them.
 
     Raises PlanStepUnplannableError for a step with nothing to place,
     ActuationDurationMissingError for a stated endpoint with no stated
-    time, and PlanningError if a step carries `at:` outside the fastening
-    for_each (v0's only motion machinery).
+    time, PathCollisionError (naming the row and the colliding pair) for
+    a motion or actuation sweep that collides, PlanningUnavailable if the
+    collision backend (the `tesseract` extra) is missing, and
+    PlanningError if a step carries `at:` outside the fastening for_each
+    (v0's only motion machinery).
     """
     robot_prefix = f"{plan.robot_instance}__"
     # D3: the non-robot joint state, threaded through the walk. Starts at
@@ -113,16 +132,35 @@ def build_timeline(
     # build -- ADR-0028 Erratum 1) and accumulates each actuation row's
     # targets as the plan leaves them.
     module_state: dict[str, float] = {k: v for k, v in scene.joint_state.items() if not k.startswith(robot_prefix)}
+    # The FULL namespaced state in effect -- module joints as the plan has
+    # left them AND the robot wherever the last motion row put it. Every
+    # check below runs against this, and every row's frames end in it.
+    current_state: dict[str, float] = dict(scene.joint_state)
 
     segments_for_hole: dict[str | None, dict[str, PathSegment]] = {}
     for segment in plan.segments:
         segments_for_hole.setdefault(segment.hole_id, {})[segment.kind] = segment
 
     rows: list[CycleTimeRow] = []
-    last_motion_label: str | None = None
+    checked_by_label: dict[str, PathSegment] = {}
+    last_row_label: str | None = None
+
+    def scene_in_effect() -> Scene:
+        return dataclasses.replace(scene, joint_state=dict(current_state))
 
     def emit_motion(segment: PathSegment) -> None:
-        nonlocal last_motion_label
+        nonlocal current_state, last_row_label
+        # D5: checked against the module state in effect at THIS point in
+        # the plan -- jaws closed after clamp, open after unclamp.
+        frames = check_joint_segment(
+            scene=scene_in_effect(),
+            robot_instance=plan.robot_instance,
+            label=segment.label,
+            start_joints=segment.start_joints,
+            end_joints=segment.end_joints,
+            samples=path_samples,
+            collision_margin_mm=collision_margin_mm,
+        )
         duration = joint_distance(segment.start_joints, segment.end_joints) / joint_speed_rad_s
         rows.append(
             CycleTimeRow(
@@ -131,21 +169,60 @@ def build_timeline(
                 source="ESTIMATE",
                 kind="motion",
                 module_state=dict(module_state),
+                frames=frames,
             )
         )
-        last_motion_label = segment.label
+        checked_by_label[segment.label] = dataclasses.replace(segment, frames=frames)
+        current_state = dict(frames[-1])
+        last_row_label = segment.label
 
-    def emit_stationary(label: str, duration_s: float, kind: str) -> None:
+    def emit_actuation(label: str, duration_s: float, targets: dict[str, float]) -> None:
+        nonlocal current_state, last_row_label
+        # D6: one verb, one sweep -- every actuated joint interpolates
+        # together, each sample checked with the robot at its accumulated
+        # pose. The row snapshots module_state at its START; the targets
+        # land after it, in effect for every subsequent row.
+        start = {key: current_state.get(key, 0.0) for key in targets}
+        frames = check_actuation_segment(
+            scene=scene_in_effect(),
+            label=label,
+            start=start,
+            end=targets,
+            samples=path_samples,
+            collision_margin_mm=collision_margin_mm,
+        )
         rows.append(
             CycleTimeRow(
                 label=label,
                 duration_s=duration_s,
                 source="nominal_duration_s",
-                kind=kind,
-                held_at_segment=last_motion_label,
+                kind="actuation",
                 module_state=dict(module_state),
+                frames=frames,
             )
         )
+        current_state = dict(frames[-1])
+        module_state.update(targets)
+        last_row_label = label
+
+    def emit_dwell(label: str, duration_s: float) -> None:
+        nonlocal last_row_label
+        # A dwell holds its predecessor's final frame -- whatever kind the
+        # predecessor was, so a dwell after `clamp` shows the jaws CLOSED,
+        # never a frame captured before they moved. With no predecessor it
+        # holds the scene's own initial authored state.
+        rows.append(
+            CycleTimeRow(
+                label=label,
+                duration_s=duration_s,
+                source="nominal_duration_s",
+                kind="dwell",
+                held_at=last_row_label,
+                module_state=dict(module_state),
+                frames=(dict(current_state),),
+            )
+        )
+        last_row_label = label
 
     def handle_fastening_step(item: str) -> None:
         """One drive_screw step of the fastening for_each: the motion rows
@@ -160,7 +237,7 @@ def build_timeline(
         emit_motion(by_kind["transit"])
         emit_motion(by_kind["approach"])
         if plan.drive_screw_nominal_duration_s is not None:
-            emit_stationary(f"drive_screw @ {item}", plan.drive_screw_nominal_duration_s, "dwell")
+            emit_dwell(f"drive_screw @ {item}", plan.drive_screw_nominal_duration_s)
         emit_motion(by_kind["withdraw"])
 
     def handle_step(step: dict[str, Any], item: str | None, is_fastening_item: bool) -> None:
@@ -184,15 +261,12 @@ def build_timeline(
         if capability.actuates:
             if capability.nominal_duration_s is None:
                 raise ActuationDurationMissingError(instance, resolved.instance(instance).module.id, capability.name)
-            emit_stationary(label, capability.nominal_duration_s, "actuation")
-            # The row snapshots module_state at its START; the targets land
-            # after it, in effect for every subsequent row.
-            for act in capability.actuates:
-                module_state[f"{instance}__{act.joint}"] = _native_value(act.to, act.units)
+            targets = {f"{instance}__{act.joint}": _native_value(act.to, act.units) for act in capability.actuates}
+            emit_actuation(label, capability.nominal_duration_s, targets)
             return
 
         if capability.nominal_duration_s is not None:
-            emit_stationary(label, capability.nominal_duration_s, "dwell")
+            emit_dwell(label, capability.nominal_duration_s)
             return
 
         raise PlanStepUnplannableError(str(step.get("step", op)), instance, op)
@@ -233,11 +307,16 @@ def build_timeline(
             if "module" in entry and "op" in entry:
                 handle_step(entry, item=None, is_fastening_item=False)
 
-    walk(resolved.cell.plan)
+    try:
+        walk(resolved.cell.plan)
+    except CollisionCheckUnavailable as e:
+        # The walk IS the check pass now (D5/D6); surface a missing
+        # backend as the same refusal shape the IK path uses.
+        raise PlanningUnavailable(str(e)) from e
 
     return Timeline(
         rows=tuple(rows),
-        segments=plan.segments,
+        segments=tuple(checked_by_label[s.label] for s in plan.segments),
         plan=plan,
         total_s=sum(row.duration_s for row in rows),
         joint_speed_rad_s=joint_speed_rad_s,
