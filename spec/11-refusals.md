@@ -50,6 +50,7 @@ field, a layer, or a runtime that does not exist yet).
 | Code | Phase | Outcome | Layer | ADR | Status |
 |---|---|---|---|---|---|
 | `OCM_ACTUATION_CONFLICT` | design | refuse | module | ADR-0028 | live |
+| `OCM_ACTUATION_DURATION_MISSING` | design | refuse | cell | ADR-0029 | live |
 | `OCM_ACTUATION_JOINT_FIXED` | design | refuse | module | ADR-0028 | live |
 | `OCM_ACTUATION_JOINT_UNKNOWN` | design | refuse | module | ADR-0028 | live |
 | `OCM_ACTUATION_OUT_OF_LIMIT` | design | refuse | module | ADR-0028 | live |
@@ -85,6 +86,7 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_PARAM_OUT_OF_BOUNDS` | design | refuse | cell | ADR-0013 | live |
 | `OCM_PATH_COLLISION` | design | refuse | cell | ADR-0007 | live |
 | `OCM_PIN_ON_MULTIPLE_NETS` | design | refuse | module | ADR-0015 | live |
+| `OCM_PLAN_STEP_UNPLANNABLE` | design | refuse | cell | ADR-0029 | live |
 | `OCM_PORT_UNCONNECTED` | design | refuse | module | ADR-0015 | live |
 | `OCM_POSE_UNREACHABLE` | design | refuse | cell | ADR-0007 | live |
 | `OCM_REQUIREMENT_UNBOUND` | design | refuse | cell | ADR-0023 | live |

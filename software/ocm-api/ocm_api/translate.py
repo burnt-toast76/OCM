@@ -495,6 +495,24 @@ def path_collision_to_refusal(segment: str, instance_a: str, instance_b: str, li
     )
 
 
+def plan_step_unplannable_to_refusal(step: str, instance: str, op: str, message: str) -> Refusal:
+    return Refusal(
+        code=Codes.OCM_PLAN_STEP_UNPLANNABLE,
+        path=f"plan.steps['{step}']",
+        message=message,
+        hint="Give the capability an at: target, an actuates block (ADR-0028), or a nominal_duration_s -- the timeline places what is stated, and this step states nothing.",
+    )
+
+
+def actuation_duration_missing_to_refusal(instance: str, capability: str, message: str) -> Refusal:
+    return Refusal(
+        code=Codes.OCM_ACTUATION_DURATION_MISSING,
+        path=f"modules['{instance}'].capabilities['{capability}'].nominal_duration_s",
+        message=message,
+        hint="Declare nominal_duration_s on the capability -- the endpoint is stated, the time is not, and it will not be invented.",
+    )
+
+
 def contacts_to_refusals(contacts: list[dict[str, Any]]) -> list[Refusal]:
     return [
         Refusal(

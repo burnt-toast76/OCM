@@ -4,9 +4,10 @@ Companion to `spec/11-refusals.md` / `spec/schema/ocm-refusals-1.0.yaml` (ADR-00
 catalogue entry: where it is evaluated **today**, and the gap flag. This is a worklist, not an
 essay.
 
-**Counts.** 95 entries: 53 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
+**Counts.** 97 entries: 55 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
 no engine emits them yet). (ADR-0020 Erratum 1 split `OCM_IDENTITY_MISMATCH` into a local and a
-store code, +1 deferred. ADR-0028 Erratum 1 added `OCM_FRAGMENT_MALFORMED`, +1 live.)
+store code, +1 deferred. ADR-0028 Erratum 1 added `OCM_FRAGMENT_MALFORMED`, +1 live. ADR-0029
+phase 1 added `OCM_PLAN_STEP_UNPLANNABLE` and `OCM_ACTUATION_DURATION_MISSING`, +2 live.)
 
 ## Namespace — RESOLVED by rename
 
@@ -34,6 +35,7 @@ namespace.
 | Code | Phase/Outcome | Evaluated today | Flag |
 |---|---|---|---|
 | `OCM_ACTUATION_CONFLICT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_ACTUATION_DURATION_MISSING` | design/refuse | ocm-generator planner/timeline → ocm-api/generation.py | — |
 | `OCM_ACTUATION_JOINT_FIXED` | design/refuse | ocm-generator scene/actuation → validate_module | — |
 | `OCM_ACTUATION_JOINT_UNKNOWN` | design/refuse | ocm-generator scene/actuation → validate_module | — |
 | `OCM_ACTUATION_OUT_OF_LIMIT` | design/refuse | ocm-generator scene/actuation → validate_module | — |
@@ -69,6 +71,7 @@ namespace.
 | `OCM_PARAM_OUT_OF_BOUNDS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_PATH_COLLISION` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
 | `OCM_PIN_ON_MULTIPLE_NETS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_PLAN_STEP_UNPLANNABLE` | design/refuse | ocm-generator planner/timeline → ocm-api/generation.py | — |
 | `OCM_PORT_UNCONNECTED` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_POSE_UNREACHABLE` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
 | `OCM_REQUIREMENT_UNBOUND` | design/refuse | ocm-resolve → ocm-api/translate.py | — |

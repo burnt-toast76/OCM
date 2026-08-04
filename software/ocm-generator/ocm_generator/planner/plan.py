@@ -88,13 +88,15 @@ class PathSegment:
     hole_id: str | None  # the hole this segment leads into (transit/approach) or out of (withdraw); None for the final transit home
     start_joints: tuple[float, ...]
     end_joints: tuple[float, ...]
-    # Every joint-angle tuple `.path.check_joint_segment` sampled AND
-    # already proved collision-free for this exact segment, in travel
-    # order (start_joints == frames[0], end_joints == frames[-1]) --
-    # `.scene.animation` reuses these directly for `--view-animation`,
+    # Every state `.path.check_joint_segment` sampled AND already proved
+    # collision-free for this exact segment, in travel order -- each one a
+    # full namespaced joint-state dict (ADR-0029 D2: the same shape
+    # Scene.joint_state and compute_world_poses speak; frames[0]/[-1]
+    # carry start_joints/end_joints overlaid on the scene's own state).
+    # `.emitters.animation` reuses these directly for `--view-animation`,
     # never re-interpolating its own. Empty until plan_fastening_sequence
     # runs the check (see that function's own two-pass construction).
-    frames: tuple[tuple[float, ...], ...] = ()
+    frames: tuple[dict[str, float], ...] = ()
 
 
 @dataclass(frozen=True)

@@ -16,12 +16,14 @@ from typing import Any
 from ocm_core.cell import Cell
 from ocm_generator.emitters import emit_urscript, render_html_animation
 from ocm_generator.planner import (
+    ActuationDurationMissingError,
     NoDriveScrewStepError,
     PathCollisionError,
     PlanningError,
     PlanningUnavailable,
+    PlanStepUnplannableError,
     PoseUnreachableError,
-    estimate_cycle_time,
+    build_timeline,
     plan_fastening_sequence,
 )
 from ocm_generator.scene import (
@@ -36,7 +38,14 @@ from ocm_generator.scene import (
 
 from .envelope import Codes, Envelope, Refusal, single_refusal
 from .resolution import resolve_with_refusals
-from .translate import contacts_to_refusals, path_collision_to_refusal, pose_unreachable_to_refusal, scene_error_to_refusal
+from .translate import (
+    actuation_duration_missing_to_refusal,
+    contacts_to_refusals,
+    path_collision_to_refusal,
+    plan_step_unplannable_to_refusal,
+    pose_unreachable_to_refusal,
+    scene_error_to_refusal,
+)
 from .workspace import Workspace, read_yaml
 
 
@@ -128,28 +137,36 @@ def plan_cell(ws: Workspace, cell_id: str, collision_margin_mm: float = 1.0, pat
 
     try:
         plan = plan_fastening_sequence(resolved, scene, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
+        timeline = build_timeline(resolved, scene, plan)
     except NoDriveScrewStepError as e:
         return single_refusal(Codes.OCM_NO_FASTENING_STEP, path="plan", message=str(e), hint="Add a for_each fastening step with a drive_screw op to the plan.")
     except PoseUnreachableError as e:
         return Envelope.refuse([pose_unreachable_to_refusal(e.pose_name, str(e))])
     except PathCollisionError as e:
         return Envelope.refuse([path_collision_to_refusal(e.segment, e.instance_a, e.instance_b, e.link_a, e.link_b, e.fraction, str(e))])
+    except PlanStepUnplannableError as e:
+        return Envelope.refuse([plan_step_unplannable_to_refusal(e.step, e.instance, e.op, str(e))])
+    except ActuationDurationMissingError as e:
+        return Envelope.refuse([actuation_duration_missing_to_refusal(e.instance, e.capability, str(e))])
     except PlanningUnavailable as e:
         return single_refusal(Codes.OCM_UNAVAILABLE, path="$", message=str(e))
     except PlanningError as e:
         return single_refusal(Codes.OCM_CELL_INVALID, path="plan", message=str(e))
 
-    report = estimate_cycle_time(plan)
+    report = timeline.report
     cycle_table = [
         {
             "label": row.label,
             "duration_s": row.duration_s,
             "source": row.source,
-            "overlapped_with": row.overlapped_with,
+            "kind": row.kind,
             "held_at_segment": row.held_at_segment,
         }
         for row in report.rows
     ]
+    # ADR-0029 D4: the naive_serial_total_s / overlapped_total_s /
+    # savings_s triple collapsed to one strictly serial total_s -- a
+    # BREAKING change to this verb's response shape.
     return Envelope.succeed(
         {
             "cell_id": cell_id,
@@ -157,9 +174,7 @@ def plan_cell(ws: Workspace, cell_id: str, collision_margin_mm: float = 1.0, pat
             "robot_instance": plan.robot_instance,
             "holes": [h.hole_id for h in plan.holes],
             "cycle_table": cycle_table,
-            "naive_serial_total_s": report.naive_serial_total_s,
-            "overlapped_total_s": report.overlapped_total_s,
-            "savings_s": report.savings_s,
+            "total_s": report.total_s,
         }
     )
 
@@ -186,12 +201,17 @@ def emit(
     if urscript is not None or animation is not None:
         try:
             plan = plan_fastening_sequence(resolved, scene, collision_margin_mm=collision_margin_mm, path_samples=path_samples)
+            timeline = build_timeline(resolved, scene, plan)
         except NoDriveScrewStepError as e:
             return single_refusal(Codes.OCM_NO_FASTENING_STEP, path="plan", message=str(e))
         except PoseUnreachableError as e:
             return Envelope.refuse([pose_unreachable_to_refusal(e.pose_name, str(e))])
         except PathCollisionError as e:
             return Envelope.refuse([path_collision_to_refusal(e.segment, e.instance_a, e.instance_b, e.link_a, e.link_b, e.fraction, str(e))])
+        except PlanStepUnplannableError as e:
+            return Envelope.refuse([plan_step_unplannable_to_refusal(e.step, e.instance, e.op, str(e))])
+        except ActuationDurationMissingError as e:
+            return Envelope.refuse([actuation_duration_missing_to_refusal(e.instance, e.capability, str(e))])
         except PlanningUnavailable as e:
             return single_refusal(Codes.OCM_UNAVAILABLE, path="$", message=str(e))
         except PlanningError as e:
@@ -201,8 +221,7 @@ def emit(
             Path(urscript).write_text(emit_urscript(plan), encoding="utf-8")
             written["urscript"] = str(urscript)
         if animation is not None:
-            report = estimate_cycle_time(plan)
-            Path(animation).write_text(render_html_animation(scene, resolved, plan, report), encoding="utf-8")
+            Path(animation).write_text(render_html_animation(scene, resolved, plan, timeline.report), encoding="utf-8")
             written["animation"] = str(animation)
 
     return Envelope.succeed({"cell_id": cell_id, "written": written})

@@ -21,7 +21,7 @@ pytest.importorskip("tesseract_robotics")
 
 from ocm_core.cell import Cell  # noqa: E402
 from ocm_generator.emitters import build_animation_payload, render_html_animation  # noqa: E402
-from ocm_generator.planner import estimate_cycle_time, plan_fastening_sequence  # noqa: E402
+from ocm_generator.planner import build_timeline, plan_fastening_sequence  # noqa: E402
 from ocm_generator.scene import build_scene, render_html  # noqa: E402
 from ocm_resolve import resolve_cell  # noqa: E402
 
@@ -48,7 +48,13 @@ def _animation_cell_dict(features: dict[str, list[float]], for_each: list[str]) 
                 "mount": {"station": [400, 300], "pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}},
                 "joint_state": dict(_HOME_JOINT_STATE),
             },
-            {"instance": "sd1", "module": "com.accelsolutions.screwdriver.sd50@1.2.0", "mount": {"on": "robot1.flange"}},
+            {
+                "instance": "sd1",
+                "module": "com.accelsolutions.screwdriver.sd50@1.2.0",
+                "mount": {"on": "robot1.flange"},
+                # Same binding the real cell carries -- see test_planner.py.
+                "requires": {"workpiece_secured": "nest1.clamped"},
+            },
             {
                 "instance": "nest1",
                 "module": "com.accelsolutions.fixture.pneumatic-nest@1.1.0",
@@ -86,7 +92,7 @@ def _build(repo_root: Path, features: dict[str, list[float]], for_each: list[str
     resolved = resolve_cell(cell, repo_root / "modules")
     scene = build_scene(resolved, repo_root / "modules")
     plan = plan_fastening_sequence(resolved, scene, path_samples=path_samples)
-    report = estimate_cycle_time(plan)
+    report = build_timeline(resolved, scene, plan).report
     return resolved, scene, plan, report
 
 
@@ -120,19 +126,25 @@ def test_dwell_segments_have_exactly_one_held_frame(repo_root: Path):
 
     payload = build_animation_payload(scene, resolved, plan, report)
 
-    dwell_segments = [seg for seg in payload["animation"] if seg["kind"] == "dwell"]
-    # 3 holes * 2 dwells each (load_screw wait, drive_screw) = 6.
-    assert len(dwell_segments) == 6
-    for seg in dwell_segments:
+    held_segments = [seg for seg in payload["animation"] if seg["kind"] != "motion"]
+    # ADR-0029 D1's in-order walk: nest1's clamp/unclamp bracket the
+    # sequence (dwells -- the real nest declares no actuates), and each
+    # hole reads load_screw (BEFORE its own transit, where the plan lists
+    # it -- the overlap special case is gone, D4) then drive_screw:
+    # 2 + 3 holes * 2 = 8 held rows, each exactly one frame.
+    assert len(held_segments) == 8
+    for seg in held_segments:
         assert len(seg["frames"]) == 1, (seg["name"], len(seg["frames"]))
-    names = [seg["name"] for seg in dwell_segments]
+    names = [seg["name"] for seg in held_segments]
     assert names == [
+        "nest1.clamp",
         "load_screw @ hole_1",
         "drive_screw @ hole_1",
         "load_screw @ hole_2",
         "drive_screw @ hole_2",
         "load_screw @ hole_3",
         "drive_screw @ hole_3",
+        "nest1.unclamp",
     ]
 
 
@@ -162,9 +174,10 @@ def test_total_duration_matches_the_cycle_table_total(repo_root: Path):
 
     payload = build_animation_payload(scene, resolved, plan, report)
 
-    assert payload["total_duration_s"] == pytest.approx(report.naive_serial_total_s)
+    assert payload["total_duration_s"] == pytest.approx(report.total_s)
     # And it's genuinely the sum of every segment's own duration -- not a
-    # coincidentally-equal separately-computed number.
+    # coincidentally-equal separately-computed number (D4: the total IS
+    # the plain serial sum; there is no overlapped variant to disagree).
     assert payload["total_duration_s"] == pytest.approx(sum(seg["duration_s"] for seg in payload["animation"]))
     # Sanity: every row in the printed cycle table produced exactly one
     # animation segment -- nothing dropped, nothing invented.
@@ -240,7 +253,7 @@ def test_animated_html_has_playback_controls_and_valid_data(repo_root: Path):
 
     data = _extract_data(page)
     assert len(data["animation"]) == len(report.rows)
-    assert data["total_duration_s"] == pytest.approx(report.naive_serial_total_s)
+    assert data["total_duration_s"] == pytest.approx(report.total_s)
 
 
 def test_static_view_output_is_unchanged_by_the_animation_feature(repo_root: Path):

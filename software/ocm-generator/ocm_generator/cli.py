@@ -166,7 +166,7 @@ def cmd_scene_collision(scene, args: argparse.Namespace) -> int:
 def cmd_plan(args: argparse.Namespace) -> int:
     from ocm_core import load_cell
     from ocm_generator.emitters import emit_urscript, render_cycle_time_table, render_html_animation
-    from ocm_generator.planner import PlanningError, PlanningUnavailable, estimate_cycle_time, plan_fastening_sequence
+    from ocm_generator.planner import PlanningError, PlanningUnavailable, build_timeline, plan_fastening_sequence
     from ocm_generator.scene import SceneBuildError, build_scene
     from ocm_resolve import CellResolutionError, resolve_cell
 
@@ -195,6 +195,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
             collision_margin_mm=args.collision_margin_mm,
             path_samples=args.path_samples,
         )
+        timeline = build_timeline(resolved, scene, plan)
     except PlanningUnavailable as e:
         print(f"FAILED: planning unavailable: {e}", file=sys.stderr)
         return 1
@@ -208,7 +209,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
           f"{', '.join(h.hole_id for h in plan.holes)}")
     print(f"  wrote URScript to {args.emit_urscript}")
 
-    report = estimate_cycle_time(plan)
+    report = timeline.report
     print()
     print(render_cycle_time_table(plan, report))
 

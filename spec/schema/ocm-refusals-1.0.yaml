@@ -771,3 +771,24 @@ OCM_FRAGMENT_MALFORMED:
   # nothing can parse backs nothing. Emitted by validate_module's fragment-
   # parse step, via the scene's own load_fragment (one parser, one error type).
   message: "mechanical.geometry.urdf_fragment {path} exists but is not well-formed XML: {detail}"
+OCM_PLAN_STEP_UNPLANNABLE:
+  phase: design
+  outcome: refuse
+  adr: ADR-0029
+  layer: cell
+  # D1: every op-step must land on the timeline as motion (at:), an
+  # actuation (actuates), or a dwell (nominal_duration_s). A capability
+  # that states none of the three has nothing to place -- and the walk
+  # says so instead of silently dropping the step from the timeline.
+  message: "Plan step {step} calls {inst}.{op}, which declares no at: target, no actuates, and no nominal_duration_s -- nothing to place on a timeline"
+OCM_ACTUATION_DURATION_MISSING:
+  phase: design
+  outcome: refuse
+  adr: ADR-0029
+  layer: cell
+  # The fabrication guard: ADR-0028 D5 assumed nominal_duration_s would be
+  # present because every capability in the repo happens to declare it;
+  # nothing enforced it. Without this, a timeline would have to invent a
+  # duration for a stated motion, and it would render as a cycle time
+  # indistinguishable from a measured one.
+  message: "Capability {cap} on {module} declares actuates but no nominal_duration_s -- the endpoint is stated, the time is not, and it will not be invented"

@@ -75,6 +75,10 @@ def _pk100_manifest(*, with_frame: bool) -> dict:
                 "parameters": {
                     "vacuum_kpa": {"type": "number", "unit": "kPa", "min": 20.0, "max": 80.0, "summary": "Vacuum level to apply."},
                 },
+                # ADR-0023: timeout_s/on_timeout are required, so the ONLY
+                # schema violation left is the planted missing-frame trap.
+                "timeout_s": 3.0,
+                "on_timeout": "hold",
                 "results": {"part_pose": part_pose},
             }
         ],

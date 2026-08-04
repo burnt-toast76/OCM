@@ -1,8 +1,16 @@
 # ADR-0029 — The plan is the timeline
 
-**Status:** Proposed. Consumes ADR-0028 (a capability declares the joints it actuates).
-Generalises the fastening-shaped planner ADR-0007 and ADR-0010 built. Prerequisite for
+**Status:** Accepted. Consumes ADR-0028 (a capability declares the joints it actuates).
+Generalises the fastening-shaped planner ADR-0007 built. Prerequisite for
 ADR-0030 (`ocm-viewer`, not yet written).
+
+**Phase.** D1–D4 are implemented (`planner/timeline.py` walks `cell.plan` in order; frames are
+namespaced joint-state dicts; rows are typed and carry `module_state`; the timeline is strictly
+serial and the `load_screw` overlap is gone). **D5–D7 are not**: robot segments still check
+against the cell's authored `joint_state`, actuation rows carry no swept frames and are not
+collision-checked (they hold one frame for their declared duration — emitting an unchecked
+sweep would violate D6's own invariant), and there is no JSON trace artifact. Do not mistake
+this ADR for fully realised.
 
 ## Context
 

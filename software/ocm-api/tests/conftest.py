@@ -113,8 +113,15 @@ def build_two_hole_cell_with_obstacle(api, cell_id: str = "obstacle-cell") -> No
         {"station": [400, 300], "pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}},
     )
     api.set_joint_state(cell_id, "robot1", {"shoulder_lift_joint": -1.5707963267948966, "elbow_joint": 1.5707963267948966})
-    api.place_instance(cell_id, "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"})
+    # nest1 before sd1 so sd50's drive_screw requirement (ADR-0023) can
+    # bind to a target that already exists -- same binding the real cell
+    # carries. (This tesseract-gated helper predates requirement bindings
+    # and was never runnable where that check landed.)
     api.place_instance(cell_id, "nest1", "com.accelsolutions.fixture.pneumatic-nest@1.1.0", {"pose": {"xyz_mm": [640, 300, 0], "rpy_deg": [0, 0, 90]}})
+    api.place_instance(
+        cell_id, "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"},
+        requires={"workpiece_secured": "nest1.clamped"},
+    )
     api.place_instance(cell_id, "blocker", "com.example.obstacle.block@1.0.0", {"pose": {"xyz_mm": [598.5, 473.9, 281.8], "rpy_deg": [0, 0, 0]}})
 
     part = {"id": "BRK-TEST", "features": {"hole_1": {"xyz_mm": [12, 12, 0], "normal": [0, 0, 1]}, "hole_2": {"xyz_mm": [300, 200, 0], "normal": [0, 0, 1]}}}

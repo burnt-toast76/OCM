@@ -13,13 +13,15 @@ this package does not.
 """
 
 from .errors import (
+    ActuationDurationMissingError,
     NoDriveScrewStepError,
     PathCollisionError,
     PlanningError,
     PlanningUnavailable,
+    PlanStepUnplannableError,
     PoseUnreachableError,
 )
-from .cycle_time import CycleTimeReport, CycleTimeRow, estimate_cycle_time
+from .cycle_time import CycleTimeReport, CycleTimeRow
 from .ik import UR_JOINT_ORDER, solve_ur_ik
 from .plan import FasteningPlan, HolePose, PathSegment, plan_fastening_sequence
 from .poses import (
@@ -32,8 +34,10 @@ from .poses import (
     find_fastening_plan,
     standoff_step_number,
 )
+from .timeline import Timeline, build_timeline
 
 __all__ = [
+    "ActuationDurationMissingError",
     "CycleTimeReport",
     "CycleTimeRow",
     "DriveScrewStep",
@@ -43,15 +47,17 @@ __all__ = [
     "NoDriveScrewStepError",
     "PathCollisionError",
     "PathSegment",
+    "PlanStepUnplannableError",
     "PlanningError",
     "PlanningUnavailable",
     "PoseUnreachableError",
+    "Timeline",
     "ToolPoses",
     "UR_JOINT_ORDER",
+    "build_timeline",
     "compute_flange_poses",
     "compute_part_datum_world",
     "contact_step_number",
-    "estimate_cycle_time",
     "find_fastening_plan",
     "plan_fastening_sequence",
     "solve_ur_ik",

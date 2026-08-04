@@ -363,7 +363,7 @@ def build_server(repo_root: str) -> FastMCP:
         "table) -- needs the `tesseract` extra. Refusals name the pose (OCM_POSE_UNREACHABLE) or the segment + "
         "colliding pair + fraction along it (OCM_PATH_COLLISION).",
         '  call: plan_cell(cell="bracket-asm-01")\n'
-        '  response: {"ok": true, "data": {"holes": ["hole_1","hole_2","hole_3"], "cycle_table": [...], "naive_serial_total_s": 12.9}}',
+        '  response: {"ok": true, "data": {"holes": ["hole_1","hole_2","hole_3"], "cycle_table": [...], "total_s": 15.6}}',
     ))
     def plan_cell(cell: str, collision_margin_mm: float = 1.0, path_samples: int = 50) -> dict[str, Any]:
         return api.plan_cell(cell, collision_margin_mm=collision_margin_mm, path_samples=path_samples).to_dict()

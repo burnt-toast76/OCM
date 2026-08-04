@@ -263,8 +263,11 @@ def test_pose_unreachable(api: OcmApi):
     api.create_cell("c15", "com.accelsolutions.base.frame1200@2.0.0")
     api.place_instance("c15", "robot1", "com.universal-robots.ur5e@3.1.0", {"pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}})
     api.set_joint_state("c15", "robot1", {"shoulder_lift_joint": -1.5707963267948966, "elbow_joint": 1.5707963267948966})
-    api.place_instance("c15", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"})
     api.place_instance("c15", "nest1", "com.accelsolutions.fixture.pneumatic-nest@1.1.0", {"pose": {"xyz_mm": [640, 300, 0], "rpy_deg": [0, 0, 90]}})
+    api.place_instance(
+        "c15", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"},
+        requires={"workpiece_secured": "nest1.clamped"},  # same binding the real cell carries (ADR-0023)
+    )
 
     part = {"id": "BRK-TEST", "features": {"hole_1": {"xyz_mm": [9000, 9000, 0], "normal": [0, 0, 1]}}}
     plan = [

@@ -21,19 +21,23 @@ collision-free -- not a separately-interpolated, unchecked one.
 cycle_time.CycleTimeReport.rows` one-for-one -- literally the same rows
 the printed cycle-time table shows, so a segment's caption and duration in
 the viewer are the exact numbers in that table, not a separately-computed
-estimate. Two kinds:
+estimate. By `CycleTimeRow.kind` (ADR-0029 D3):
 
-- **motion** rows (`source == "ESTIMATE"`) carry every frame from the
-  matching `PathSegment.frames` -- real per-frame motion, reused wholesale.
-- **dwell** rows (`source in {"overlapped", "nominal_duration_s"}`) --
-  drive_screw actually driving, or a wait at standoff for load_screw's own
-  precondition -- carry exactly ONE held frame, looked up via
-  `CycleTimeRow.held_at_segment` (the matching PathSegment's own LAST
+- **motion** rows carry every frame from the matching `PathSegment.frames`
+  -- real per-frame motion, reused wholesale.
+- **dwell** and **actuation** rows carry exactly ONE held frame, looked up
+  via `CycleTimeRow.held_at_segment` (the matching PathSegment's own LAST
   frame -- e.g. drive_screw's held pose is the approach segment's last
-  frame, i.e. contact). The pause is real and visible: this is where
-  spec/08's handshake actually lives (a standoff sync withholding
-  hs_done_step, a contact sync running drive_screw's own PackML cycle) --
-  see spec/08-robot-handshake.md.
+  frame, i.e. contact), or the scene's own initial state for a row that
+  precedes all motion (e.g. the opening clamp). The pause is real and
+  visible: this is where spec/08's handshake actually lives -- see
+  spec/08-robot-handshake.md. An actuation row is held rather than swept
+  ON PURPOSE in phase 1: D6 requires every emitted frame to have been
+  collision-checked, and the checker for actuation sweeps is phase 2 --
+  emitting unchecked interpolated frames would put unverified motion on
+  screen looking identical to verified motion, the exact failure D6
+  exists to prevent. So the jaws do not move yet; the timeline pauses
+  where the plan says the actuation happens.
 
 No smoothing, no retiming: playback is linear between whatever frames were
 actually checked, at a constant per-frame timestep within each motion
@@ -72,7 +76,7 @@ from typing import Any
 from ocm_resolve import ResolvedCell
 
 from ocm_generator.errors import OcmGeneratorError
-from ocm_generator.planner import CycleTimeReport, FasteningPlan, UR_JOINT_ORDER
+from ocm_generator.planner import CycleTimeReport, FasteningPlan
 from ocm_generator.scene.build import WORLD_LINK, Scene
 from ocm_generator.scene.kinematics import compute_world_poses, list_collision_primitives
 from ocm_generator.scene.transforms import Pose
@@ -142,16 +146,13 @@ def _dynamic_primitive_specs(root: ET.Element, dynamic_link_names: set[str], sce
     return specs
 
 
-def _frame_transforms(
-    root: ET.Element, base_joint_state: dict[str, float], robot_instance: str, joints: tuple[float, ...], dynamic_link_names: set[str]
-) -> list[dict[str, Any]]:
+def _frame_transforms(root: ET.Element, frame: dict[str, float], dynamic_link_names: set[str]) -> list[dict[str, Any]]:
     """Every dynamic primitive's {position, quaternion} for one already-
-    checked joint state `joints` -- the same document-order walk
+    checked frame -- which IS a full namespaced joint-state dict (ADR-0029
+    D2), fed straight to forward kinematics. The same document-order walk
     `_dynamic_primitive_specs` used, so index `i` here is index `i` there.
     """
-    joint_state = dict(base_joint_state)
-    joint_state.update(zip((f"{robot_instance}__{j}" for j in UR_JOINT_ORDER), joints))
-    world_poses = compute_world_poses(root, joint_state, WORLD_LINK)
+    world_poses = compute_world_poses(root, frame, WORLD_LINK)
 
     transforms: list[dict[str, Any]] = []
     for link in root.findall("link"):
@@ -161,12 +162,6 @@ def _frame_transforms(
         for prim in list_collision_primitives(link, world_poses[name]):
             transforms.append({"position": list(prim.world.translation), "quaternion": list(prim.world.quaternion_xyzw())})
     return transforms
-
-
-_DWELL_OP_BY_SOURCE = {
-    "nominal_duration_s": "drive_screw",
-    "overlapped": "load_screw",
-}
 
 
 def build_animation_payload(scene: Scene, resolved: ResolvedCell, plan: FasteningPlan, cycle_report: CycleTimeReport) -> dict[str, Any]:
@@ -183,12 +178,12 @@ def build_animation_payload(scene: Scene, resolved: ResolvedCell, plan: Fastenin
 
     segments_by_label = {segment.label: segment for segment in plan.segments}
 
-    def frames_for(joints_seq: tuple[tuple[float, ...], ...]) -> list[list[dict[str, Any]]]:
-        return [_frame_transforms(root, scene.joint_state, plan.robot_instance, joints, dynamic_link_names) for joints in joints_seq]
+    def frames_for(frames: tuple[dict[str, float], ...]) -> list[list[dict[str, Any]]]:
+        return [_frame_transforms(root, frame, dynamic_link_names) for frame in frames]
 
     animation: list[dict[str, Any]] = []
     for row in cycle_report.rows:
-        if row.source == "ESTIMATE":
+        if row.kind == "motion":
             segment = segments_by_label.get(row.label)
             if segment is None or not segment.frames:
                 raise AnimationError(f"cycle-time row {row.label!r} has no matching checked PathSegment frames")
@@ -202,24 +197,33 @@ def build_animation_payload(scene: Scene, resolved: ResolvedCell, plan: Fastenin
                 }
             )
         else:
-            held_segment = segments_by_label.get(row.held_at_segment) if row.held_at_segment else None
-            if held_segment is None or not held_segment.frames:
-                raise AnimationError(f"cycle-time row {row.label!r} (dwell) has no held_at_segment frame to show")
-            op = _DWELL_OP_BY_SOURCE.get(row.source, row.source)
+            # A stationary row (dwell/actuation) holds ONE frame: its
+            # held_at_segment's last checked frame, or -- for a row that
+            # precedes all motion, like the opening clamp -- the scene's
+            # own initial state, which every checked segment departs from.
+            if row.held_at_segment is None:
+                held_frame: dict[str, float] = scene.joint_state
+                hole_id = None
+            else:
+                held_segment = segments_by_label.get(row.held_at_segment)
+                if held_segment is None or not held_segment.frames:
+                    raise AnimationError(f"cycle-time row {row.label!r} ({row.kind}) has no held_at_segment frame to show")
+                held_frame = held_segment.frames[-1]
+                hole_id = held_segment.hole_id
             animation.append(
                 {
-                    "name": f"{op} @ {held_segment.hole_id}",
-                    "kind": "dwell",
-                    "hole_id": held_segment.hole_id,
+                    "name": row.label,
+                    "kind": row.kind,
+                    "hole_id": hole_id,
                     "duration_s": row.duration_s,
-                    "frames": frames_for((held_segment.frames[-1],)),
+                    "frames": frames_for((held_frame,)),
                 }
             )
 
     return {
         "dynamic_primitives": dynamic_primitives,
         "animation": animation,
-        "total_duration_s": cycle_report.naive_serial_total_s,
+        "total_duration_s": cycle_report.total_s,
     }
 
 

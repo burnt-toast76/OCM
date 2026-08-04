@@ -81,6 +81,9 @@ class Codes:
     OCM_JOINT_STATE_OUT_OF_LIMIT = "OCM_JOINT_STATE_OUT_OF_LIMIT"  # cell joint_state beyond the joint's <limit> (D3 retrofit)
     OCM_JOINT_UNACTUATED = "OCM_JOINT_UNACTUATED"  # advise: a movable joint no capability actuates (D4)
     OCM_FRAGMENT_MALFORMED = "OCM_FRAGMENT_MALFORMED"  # urdf_fragment exists but is not well-formed XML (Erratum 1; underlying principle ADR-0007)
+    # ADR-0029 (the plan is the timeline) -- the in-order walk's refusals.
+    OCM_PLAN_STEP_UNPLANNABLE = "OCM_PLAN_STEP_UNPLANNABLE"  # no at:, no actuates, no nominal_duration_s -- nothing to place on a timeline
+    OCM_ACTUATION_DURATION_MISSING = "OCM_ACTUATION_DURATION_MISSING"  # actuates with no nominal_duration_s -- a stated endpoint with no stated time
     # ADR-0023: the plan is verbs; conditions belong to modules.
     OCM_CONDITION_UNKNOWN_SIGNAL = "OCM_CONDITION_UNKNOWN_SIGNAL"  # a pre/postcondition names no known signal or requires key
     OCM_REQUIREMENT_UNBOUND = "OCM_REQUIREMENT_UNBOUND"  # a capability's requires key is unbound by the cell

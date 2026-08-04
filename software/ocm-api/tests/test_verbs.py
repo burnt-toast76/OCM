@@ -341,15 +341,26 @@ def test_plan_cell_and_emit(api: OcmApi, workspace_root: Path, tmp_path: Path):
     e = api.plan_cell("bracket-asm-01")
     assert e.ok, e.refusals
     assert e.data["holes"] == ["hole_1", "hole_2", "hole_3"]
-    assert e.data["naive_serial_total_s"] > 0
+    # ADR-0029 D4: one strictly serial total -- re-derived, not re-baselined:
+    # it is the plain sum of the table's own rows, whose stated
+    # (non-ESTIMATE) part is the manifests' own durations with no overlap:
+    # nest1 clamp 0.6 + 3 * (load_screw 0.9 + drive_screw 1.8) + unclamp 0.4 = 9.1 s.
+    assert e.data["total_s"] == pytest.approx(sum(row["duration_s"] for row in e.data["cycle_table"]))
+    stated = sum(row["duration_s"] for row in e.data["cycle_table"] if row["source"] == "nominal_duration_s")
+    assert stated == pytest.approx(0.6 + 3 * (0.9 + 1.8) + 0.4)
     assert len(e.data["cycle_table"]) > 0
-    # Every row's full structure is populated -- the GUI/agent both need
-    # duration/source AND which segment an overlapped load_screw hides
-    # inside or a dwell is held at, not just a label.
-    overlapped_rows = [row for row in e.data["cycle_table"] if row["source"] == "overlapped"]
-    assert overlapped_rows
-    for row in overlapped_rows:
-        assert row["overlapped_with"]
+    # Every row is typed (D3), nothing is "overlapped" (D4), and a
+    # stationary row names the segment it is held at -- except one that
+    # precedes all motion (the opening clamp), which holds the initial state.
+    assert all(row["source"] != "overlapped" for row in e.data["cycle_table"])
+    for row in e.data["cycle_table"]:
+        assert row["kind"] in ("motion", "actuation", "dwell")
+    assert e.data["cycle_table"][0]["label"] == "nest1.clamp"
+    assert e.data["cycle_table"][0]["held_at_segment"] is None
+    drive_rows = [row for row in e.data["cycle_table"] if row["label"].startswith("drive_screw @ ")]
+    assert len(drive_rows) == 3
+    for row in drive_rows:
+        assert row["kind"] == "dwell"
         assert row["held_at_segment"]
 
     script_path = tmp_path / "out.script"
