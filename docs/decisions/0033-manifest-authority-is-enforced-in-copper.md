@@ -36,7 +36,7 @@ mechanism; we are terminating one we already own.
 ## Decision 1 — The engineering link is a permissive, not a firewall rule
 
 The physical link carrying ADS to the cell is powered through a contact that closes only in
-PROGRAM. In AUTO and in MANUAL the link is down at layer 1 — not filtered, not dropped, not
+EDIT. In AUTO and in MANUAL the link is down at layer 1 — not filtered, not dropped, not
 authenticated-and-denied. Down.
 
 Wire it as a permissive: energize to allow. Never as an inhibit. Loss of the wire must leave
@@ -103,13 +103,13 @@ a mismatch refuses at load.
 # cells/press-fit-01/cell.yaml
 mode_selector:
   channels: 2
-  positions: [program, manual, auto]
+  positions: [edit, manual, auto]
   safe_input: EL1904
 
 engineering_link:
   permissive_from: EL2904.1        # safe output driving the interrupting relay
   interrupt_device: K1             # forcibly-guided; contact in the 24 V feed
-  closed_in: [program]             # the only positions in which writes are possible
+  closed_in: [edit]                # the only positions in which writes are possible
   ads_routes_expected: 1           # audited; live count arrives on the read path
   observation:
     transport: rs422

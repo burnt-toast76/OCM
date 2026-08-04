@@ -322,16 +322,20 @@ validated exactly as clean as honest ones; now used to confirm the loop still cl
 changes. (`docs/cold-test-module-authoring.md`)
 
 ### Packages
-| Package | Does |
-|---|---|
-| `ocm-core` | Schemas, units, shared types |
-| `ocm-resolve` | Reference resolution, connectivity, collision checking |
-| `ocm-generator` | PLC / robot code emission |
-| `ocm-api` | The server; the one surface both GUI and agent call |
-| `ocm-agent` | The MCP-facing agent client |
-| `ocm-composer` | The React front end |
-| `ocm-runtime` | On-machine execution |
-| `ocm-viewer` | Scene / trace visualisation |
+| Package | Does | State |
+|---|---|---|
+| `ocm-core` | Schemas, units, shared types | built |
+| `ocm-resolve` | Reference resolution, connectivity | built |
+| `ocm-generator` | Scene composition, planning, collision checking — and PLC emission when it exists | built; **collision and scene work live here today**, not in `ocm-resolve` |
+| `ocm-api` | The server; the one surface both GUI and agent call | built |
+| `ocm-composer` | React front end | built |
+| `ocm-agent` | MCP-facing agent client | placeholder |
+| `ocm-runtime` | On-machine execution | placeholder |
+| `ocm-viewer` | Scene / trace visualisation | placeholder (ADR-0030 reserved) |
+
+> Package boundaries here reflect current layout. The glossary otherwise
+> describes what the decisions say; anywhere it names a file, package, or
+> path, it tracks disk.
 
 ### Verbs
 The API surface, identical for a human clicking and an agent calling: `create_*_draft`,
