@@ -34,6 +34,11 @@ REGISTRY: dict[str, type] = {
     "<root>.nets": cell_mod.Nets,
     "<root>.identity": cell_mod.Identity,
     "<root>.carriers": cell_mod.Carriers,
+    # ADR-0031: the geometric carrier instance (a different question about
+    # the same object as `carriers` above).
+    "<root>.carrier": cell_mod.CarrierInstance,
+    "<root>.carrier.entry_mm": cell_mod.TransitOffsets,
+    "<root>.carrier.transit_mm": cell_mod.TransitOffsets,
     "<root>.record_sink": cell_mod.RecordSink,
     "<root>.record_sink.journal": cell_mod.Journal,
     "<root>.record_sink.forward[]": cell_mod.ForwardTarget,

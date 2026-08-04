@@ -15,6 +15,7 @@ from .cell import (
     Base,
     Cell,
     CellSafety,
+    CarrierInstance,
     Consumable,
     Controller,
     InstanceAddress,
@@ -22,6 +23,7 @@ from .cell import (
     ModuleInstance,
     ModuleRef,
     Pose,
+    TransitOffsets,
     validate_cell_dict,
 )
 from .component import (
@@ -98,6 +100,7 @@ __all__ = [
     "CARRIER_CONTROL_FIELDS",
     "Carrier",
     "CarrierMechanical",
+    "CarrierInstance",
     "CarrierMount",
     "Component",
     "ComponentComms",
@@ -157,6 +160,7 @@ __all__ = [
     "load_module",
     "load_schema",
     "new_yaml_rt",
+    "TransitOffsets",
     "validate_cell_dict",
     "validate_module_dict",
 ]

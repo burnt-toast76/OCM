@@ -116,3 +116,13 @@ def test_located_resolve_errors_map_to_their_codes():
         refusal = resolve_error_to_refusal(error)
         assert refusal.code == expected_code, (error, refusal.code)
         assert refusal.message == error
+
+
+def test_part_datum_undeclared_maps_to_its_code():
+    # Part 2 (D4): the resolve-side error rides the same channel as every
+    # other cell refusal; the mapping is what makes it a code.
+    error = "cell com.example.cell.tiny01: plan operates on part but no carrier or fixture declares frames.part_datum -- the part's location is a stated fact, not a guess"
+    refusal = resolve_error_to_refusal(error)
+    assert refusal.code == Codes.OCM_PART_DATUM_UNDECLARED
+    assert refusal.path == "plan"
+    assert "clamp verb" in refusal.hint

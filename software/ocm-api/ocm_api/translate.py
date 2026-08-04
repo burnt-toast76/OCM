@@ -216,6 +216,10 @@ _RE_REQUIREMENT_UNBOUND = re.compile(
 _RE_REQUIREMENT_UNKNOWN_TARGET = re.compile(
     _CELL + r"instance (?P<inst>\S+) binds requirement '(?P<req>[^']+)' to "
 )
+# ADR-0031 D4: a plan operating on `part` with no declared part datum anywhere.
+_RE_PART_DATUM_UNDECLARED = re.compile(
+    _CELL + r"plan operates on part but no carrier or fixture declares frames\.part_datum"
+)
 
 
 def _parse_pylist(text: str) -> list[str]:
@@ -480,6 +484,13 @@ def resolve_error_to_refusal(error: str) -> Refusal:
             path=f"modules['{m['loc']}'].mechanical.located.constraints['{m['feature']}'].tolerance",
             message=error,
             hint="Linear DOF (x/y/z) take a length unit, rotational DOF (rx/ry/rz) an angle -- the unit is type-checked against the DOF, never inferred from it (ADR-0028 D2's rule, applied here by ADR-0031).",
+        )
+    if _RE_PART_DATUM_UNDECLARED.match(error):
+        return Refusal(
+            code=Codes.OCM_PART_DATUM_UNDECLARED,
+            path="plan",
+            message=error,
+            hint="Declare frames.part_datum on the carrier type the cell places, or on a fixture module -- where a correctly seated part's own origin lands is a stated fact, never inferred from a clamp verb (ADR-0031 D4).",
         )
 
     return Refusal(code=Codes.OCM_CELL_INVALID, path="$", message=error)

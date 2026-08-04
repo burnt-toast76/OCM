@@ -67,7 +67,7 @@ def _resolve_and_build(ws: Workspace, cell_id: str) -> tuple[Any, Any, list[Refu
         return None, None, refusals
 
     try:
-        scene = build_scene(resolved, ws.modules_dir)
+        scene = build_scene(resolved, ws.modules_dir, carriers_root=ws.carriers_dir)
     except SceneBuildError as e:
         return None, None, [scene_error_to_refusal(err) for err in e.errors]
 

@@ -844,3 +844,15 @@ OCM_LOCATED_UNIT_MISMATCH:
   # against the DOF (length for x/y/z, angle for rx/ry/rz), never inferred
   # from it. A unit in NEITHER table is OCM_UNIT_UNRECOGNISED, unchanged.
   message: "Located feature {feature} gives {dof} a {kind} unit {unit}; a {dof_kind} DOF takes a {expected}"
+OCM_PART_DATUM_UNDECLARED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0031
+  layer: cell
+  # D4: the part's location is a stated fact -- the carrier type's
+  # frames.part_datum, or a fixture module's -- never inferred by scraping
+  # the plan for a clamp verb. The heuristic and the declaration are two
+  # answers to one question, and the heuristic is wrong in every cell but
+  # the first (in a line, the part arrives already clamped and no
+  # downstream cell has a clamp step).
+  message: "Cell plan operates on part but no carrier or fixture declares frames.part_datum"

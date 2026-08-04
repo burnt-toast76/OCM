@@ -91,6 +91,8 @@ class Codes:
     OCM_LOCATED_DOF_OVERCONSTRAINED = "OCM_LOCATED_DOF_OVERCONSTRAINED"  # a DOF governed twice -- the same failure, from the other side
     OCM_LOCATED_TOLERANCE_MISSING = "OCM_LOCATED_TOLERANCE_MISSING"  # a governed DOF with no tolerance -- a claim of infinite precision
     OCM_LOCATED_UNIT_MISMATCH = "OCM_LOCATED_UNIT_MISMATCH"  # length unit on a rotational DOF or vice versa (ADR-0028 D2's rule, second site)
+    # ADR-0031 part 2 (D4) -- the part datum is declared, never scraped from a clamp verb.
+    OCM_PART_DATUM_UNDECLARED = "OCM_PART_DATUM_UNDECLARED"  # plan operates on part; no carrier or fixture declares frames.part_datum
     # ADR-0023: the plan is verbs; conditions belong to modules.
     OCM_CONDITION_UNKNOWN_SIGNAL = "OCM_CONDITION_UNKNOWN_SIGNAL"  # a pre/postcondition names no known signal or requires key
     OCM_REQUIREMENT_UNBOUND = "OCM_REQUIREMENT_UNBOUND"  # a capability's requires key is unbound by the cell

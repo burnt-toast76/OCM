@@ -15,14 +15,16 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ocm_core import Capability, Cell, Module, ModuleInstance, Parameter
+from ocm_core import Capability, Carrier, Cell, Module, ModuleInstance, ModuleRef, Parameter
+from ocm_core.cell import CarrierInstance
 
 from .connectivity import check_module_connectivity
 from .errors import CellResolutionError
 from .plan_walk import iter_op_steps
-from .search import SearchPath, find_component, find_module
+from .search import SearchPath, find_carrier, find_component, find_module
 
 if TYPE_CHECKING:
     from ocm_core import Component
@@ -44,10 +46,26 @@ class ResolvedModuleInstance:
 
 
 @dataclass(frozen=True)
+class ResolvedCarrier:
+    """ADR-0031: the cell's carrier instance with its TYPE manifest loaded.
+    `declaration` is the cell's own block (instance name, located_on,
+    entry/transit offsets); `carrier` is the carriers/ entry it named."""
+
+    declaration: CarrierInstance
+    carrier: Carrier
+
+    @property
+    def name(self) -> str:
+        return self.declaration.instance
+
+
+@dataclass(frozen=True)
 class ResolvedCell:
     cell: Cell
     base: Module
     instances: dict[str, ResolvedModuleInstance] = field(default_factory=dict)
+    # ADR-0031: the resolved carrier instance, if the cell declares one.
+    carrier: ResolvedCarrier | None = None
 
     def instance(self, name: str) -> ResolvedModuleInstance:
         try:
@@ -569,7 +587,104 @@ def resolve_module(module: Module, components_search_path: SearchPath | None = N
     return errors
 
 
-def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: SearchPath | None = None) -> ResolvedCell:
+def _resolve_carrier(
+    cell: Cell,
+    loaded: dict[str, ResolvedModuleInstance],
+    carriers_search_path: SearchPath | None,
+    search_path: SearchPath,
+    errors: list[str],
+) -> ResolvedCarrier | None:
+    """ADR-0031: load the cell's carrier type and cross-check the
+    declaration -- located_on must name a placed instance whose module
+    declares mechanical.located (the datum the chain roots at, D2/D3), and
+    transit_mm without entry_mm has no declared range to sit in.
+    """
+    declaration = cell.carrier
+    if declaration is None:
+        return None
+
+    if carriers_search_path is None:
+        # Convention: carriers/ sits beside modules/ (the repo/workspace
+        # layout); a caller with a different layout passes its own path.
+        roots = search_path if isinstance(search_path, (list, tuple)) else [search_path]
+        carriers_search_path = [Path(r).parent / "carriers" for r in roots]
+
+    try:
+        ref = ModuleRef.parse(declaration.type)
+    except ValueError as e:
+        errors.append(f"cell {cell.id}: carrier type ref {declaration.type!r} is invalid: {e}")
+        return None
+
+    carrier, carrier_errors = find_carrier(ref, carriers_search_path)
+    errors.extend(f"cell {cell.id}: carrier {declaration.instance}: {e}" for e in carrier_errors)
+
+    target = loaded.get(declaration.located_on)
+    if target is None:
+        errors.append(
+            f"cell {cell.id}: carrier {declaration.instance} is located_on {declaration.located_on!r}, "
+            f"which is not a placed module instance (has: {sorted(loaded)})"
+        )
+    elif target.module.mechanical.located is None:
+        errors.append(
+            f"cell {cell.id}: carrier {declaration.instance} is located_on {declaration.located_on!r} "
+            f"({target.module.id}), which declares no mechanical.located datum to root the chain at (ADR-0031 D2)"
+        )
+
+    if declaration.transit_mm is not None and declaration.entry_mm is None:
+        errors.append(
+            f"cell {cell.id}: carrier {declaration.instance} declares transit_mm but no entry_mm -- "
+            "a transit offset needs the declared entry to bound it (the range is [entry, 0]; ADR-0031 D2)"
+        )
+    if declaration.transit_mm is not None and declaration.entry_mm is not None:
+        for axis in ("travel", "lift"):
+            offset = getattr(declaration.transit_mm, axis)
+            entry = getattr(declaration.entry_mm, axis)
+            if offset < entry:
+                errors.append(
+                    f"cell {cell.id}: carrier {declaration.instance} transit_mm.{axis} = {offset} is "
+                    f"beyond the declared entry ({entry}) -- outside the chain's own range [{entry}, 0]"
+                )
+
+    if carrier is None:
+        return None
+    return ResolvedCarrier(declaration=declaration, carrier=carrier)
+
+
+def _check_part_datum(
+    cell: Cell,
+    loaded: dict[str, ResolvedModuleInstance],
+    carrier: ResolvedCarrier | None,
+    errors: list[str],
+) -> None:
+    """ADR-0031 D4: a plan that operates on `part` needs a DECLARED part
+    datum -- the carrier type's frames.part_datum, or a placed module's --
+    and it will not be guessed from a `clamp` verb (the heuristic is wrong
+    in every cell but the first).
+    """
+    operates_on_part = any(
+        isinstance(step.get("at"), str) and (step["at"] == "part" or step["at"].startswith("part."))
+        for _location, step in iter_op_steps(cell.plan)
+    )
+    if not operates_on_part:
+        return
+
+    if carrier is not None and "part_datum" in carrier.carrier.mechanical.frames:
+        return
+    if any("part_datum" in ri.module.mechanical.frames for ri in loaded.values()):
+        return
+
+    errors.append(
+        f"cell {cell.id}: plan operates on part but no carrier or fixture declares "
+        "frames.part_datum -- the part's location is a stated fact, not a guess"
+    )
+
+
+def resolve_cell(
+    cell: Cell,
+    search_path: SearchPath,
+    components_search_path: SearchPath | None = None,
+    carriers_search_path: SearchPath | None = None,
+) -> ResolvedCell:
     """Load every module a cell references, and cross-check its plan and
     mount chain against those manifests.
 
@@ -579,7 +694,10 @@ def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: Se
     (ADR-0014) any module's own `components:` list/signal `source`
     provenance doesn't check out against `components_search_path`, or
     (ADR-0015) any module's own nets/links/ports connectivity doesn't
-    resolve against those components' transcribed connectors/pins.
+    resolve against those components' transcribed connectors/pins, or
+    (ADR-0031) the cell's carrier declaration doesn't resolve against
+    `carriers_search_path` (default: `carriers/` beside each module root)
+    or the plan operates on `part` with no declared part datum anywhere.
     """
     errors: list[str] = []
 
@@ -605,6 +723,9 @@ def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: Se
 
     _check_requirement_bindings(cell, loaded, errors)
 
+    carrier = _resolve_carrier(cell, loaded, carriers_search_path, search_path, errors)
+    _check_part_datum(cell, loaded, carrier, errors)
+
     resolved = _resolve_mounts(loaded, errors)
 
     for location, step in iter_op_steps(cell.plan):
@@ -614,4 +735,4 @@ def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: Se
         raise CellResolutionError(cell.id, errors)
 
     assert base_module is not None  # no base errors above => it resolved
-    return ResolvedCell(cell=cell, base=base_module, instances=resolved)
+    return ResolvedCell(cell=cell, base=base_module, instances=resolved, carrier=carrier)

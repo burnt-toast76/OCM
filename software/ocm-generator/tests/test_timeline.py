@@ -80,7 +80,10 @@ def _fixture_manifest() -> dict[str, Any]:
         "name": "Tiny Test Jaws",
         "mechanical": {
             "mount": {"interface": "custom"},
-            "frames": {"origin": {"xyz_mm": [0, 0, 0]}},
+            # part_datum: ADR-0031 D4 -- the plan operates on `part`, so the
+            # part's location must be DECLARED (the old clamp-verb scrape is
+            # gone); this fixture is the declaring instance.
+            "frames": {"origin": {"xyz_mm": [0, 0, 0]}, "part_datum": {"xyz_mm": [0, 0, 20]}},
             "geometry": {"urdf_fragment": "fix.urdf"},
             "mass_kg": 3.0,
         },

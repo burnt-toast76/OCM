@@ -221,6 +221,69 @@
         }
       }
     },
+    "carrier": {
+      "type": "object",
+      "description": "ADR-0031: the cell's carrier instance -- which carrier TYPE (a carriers/ entry) and where it enters. The carrier's kinematic chain is rooted at the LOCATED datum the `located_on` module declares (mechanical.located, D3), never at the mechanism that brings it there: both transit joints at zero IS the located pose, transit is negative offset, and the part datum derives from machined geometry and nothing else (D2). Identity and wear stay ADR-0020's `carriers` block -- a different question about the same object.",
+      "required": [
+        "instance",
+        "type",
+        "located_on"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "instance": {
+          "type": "string",
+          "description": "This cell's own name for the carrier instance (like a module instance name)."
+        },
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(\\.[a-z0-9_-]+)+@\\d+\\.\\d+\\.\\d+$",
+          "description": "id@revision of a carriers/ entry (ocm-carrier-1.0.schema.json)."
+        },
+        "located_on": {
+          "type": "string",
+          "description": "The module instance whose mechanical.located datum roots this carrier's chain (D2/D3). The module must declare `located`; a cell naming one that does not refuses at resolve."
+        },
+        "entry_mm": {
+          "type": "object",
+          "description": "Where the carrier ENTERS the cell -- the far end of the transit chain, as negative offsets from the located datum (D2: 'travel: -400 mm at the entry opening, lift: -12 mm riding the belt'). Declaring it is what makes the transit joints' range a stated fact rather than a fabrication: the chain's prismatic joints carry limit [entry, 0], where 0 is the hard stop the datum is machined at. OPTIONAL: a cell that never models transit omits it, and the carrier is composed seated (welded) at the located datum. Nothing anywhere declares a COMMANDED travel -- entry is a place, not a target.",
+          "required": [
+            "travel",
+            "lift"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "travel": {
+              "type": "number",
+              "maximum": 0
+            },
+            "lift": {
+              "type": "number",
+              "maximum": 0
+            }
+          }
+        },
+        "transit_mm": {
+          "type": "object",
+          "description": "The carrier's CURRENT offsets from the located datum, if it is mid-transit -- requires entry_mm (the range the values must sit in). OPTIONAL: absent means seated at the located datum, both joints at zero, which is the state the cell's work happens in.",
+          "required": [
+            "travel",
+            "lift"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "travel": {
+              "type": "number",
+              "maximum": 0
+            },
+            "lift": {
+              "type": "number",
+              "maximum": 0
+            }
+          }
+        }
+      }
+    },
     "record_sink": {
       "type": "object",
       "additionalProperties": false,

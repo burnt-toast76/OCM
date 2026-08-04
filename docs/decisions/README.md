@@ -38,7 +38,7 @@ context was.
 | [0027](0027-collision-geometry-derived-or-checked.md) | Collision geometry is derived from posed components, or authored and checked | Accepted |
 | [0028](0028-capabilities-actuate-joints.md) | A capability declares the joints it actuates | Accepted (Erratum 1) |
 | [0029](0029-plan-is-the-timeline.md) | The plan is the timeline | Accepted |
-| [0031](0031-carriers-locate-themselves.md) | Carriers are passive, pass through, and locate themselves | **Proposed** (part 1 of 3 landed) |
+| [0031](0031-carriers-locate-themselves.md) | Carriers are passive, pass through, and locate themselves | **Proposed** (part 2 of 3 landed) |
 | [0033](0033-manifest-authority-is-enforced-in-copper.md) | Manifest authority is enforced in copper | **Proposed** |
 
 Numbers are allocated by claim, not by write order: a number is claimed the moment an accepted

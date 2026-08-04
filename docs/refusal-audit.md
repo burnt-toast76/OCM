@@ -4,11 +4,12 @@ Companion to `spec/11-refusals.md` / `spec/schema/ocm-refusals-1.0.yaml` (ADR-00
 catalogue entry: where it is evaluated **today**, and the gap flag. This is a worklist, not an
 essay.
 
-**Counts.** 103 entries: 61 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
+**Counts.** 104 entries: 62 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
 no engine emits them yet). (ADR-0020 Erratum 1 split `OCM_IDENTITY_MISMATCH` into a local and a
 store code, +1 deferred. ADR-0028 Erratum 1 added `OCM_FRAGMENT_MALFORMED`, +1 live. ADR-0029
 phase 1 added `OCM_PLAN_STEP_UNPLANNABLE` and `OCM_ACTUATION_DURATION_MISSING`, +2 live.
-ADR-0031 part 1 added the carrier-type and located-datum codes, +6 live.)
+ADR-0031 part 1 added the carrier-type and located-datum codes, +6 live; part 2 added
+`OCM_PART_DATUM_UNDECLARED`, +1 live.)
 
 ## Namespace — RESOLVED by rename
 
@@ -76,6 +77,7 @@ namespace.
 | `OCM_NOT_FOUND` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_NO_FASTENING_STEP` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
 | `OCM_PARAM_OUT_OF_BOUNDS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_PART_DATUM_UNDECLARED` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_PATH_COLLISION` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
 | `OCM_PIN_ON_MULTIPLE_NETS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_PLAN_STEP_UNPLANNABLE` | design/refuse | ocm-generator planner/timeline → ocm-api/generation.py | — |

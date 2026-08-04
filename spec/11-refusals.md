@@ -90,6 +90,7 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_NOT_FOUND` | design | refuse | api | ADR-0012 | live |
 | `OCM_NO_FASTENING_STEP` | design | refuse | cell | ADR-0012 | live |
 | `OCM_PARAM_OUT_OF_BOUNDS` | design | refuse | cell | ADR-0013 | live |
+| `OCM_PART_DATUM_UNDECLARED` | design | refuse | cell | ADR-0031 | live |
 | `OCM_PATH_COLLISION` | design | refuse | cell | ADR-0007 | live |
 | `OCM_PIN_ON_MULTIPLE_NETS` | design | refuse | module | ADR-0015 | live |
 | `OCM_PLAN_STEP_UNPLANNABLE` | design | refuse | cell | ADR-0029 | live |

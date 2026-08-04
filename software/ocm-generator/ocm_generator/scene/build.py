@@ -269,10 +269,136 @@ def _inject_derived_collision(
             link_el.append(el)
 
 
+def _compose_carrier(
+    resolved: ResolvedCell,
+    carriers_root: Path,
+    loaded: dict[str, _LoadedFragment],
+    all_links: list[ET.Element],
+    all_joints: list[ET.Element],
+    instances: dict[str, SceneInstance],
+    joint_state: JointState,
+    errors: list[str],
+) -> None:
+    """ADR-0031 D2: the carrier's chain, ROOTED AT THE LOCATED DATUM --
+
+        conveyor_root --[fixed: located frame]--> {inst}__located_datum
+            --[prismatic: {inst}__travel, +X]--> {inst}__travel_link
+            --[prismatic: {inst}__lift,   +Z]--> carrier fragment root
+
+    Both joints at zero IS the located pose; transit is negative offset,
+    so the part datum derives from machined geometry and nothing else.
+    Rooting at the conveyor base and deriving the located pose forward is
+    the rejected direction (it would make a hundredths-precision pose a
+    function of millimetres-precision joint values); here the located
+    frame is a FIXED transform and the coarse mechanisms hang off it.
+
+    Nothing declares a commanded travel: the prismatic joints' limits are
+    [entry, 0] -- 0 is the hard stop the datum is machined at (true by
+    construction), entry is the cell's own declared entry offset (a place,
+    not a target). A cell that declares no entry_mm models no transit at
+    all and the carrier is composed seated (a fixed joint at zero).
+    """
+    rc = resolved.carrier
+    if rc is None:
+        return
+    name = rc.name
+    declaration = rc.declaration
+
+    conveyor = loaded.get(declaration.located_on)
+    conveyor_module = resolved.instances[declaration.located_on].module
+    located = conveyor_module.mechanical.located
+    if conveyor is None or located is None:
+        return  # resolve already refused (located_on missing/undeclared); geometry errors reported above
+
+    # The located frame, resolved through its manifest parent chain down to
+    # the conveyor's origin (= its fragment root link). Single-hop frames
+    # (parent: origin) are the norm.
+    frames = conveyor_module.mechanical.frames
+    xyz_m, rpy_rad = (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
+    offsets: list[tuple[tuple[float, float, float], tuple[float, float, float]]] = []
+    frame_name = located.frame
+    seen: set[str] = set()
+    while frame_name != "origin":
+        if frame_name in seen:
+            errors.append(f"carrier {name}: located frame {frame_name!r} has a circular parent chain")
+            return
+        seen.add(frame_name)
+        f = frames.get(frame_name)
+        if f is None:
+            return  # resolve already refused OCM_LOCATED_FRAME_UNKNOWN
+        offsets.append((_mm_to_m(f.xyz_mm), _deg_to_rad(f.rpy_deg)))
+        frame_name = f.parent
+    if len(offsets) == 1:
+        xyz_m, rpy_rad = offsets[0]
+    elif offsets:
+        # Nested frames compose only translations in this simple walk; a
+        # rotated parent frame would need full pose composition. Refuse
+        # loudly rather than place a datum wrong.
+        if any(any(r) for _xyz, r in offsets[1:]):
+            errors.append(
+                f"carrier {name}: located frame {located.frame!r} chains through a rotated parent "
+                "frame -- compose the offset into a single frame instead (v0 walks translations only)"
+            )
+            return
+        xyz_m = tuple(sum(o[0][i] for o in offsets) for i in range(3))  # type: ignore[assignment]
+        rpy_rad = offsets[0][1]
+
+    datum_link = f"{name}__located_datum"
+    travel_link = f"{name}__travel_link"
+
+    try:
+        frag = _load_and_namespace(rc.carrier, name, carriers_root)  # type: ignore[arg-type]
+    except FragmentError as e:
+        errors.append(f"carrier {name} ({rc.carrier.id}): {e}")
+        return
+
+    all_links.append(ET.Element("link", {"name": datum_link}))
+    all_joints.append(_fixed_joint(f"{name}__located", conveyor.root_link, datum_link, xyz_m, rpy_rad))
+
+    entry = declaration.entry_mm
+    if entry is None:
+        # No transit modelled: the carrier is seated at the datum. Fixed,
+        # zero -- the located pose by construction.
+        all_joints.append(_fixed_joint(f"{name}__seated", datum_link, frag.root_link, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)))
+        chain_links: list[str] = [datum_link]
+    else:
+        all_links.append(ET.Element("link", {"name": travel_link}))
+        for joint_name, parent, child, axis, entry_mm_value in (
+            (f"{name}__travel", datum_link, travel_link, "1 0 0", entry.travel),
+            (f"{name}__lift", travel_link, frag.root_link, "0 0 1", entry.lift),
+        ):
+            joint = ET.Element("joint", {"name": joint_name, "type": "prismatic"})
+            ET.SubElement(joint, "parent", {"link": parent})
+            ET.SubElement(joint, "child", {"link": child})
+            ET.SubElement(joint, "origin", {"xyz": "0 0 0", "rpy": "0 0 0"})
+            ET.SubElement(joint, "axis", {"xyz": axis})
+            # Limit [entry, 0]: both ends are DECLARED facts -- 0 is the
+            # machined hard stop (the datum), entry is where the cell says
+            # the carrier comes in. No fabricated range, no commanded value.
+            ET.SubElement(joint, "limit", {"lower": f"{entry_mm_value / 1000.0:.9g}", "upper": "0", "effort": "0", "velocity": "0"})
+            all_joints.append(joint)
+        chain_links = [datum_link, travel_link]
+
+        transit = declaration.transit_mm
+        joint_state[f"{name}__travel"] = (transit.travel / 1000.0) if transit else 0.0
+        joint_state[f"{name}__lift"] = (transit.lift / 1000.0) if transit else 0.0
+
+    all_links.extend(frag.links)
+    all_joints.extend(frag.joints)
+    instances[name] = SceneInstance(
+        name=name,
+        root_link=frag.root_link,
+        parent_link=conveyor.root_link,
+        joint_name=f"{name}__located",
+        link_names=frozenset(frag.link_names | set(chain_links)),
+    )
+
+
 def build_scene(
     resolved: ResolvedCell,
     modules_root: Path | str,
     components_root: Path | str | None = None,
+    carriers_root: Path | str | None = None,
 ) -> Scene:
     """Compose a resolved cell into a single combined URDF (a Scene).
 
@@ -288,9 +414,14 @@ def build_scene(
     module. Optional so existing callers keep working -- but a derived module
     with no components root is a collected violation, never a silently
     mesh-less scene.
+
+    `carriers_root` (ADR-0031): where carriers/ types live, needed only when
+    the cell declares a carrier instance. Defaults to `carriers/` beside
+    `modules_root`, the repo/workspace layout.
     """
     modules_root = Path(modules_root)
     components_root = Path(components_root) if components_root is not None else None
+    carriers_root = Path(carriers_root) if carriers_root is not None else modules_root.parent / "carriers"
     errors: list[str] = []
 
     loaded: dict[str, _LoadedFragment] = {}
@@ -380,12 +511,16 @@ def build_scene(
 
         _validate_joint_state(name, frag, ri.instance.joint_state, joint_state, errors)
 
+    # ADR-0031 D2: the carrier's chain, rooted at the located datum.
+    _compose_carrier(resolved, carriers_root, loaded, all_links, all_joints, instances, joint_state, errors)
+
     if errors:
         raise SceneBuildError(resolved.cell.id, errors)
 
     urdf_xml = _render_urdf(resolved.cell.id, all_links, all_joints)
 
     assert base_instance is not None  # no base errors above => it loaded
+    carrier_name = resolved.carrier.name if resolved.carrier else None
     errors.extend(
         check_workspace_containment(
             cell_id=resolved.cell.id,
@@ -393,7 +528,10 @@ def build_scene(
             joint_state=joint_state,
             base_link_names=base_instance.link_names,
             instance_link_names={name: si.link_names for name, si in instances.items()},
-            instance_kinds={name: resolved.instances[name].module.kind for name in instances},
+            instance_kinds={
+                name: ("carrier" if name == carrier_name else resolved.instances[name].module.kind)
+                for name in instances
+            },
             world_link=WORLD_LINK,
         )
     )

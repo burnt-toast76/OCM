@@ -71,7 +71,7 @@ def _draft_refusals(resolved: ResolvedCell) -> list[Refusal]:
 
 def resolve_with_refusals(cell: Cell, ws: Workspace) -> tuple[ResolvedCell | None, list[Refusal]]:
     try:
-        resolved = resolve_cell(cell, ws.modules_dir, ws.components_dir)
+        resolved = resolve_cell(cell, ws.modules_dir, ws.components_dir, carriers_search_path=ws.carriers_dir)
     except CellResolutionError as e:
         return None, [resolve_error_to_refusal(err) for err in e.errors]
 

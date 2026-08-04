@@ -9,9 +9,14 @@ ADR left out. Prerequisite for the pilot cell.
 in ocm-core, and `validate_carrier` in ocm-api refusing control sections by name
 (`OCM_CARRIER_TYPE_HAS_CONTROL`) — and `mechanical.located` on a module resolves with its five
 refusals (frame unknown, DOF ungoverned/overconstrained, tolerance missing, unit mismatch;
-unrecognised units ride the existing `OCM_UNIT_UNRECOGNISED`). **D4 and D5 are not**: the part
-datum is still inferred from the `clamp` verb (`_find_clamp_fixture` still exists), no cell can
-place a carrier, and actuation is still module-local. Accepted when parts 2 and 3 land.
+unrecognised units ride the existing `OCM_UNIT_UNRECOGNISED`). D2 and D4 are implemented
+(part 2): a cell declares its carrier instance (`carrier:` — type, `located_on`, optional
+`entry_mm`/`transit_mm`, both schema-bounded ≤ 0), the scene composes the chain rooted at the
+located datum (both transit joints at zero IS the located pose; the prismatic limits are
+[entry, 0], both ends declared facts), `compute_part_datum_world` reads the declared
+`part_datum` (carrier first, else the one declaring fixture) and `_find_clamp_fixture` is
+deleted, with `OCM_PART_DATUM_UNDECLARED` refusing a part-operating plan that declares no
+datum anywhere. **D5 is not**: actuation is still module-local. Accepted when part 3 lands.
 
 ## Context
 

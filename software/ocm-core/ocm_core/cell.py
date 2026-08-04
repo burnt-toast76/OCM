@@ -346,6 +346,50 @@ class Carriers:
 
 
 @dataclass(frozen=True)
+class TransitOffsets:
+    """ADR-0031 D2: offsets from the located datum, millimetres, NEGATIVE
+    by construction -- both joints at zero IS the located pose, and a
+    positive value would put the carrier past the hard stop the datum is
+    machined at (schema-enforced: maximum 0)."""
+
+    travel: float
+    lift: float
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "TransitOffsets":
+        return cls(travel=data["travel"], lift=data["lift"])
+
+
+@dataclass(frozen=True)
+class CarrierInstance:
+    """ADR-0031: the cell's carrier instance -- which carrier TYPE and
+    where it enters. `located_on` names the module whose mechanical.located
+    datum roots the chain (D2/D3); `entry_mm` (optional) is where the
+    carrier enters -- a place, never a commanded travel; `transit_mm`
+    (optional, requires entry_mm) is where it currently sits, absent
+    meaning seated at the located datum. Identity and wear stay ADR-0020's
+    `carriers` block."""
+
+    instance: str
+    type: str  # id@revision of a carriers/ entry
+    located_on: str
+    entry_mm: TransitOffsets | None = None
+    transit_mm: TransitOffsets | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CarrierInstance":
+        entry = data.get("entry_mm")
+        transit = data.get("transit_mm")
+        return cls(
+            instance=data["instance"],
+            type=data["type"],
+            located_on=data["located_on"],
+            entry_mm=TransitOffsets.from_dict(entry) if entry else None,
+            transit_mm=TransitOffsets.from_dict(transit) if transit else None,
+        )
+
+
+@dataclass(frozen=True)
 class Journal:
     """ADR-0021: the on-cell journal within a record_sink."""
 
@@ -492,6 +536,9 @@ class Cell:
     # ... and the subsystem blocks that are NOT ports.
     identity: Identity | None = None
     carriers: Carriers | None = None
+    # ADR-0031: the geometric carrier instance -- a different question about
+    # the same object as `carriers` (identity/wear) above.
+    carrier: CarrierInstance | None = None
     record_sink: RecordSink | None = None
     produces: Produces | None = None
     mode_selector: ModeSelector | None = None
@@ -509,6 +556,7 @@ class Cell:
         nets = data.get("nets")
         identity = data.get("identity")
         carriers = data.get("carriers")
+        carrier = data.get("carrier")
         record_sink = data.get("record_sink")
         produces = data.get("produces")
         mode_selector = data.get("mode_selector")
@@ -529,6 +577,7 @@ class Cell:
             links=tuple(Link.from_dict(link) for link in data.get("links", [])),
             identity=Identity.from_dict(identity) if identity else None,
             carriers=Carriers.from_dict(carriers) if carriers else None,
+            carrier=CarrierInstance.from_dict(carrier) if carrier else None,
             record_sink=RecordSink.from_dict(record_sink) if record_sink else None,
             produces=Produces.from_dict(produces) if produces else None,
             mode_selector=ModeSelector.from_dict(mode_selector) if mode_selector else None,
