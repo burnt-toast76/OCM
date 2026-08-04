@@ -4,6 +4,15 @@
 ADR-0029 (the plan is the timeline). Extends ADR-0020 (carrier identity) with the geometry that
 ADR left out. Prerequisite for the pilot cell.
 
+**Phase.** D1 and D3 are implemented (part 1): the carrier type exists — its own
+`carriers/<id>/carrier.yaml` tree, `spec/schema/ocm-carrier-1.0.schema.json`, a typed `Carrier`
+in ocm-core, and `validate_carrier` in ocm-api refusing control sections by name
+(`OCM_CARRIER_TYPE_HAS_CONTROL`) — and `mechanical.located` on a module resolves with its five
+refusals (frame unknown, DOF ungoverned/overconstrained, tolerance missing, unit mismatch;
+unrecognised units ride the existing `OCM_UNIT_UNRECOGNISED`). **D4 and D5 are not**: the part
+datum is still inferred from the `clamp` verb (`_find_clamp_fixture` still exists), no cell can
+place a carrier, and actuation is still module-local. Accepted when parts 2 and 3 land.
+
 ## Context
 
 OCM assumes everything in a cell is owned by the cell and controlled by it. A pallet is neither,

@@ -184,12 +184,29 @@ _RE_DERIVED_ENVELOPE_MISSING = re.compile(
 )
 _RE_UNIT_UNRECOGNISED = re.compile(
     _CONN + r"(?:component (?P<refdes>\S+) envelope|structure (?P<struct>\S+)|"
-    r"capability '(?P<cap>[^']+)' actuation) unit "
+    r"capability '(?P<cap>[^']+)' actuation|"
+    r"located feature '(?P<locfeat>[^']+)' tolerance) unit "
     r"'(?P<unit>[^']+)' is unrecognised"
 )
 # ADR-0028: two actuates entries in one capability naming the same joint.
 _RE_ACTUATION_CONFLICT = re.compile(
     _CONN + r"capability '(?P<cap>[^']+)' actuates joint '(?P<joint>[^']+)' more than once"
+)
+# ADR-0031 D3: the located datum's constraint-scheme refusals.
+_RE_LOCATED_FRAME_UNKNOWN = re.compile(
+    _CONN + r"located\.frame '(?P<frame>[^']+)' is not a declared mechanical\.frames entry"
+)
+_RE_LOCATED_DOF_UNGOVERNED = re.compile(
+    _CONN + r"located constraints govern nothing for '(?P<dof>[^']+)'"
+)
+_RE_LOCATED_DOF_OVERCONSTRAINED = re.compile(
+    _CONN + r"located DOF '(?P<dof>[^']+)' is governed by both '(?P<feature_a>[^']+)' and '(?P<feature_b>[^']+)'"
+)
+_RE_LOCATED_TOLERANCE_MISSING = re.compile(
+    _CONN + r"located feature '(?P<feature>[^']+)' governs (?P<dof>\S+) but declares no tolerance"
+)
+_RE_LOCATED_UNIT_MISMATCH = re.compile(
+    _CONN + r"located feature '(?P<feature>[^']+)' gives (?P<dof>\S+) (?:an angular|a length) unit"
 )
 _CELL = r"^cell (?P<cell>\S+): "
 _RE_REQUIREMENT_UNBOUND = re.compile(
@@ -427,6 +444,42 @@ def resolve_error_to_refusal(error: str) -> Refusal:
             path=f"modules['{m['loc']}'].capabilities['{m['cap']}'].actuates",
             message=error,
             hint=f"One actuates entry per joint -- {m['joint']!r} can only hold one value when the postcondition is true (ADR-0028).",
+        )
+    if m := _RE_LOCATED_FRAME_UNKNOWN.match(error):
+        return Refusal(
+            code=Codes.OCM_LOCATED_FRAME_UNKNOWN,
+            path=f"modules['{m['loc']}'].mechanical.located.frame",
+            message=error,
+            hint="Name a frame declared in this module's own mechanical.frames -- the located datum is machined into THIS module's structure (ADR-0031 D3).",
+        )
+    if m := _RE_LOCATED_DOF_UNGOVERNED.match(error):
+        return Refusal(
+            code=Codes.OCM_LOCATED_DOF_UNGOVERNED,
+            path=f"modules['{m['loc']}'].mechanical.located.constraints",
+            message=error,
+            hint=f"Add {m['dof']!r} to the feature that physically constrains it -- an ungoverned DOF is a fixture whose constraint scheme does not close (ADR-0031 D3).",
+        )
+    if m := _RE_LOCATED_DOF_OVERCONSTRAINED.match(error):
+        return Refusal(
+            code=Codes.OCM_LOCATED_DOF_OVERCONSTRAINED,
+            path=f"modules['{m['loc']}'].mechanical.located.constraints",
+            message=error,
+            allowed={"feature_a": m["feature_a"], "feature_b": m["feature_b"]},
+            hint=f"Exactly one feature governs {m['dof']!r} -- decide which one physically constrains it and remove it from the other (ADR-0031 D3).",
+        )
+    if m := _RE_LOCATED_TOLERANCE_MISSING.match(error):
+        return Refusal(
+            code=Codes.OCM_LOCATED_TOLERANCE_MISSING,
+            path=f"modules['{m['loc']}'].mechanical.located.constraints['{m['feature']}'].tolerance",
+            message=error,
+            hint=f"State {m['dof']}'s tolerance on {m['feature']!r} -- a located pose without one is a claim of infinite precision (ADR-0031 D3).",
+        )
+    if m := _RE_LOCATED_UNIT_MISMATCH.match(error):
+        return Refusal(
+            code=Codes.OCM_LOCATED_UNIT_MISMATCH,
+            path=f"modules['{m['loc']}'].mechanical.located.constraints['{m['feature']}'].tolerance",
+            message=error,
+            hint="Linear DOF (x/y/z) take a length unit, rotational DOF (rx/ry/rz) an angle -- the unit is type-checked against the DOF, never inferred from it (ADR-0028 D2's rule, applied here by ADR-0031).",
         )
 
     return Refusal(code=Codes.OCM_CELL_INVALID, path="$", message=error)

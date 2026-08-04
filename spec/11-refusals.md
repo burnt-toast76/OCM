@@ -57,6 +57,7 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_ACTUATION_UNIT_MISMATCH` | design | refuse | module | ADR-0028 | live |
 | `OCM_ALREADY_EXISTS` | design | refuse | api | ADR-0012 | live |
 | `OCM_AUTHORED_COLLISION_MISSING` | design | refuse | module | ADR-0027 | live |
+| `OCM_CARRIER_TYPE_HAS_CONTROL` | design | refuse | carrier | ADR-0031 | live |
 | `OCM_CELL_INVALID` | design | refuse | cell | ADR-0012 | live |
 | `OCM_COLLISION_DETECTED` | design | refuse | cell | ADR-0007 | live |
 | `OCM_COLLISION_SOURCE_MISSING` | design | refuse | module | ADR-0027 | live |
@@ -80,6 +81,11 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_LINK_NON_COMMUNICATION_PORT` | design | refuse | module | ADR-0015 | live |
 | `OCM_LINK_PROTOCOL_MISMATCH` | design | refuse | module | ADR-0015 | live |
 | `OCM_LINK_UNKNOWN` | design | refuse | module | ADR-0027 | live |
+| `OCM_LOCATED_DOF_OVERCONSTRAINED` | design | refuse | module | ADR-0031 | live |
+| `OCM_LOCATED_DOF_UNGOVERNED` | design | refuse | module | ADR-0031 | live |
+| `OCM_LOCATED_FRAME_UNKNOWN` | design | refuse | module | ADR-0031 | live |
+| `OCM_LOCATED_TOLERANCE_MISSING` | design | refuse | module | ADR-0031 | live |
+| `OCM_LOCATED_UNIT_MISMATCH` | design | refuse | module | ADR-0031 | live |
 | `OCM_NET_TOO_FEW_ENDPOINTS` | design | refuse | module | ADR-0015 | live |
 | `OCM_NOT_FOUND` | design | refuse | api | ADR-0012 | live |
 | `OCM_NO_FASTENING_STEP` | design | refuse | cell | ADR-0012 | live |

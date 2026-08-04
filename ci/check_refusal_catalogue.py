@@ -68,6 +68,9 @@ ALLOWLIST = {
     # environment variables, config keys, and constants.
     "ANTHROPIC_API_KEY", "OCM_API_REPO", "DEFAULT_REGISTERED_PROTOCOLS",
     "UR_JOINT_ORDER", "PK100_DATASHEET",
+    # ocm_core.carrier's exported constant naming the module-schema sections a
+    # carrier must never carry (ADR-0031 D1) -- appears quoted in __all__.
+    "CARRIER_CONTROL_FIELDS",
 }
 
 

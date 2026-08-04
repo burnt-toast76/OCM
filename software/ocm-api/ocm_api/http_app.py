@@ -139,6 +139,10 @@ def build_app(repo_root: str) -> FastAPI:
     def validate_component(id: str = Body(..., embed=True)) -> dict[str, Any]:
         return envelope_response(api.validate_component(id))
 
+    @app.post("/validate_carrier")
+    def validate_carrier(id: str = Body(..., embed=True)) -> dict[str, Any]:
+        return envelope_response(api.validate_carrier(id))
+
     @app.post("/publish_component")
     def publish_component(id: str = Body(...), revision: str = Body(...)) -> dict[str, Any]:
         return envelope_response(api.publish_component(id, revision))

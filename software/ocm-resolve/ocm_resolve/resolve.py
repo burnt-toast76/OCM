@@ -339,6 +339,89 @@ def _check_module_capabilities(location: str, module: Module, errors: list[str])
                 )
 
 
+_LOCATED_LINEAR_DOF = ("x", "y", "z")
+_LOCATED_ROTATIONAL_DOF = ("rx", "ry", "rz")
+_LOCATED_ALL_DOF = _LOCATED_LINEAR_DOF + _LOCATED_ROTATIONAL_DOF
+
+
+def _check_module_located(location: str, module: Module, errors: list[str]) -> None:
+    """ADR-0031 D3, manifest-only (no fragment, no file -- contrast
+    ADR-0028, where joint limits forced the generator split):
+
+    - OCM_LOCATED_FRAME_UNKNOWN: `located.frame` names no mechanical.frames
+      entry.
+    - OCM_LOCATED_DOF_UNGOVERNED / OCM_LOCATED_DOF_OVERCONSTRAINED: across
+      all constraints, each of the six DOF must be governed exactly once.
+      Both are the same failure -- a constraint scheme that does not close
+      -- and finding it in a manifest is cheaper than finding it in steel.
+    - OCM_LOCATED_TOLERANCE_MISSING: a governed DOF with no tolerance entry
+      on the governing feature.
+    - OCM_LOCATED_UNIT_MISMATCH / OCM_UNIT_UNRECOGNISED: ADR-0028 D2's rule
+      applied to a second place -- the unit is type-checked against the
+      DOF (length for x/y/z, angle for rx/ry/rz), never inferred from it.
+    """
+    located = module.mechanical.located
+    if located is None:
+        return
+
+    from ocm_core.units import known_angle_units, known_length_units
+
+    if located.frame not in module.mechanical.frames:
+        errors.append(
+            f"module {location} ({module.id}): located.frame {located.frame!r} is not a declared "
+            f"mechanical.frames entry (has: {sorted(module.mechanical.frames)})"
+        )
+
+    governed_by: dict[str, list[str]] = {dof: [] for dof in _LOCATED_ALL_DOF}
+    for constraint in located.constraints:
+        for dof in constraint.governs:
+            if dof in governed_by:  # values outside the six are schema-refused; belt only
+                governed_by[dof].append(constraint.feature)
+
+        for dof in constraint.governs:
+            tol = constraint.tolerance.get(dof)
+            if tol is None:
+                errors.append(
+                    f"module {location} ({module.id}): located feature {constraint.feature!r} "
+                    f"governs {dof} but declares no tolerance for it"
+                )
+                continue
+            is_length = tol.unit in known_length_units()
+            is_angle = tol.unit in known_angle_units()
+            if not (is_length or is_angle):
+                errors.append(
+                    f"module {location} ({module.id}): located feature {constraint.feature!r} tolerance "
+                    f"unit {tol.unit!r} is unrecognised (known: "
+                    f"{sorted(known_length_units() + known_angle_units())})"
+                )
+                continue
+            if dof in _LOCATED_LINEAR_DOF and is_angle:
+                errors.append(
+                    f"module {location} ({module.id}): located feature {constraint.feature!r} gives "
+                    f"{dof} an angular unit {tol.unit!r}; a linear DOF takes a length "
+                    f"({list(known_length_units())})"
+                )
+            elif dof in _LOCATED_ROTATIONAL_DOF and is_length:
+                errors.append(
+                    f"module {location} ({module.id}): located feature {constraint.feature!r} gives "
+                    f"{dof} a length unit {tol.unit!r}; a rotational DOF takes an angle "
+                    f"({list(known_angle_units())})"
+                )
+
+    for dof in _LOCATED_ALL_DOF:
+        features = governed_by[dof]
+        if not features:
+            errors.append(
+                f"module {location} ({module.id}): located constraints govern nothing for {dof!r} "
+                "-- the constraint scheme does not close"
+            )
+        elif len(features) > 1:
+            errors.append(
+                f"module {location} ({module.id}): located DOF {dof!r} is governed by both "
+                f"{features[0]!r} and {features[1]!r} -- the constraint scheme does not close"
+            )
+
+
 def _input_bool_instances(loaded: dict[str, ResolvedModuleInstance]) -> list[str]:
     """Instance names whose module declares at least one input bool signal --
     the candidate targets a `requires` key can be bound to. Named in the
@@ -482,6 +565,7 @@ def resolve_module(module: Module, components_search_path: SearchPath | None = N
     check_module_connectivity(module.id, module, resolved_components, errors)
     _check_module_capabilities(module.id, module, errors)
     _check_collision_geometry(module.id, module, resolved_components, errors)
+    _check_module_located(module.id, module, errors)
     return errors
 
 
@@ -517,6 +601,7 @@ def resolve_cell(cell: Cell, search_path: SearchPath, components_search_path: Se
             check_module_connectivity(mi.instance, module, resolved_components, errors)
             _check_collision_geometry(mi.instance, module, resolved_components, errors)
             _check_module_capabilities(mi.instance, module, errors)
+            _check_module_located(mi.instance, module, errors)
 
     _check_requirement_bindings(cell, loaded, errors)
 

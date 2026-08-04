@@ -792,3 +792,55 @@ OCM_ACTUATION_DURATION_MISSING:
   # duration for a stated motion, and it would render as a cycle time
   # indistinguishable from a measured one.
   message: "Capability {cap} on {module} declares actuates but no nominal_duration_s -- the endpoint is stated, the time is not, and it will not be invented"
+OCM_CARRIER_TYPE_HAS_CONTROL:
+  phase: design
+  outcome: refuse
+  adr: ADR-0031
+  layer: carrier
+  # D1: a carrier has no controller, no states, and no capabilities.
+  # additionalProperties:false refuses these structurally, but a carrier
+  # authored from a module template carries the keys, and a bare
+  # "additional property not allowed" tells the author nothing -- this
+  # names the field and says why. A schema satisfied by a stub would be
+  # the fabrication ADR-0014 exists to refuse.
+  message: "Carrier type {id} declares {field} -- a carrier has no controller, no states, and no capabilities"
+OCM_LOCATED_FRAME_UNKNOWN:
+  phase: design
+  outcome: refuse
+  adr: ADR-0031
+  layer: module
+  message: "located.frame {frame} is not a declared mechanical.frames entry"
+OCM_LOCATED_DOF_UNGOVERNED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0031
+  layer: module
+  # D3: every one of the six DOF must be governed exactly once. Ungoverned
+  # and doubly-governed are the same failure -- a constraint scheme that
+  # does not close -- and finding it in a manifest is cheaper than finding
+  # it in steel.
+  message: "located.constraints governs no feature for {dof} -- the constraint scheme does not close"
+OCM_LOCATED_DOF_OVERCONSTRAINED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0031
+  layer: module
+  message: "{dof} is governed by both {feature_a} and {feature_b}"
+OCM_LOCATED_TOLERANCE_MISSING:
+  phase: design
+  outcome: refuse
+  adr: ADR-0031
+  layer: module
+  # A located pose without a tolerance is a claim of infinite precision.
+  # Declared now, consumed later -- the numbers are known at authoring
+  # time and unrecoverable after.
+  message: "{feature} governs {dof} but declares no tolerance for it"
+OCM_LOCATED_UNIT_MISMATCH:
+  phase: design
+  outcome: refuse
+  adr: ADR-0031
+  layer: module
+  # ADR-0028 D2's rule applied to a second place: the unit is type-checked
+  # against the DOF (length for x/y/z, angle for rx/ry/rz), never inferred
+  # from it. A unit in NEITHER table is OCM_UNIT_UNRECOGNISED, unchanged.
+  message: "Located feature {feature} gives {dof} a {kind} unit {unit}; a {dof_kind} DOF takes a {expected}"

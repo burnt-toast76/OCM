@@ -5,6 +5,12 @@ The first link in the generator chain (ROADMAP Step 1): scene/, planner/,
 and emitters/ all consume a typed Module or Cell instead of walking raw YAML.
 """
 
+from .carrier import (
+    CARRIER_CONTROL_FIELDS,
+    Carrier,
+    CarrierMechanical,
+    CarrierMount,
+)
 from .cell import (
     Base,
     Cell,
@@ -34,18 +40,21 @@ from .component import (
     ComponentSupply,
 )
 from .errors import CellLoadError, ManifestValidationError, OcmCoreError
-from .loader import load_cell, load_component, load_module, load_schema, validate_module_dict
+from .loader import load_carrier, load_cell, load_component, load_module, load_schema, validate_module_dict
 from .module import (
     Actuation,
     Capability,
     Comms,
     ComponentRef,
     Connector,
+    DofTolerance,
     Electrical,
     Endpoint,
     Geometry,
     InstancePose,
     Link,
+    Located,
+    LocatedConstraint,
     Maintenance,
     Mechanical,
     Module,
@@ -86,6 +95,10 @@ __all__ = [
     "CellLoadError",
     "CellSafety",
     "Comms",
+    "CARRIER_CONTROL_FIELDS",
+    "Carrier",
+    "CarrierMechanical",
+    "CarrierMount",
     "Component",
     "ComponentComms",
     "ComponentCommsConnector",
@@ -101,6 +114,7 @@ __all__ = [
     "ComponentSource",
     "ComponentSupply",
     "Connector",
+    "DofTolerance",
     "Consumable",
     "Controller",
     "Electrical",
@@ -111,6 +125,8 @@ __all__ = [
     "InstanceMount",
     "InstancePose",
     "Link",
+    "Located",
+    "LocatedConstraint",
     "Maintenance",
     "ManifestValidationError",
     "Mechanical",
@@ -136,6 +152,7 @@ __all__ = [
     "Supply",
     "WearItem",
     "load_cell",
+    "load_carrier",
     "load_component",
     "load_module",
     "load_schema",

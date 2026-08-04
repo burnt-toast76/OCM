@@ -4,10 +4,11 @@ Companion to `spec/11-refusals.md` / `spec/schema/ocm-refusals-1.0.yaml` (ADR-00
 catalogue entry: where it is evaluated **today**, and the gap flag. This is a worklist, not an
 essay.
 
-**Counts.** 97 entries: 55 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
+**Counts.** 103 entries: 61 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
 no engine emits them yet). (ADR-0020 Erratum 1 split `OCM_IDENTITY_MISMATCH` into a local and a
 store code, +1 deferred. ADR-0028 Erratum 1 added `OCM_FRAGMENT_MALFORMED`, +1 live. ADR-0029
-phase 1 added `OCM_PLAN_STEP_UNPLANNABLE` and `OCM_ACTUATION_DURATION_MISSING`, +2 live.)
+phase 1 added `OCM_PLAN_STEP_UNPLANNABLE` and `OCM_ACTUATION_DURATION_MISSING`, +2 live.
+ADR-0031 part 1 added the carrier-type and located-datum codes, +6 live.)
 
 ## Namespace — RESOLVED by rename
 
@@ -42,6 +43,7 @@ namespace.
 | `OCM_ACTUATION_UNIT_MISMATCH` | design/refuse | ocm-generator scene/actuation → validate_module | — |
 | `OCM_ALREADY_EXISTS` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_AUTHORED_COLLISION_MISSING` | design/refuse | ocm-generator collision_geometry → validate_module | — |
+| `OCM_CARRIER_TYPE_HAS_CONTROL` | design/refuse | ocm-api carriers.py (validate_carrier) | — |
 | `OCM_CELL_INVALID` | design/refuse | ocm-core loader → ocm-api/translate.py | — |
 | `OCM_COLLISION_DETECTED` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |
 | `OCM_COLLISION_SOURCE_MISSING` | design/refuse | ocm-api verb (direct) | — |
@@ -65,6 +67,11 @@ namespace.
 | `OCM_LINK_NON_COMMUNICATION_PORT` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_LINK_PROTOCOL_MISMATCH` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_LINK_UNKNOWN` | design/refuse | ocm-generator collision_geometry → validate_module | — |
+| `OCM_LOCATED_DOF_OVERCONSTRAINED` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_LOCATED_DOF_UNGOVERNED` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_LOCATED_FRAME_UNKNOWN` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_LOCATED_TOLERANCE_MISSING` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_LOCATED_UNIT_MISMATCH` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_NET_TOO_FEW_ENDPOINTS` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_NOT_FOUND` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_NO_FASTENING_STEP` | design/refuse | ocm-generator (plan/scene) → ocm-api/generation.py | spec/09-only |

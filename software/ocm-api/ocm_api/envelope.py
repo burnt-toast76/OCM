@@ -84,6 +84,13 @@ class Codes:
     # ADR-0029 (the plan is the timeline) -- the in-order walk's refusals.
     OCM_PLAN_STEP_UNPLANNABLE = "OCM_PLAN_STEP_UNPLANNABLE"  # no at:, no actuates, no nominal_duration_s -- nothing to place on a timeline
     OCM_ACTUATION_DURATION_MISSING = "OCM_ACTUATION_DURATION_MISSING"  # actuates with no nominal_duration_s -- a stated endpoint with no stated time
+    # ADR-0031 part 1 (D1 + D3) -- the carrier type and the located datum.
+    OCM_CARRIER_TYPE_HAS_CONTROL = "OCM_CARRIER_TYPE_HAS_CONTROL"  # a carrier has no controller, no states, and no capabilities
+    OCM_LOCATED_FRAME_UNKNOWN = "OCM_LOCATED_FRAME_UNKNOWN"  # located.frame names no mechanical.frames entry
+    OCM_LOCATED_DOF_UNGOVERNED = "OCM_LOCATED_DOF_UNGOVERNED"  # a DOF no constraint feature governs -- the scheme does not close
+    OCM_LOCATED_DOF_OVERCONSTRAINED = "OCM_LOCATED_DOF_OVERCONSTRAINED"  # a DOF governed twice -- the same failure, from the other side
+    OCM_LOCATED_TOLERANCE_MISSING = "OCM_LOCATED_TOLERANCE_MISSING"  # a governed DOF with no tolerance -- a claim of infinite precision
+    OCM_LOCATED_UNIT_MISMATCH = "OCM_LOCATED_UNIT_MISMATCH"  # length unit on a rotational DOF or vice versa (ADR-0028 D2's rule, second site)
     # ADR-0023: the plan is verbs; conditions belong to modules.
     OCM_CONDITION_UNKNOWN_SIGNAL = "OCM_CONDITION_UNKNOWN_SIGNAL"  # a pre/postcondition names no known signal or requires key
     OCM_REQUIREMENT_UNBOUND = "OCM_REQUIREMENT_UNBOUND"  # a capability's requires key is unbound by the cell

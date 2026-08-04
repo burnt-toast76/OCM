@@ -156,6 +156,73 @@
             }
           }
         },
+        "located": {
+          "type": "object",
+          "description": "ADR-0031 D3: this module locates a carrier against machined datum features. Lives on the LOCATING module (the conveyor), never on the carrier -- the datum features are machined into this module's structure and do not travel. Each constraint names a physical feature, the degrees of freedom it governs, and a per-feature tolerance; every one of the six DOF must be governed exactly once (OCM_LOCATED_DOF_UNGOVERNED / OCM_LOCATED_DOF_OVERCONSTRAINED), each governed DOF carries a tolerance (OCM_LOCATED_TOLERANCE_MISSING), and units are type-checked against the DOF (OCM_LOCATED_UNIT_MISMATCH). Tolerances are declared, not yet consumed -- a located pose without them is a claim of infinite precision.",
+          "required": [
+            "frame",
+            "constraints"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "frame": {
+              "type": "string",
+              "description": "A frame in this module's own mechanical.frames: the pose a correctly seated carrier lands at (ADR-0031 D2 -- the ROOT of the carrier's chain, with transit a negative offset from it). Unknown refuses (OCM_LOCATED_FRAME_UNKNOWN)."
+            },
+            "constraints": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "feature",
+                  "governs",
+                  "tolerance",
+                  "source"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "feature": {
+                    "type": "string",
+                    "description": "The physical feature doing the constraining, as the drawing names it (e.g. 'lift_stop_surface', 'locating_pins')."
+                  },
+                  "governs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "x",
+                        "y",
+                        "z",
+                        "rx",
+                        "ry",
+                        "rz"
+                      ]
+                    },
+                    "description": "Which degrees of freedom this feature constrains. Across all constraints, each of the six is governed exactly once -- ungoverned and doubly-governed are the same failure: a constraint scheme that does not close."
+                  },
+                  "tolerance": {
+                    "type": "object",
+                    "description": "Per governed DOF: how well this feature constrains it. Per feature, not per datum -- the plane and the pins are different features with genuinely different numbers, and averaging them would be an invented value.",
+                    "additionalProperties": {
+                      "$ref": "#/$defs/dof_tolerance"
+                    }
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "measured",
+                      "datasheet",
+                      "estimated"
+                    ],
+                    "description": "Where these numbers came from -- ADR-0029's convention on durations, applied here. Required; never defaulted. Anything quoting a positional accuracy derived from this tolerance inherits the label."
+                  }
+                }
+              }
+            }
+          }
+        },
         "mass_kg": {
           "type": "number",
           "exclusiveMinimum": 0
@@ -1183,6 +1250,25 @@
     }
   ],
   "$defs": {
+    "dof_tolerance": {
+      "type": "object",
+      "description": "ADR-0031 D3: one DOF's tolerance -- an explicit value and a verbatim unit, resolved through ocm_core.units' tables and type-checked against the DOF (length for x/y/z, angle for rx/ry/rz).",
+      "required": [
+        "value",
+        "unit"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "description": "Verbatim, e.g. 'mm' or 'deg' -- never convert; a unit in neither table refuses (OCM_UNIT_UNRECOGNISED), a unit in the wrong table for the DOF refuses (OCM_LOCATED_UNIT_MISMATCH)."
+        }
+      }
+    },
     "frame": {
       "type": "object",
       "required": [

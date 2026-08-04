@@ -103,6 +103,59 @@ class StructurePrimitive:
 
 
 @dataclass(frozen=True)
+class DofTolerance:
+    """One DOF's declared tolerance ($defs/dof_tolerance, ADR-0031 D3) --
+    an explicit value and a VERBATIM unit, resolved through ocm_core.units
+    and type-checked against the DOF at resolve. Never converted here."""
+
+    value: float
+    unit: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "DofTolerance":
+        return cls(value=data["value"], unit=data["unit"])
+
+
+@dataclass(frozen=True)
+class LocatedConstraint:
+    """One physical feature of a located datum: the DOF it governs and how
+    well (ADR-0031 D3). `tolerance` is keyed by DOF name; `source` is
+    measured|datasheet|estimated, required, never defaulted."""
+
+    feature: str
+    governs: tuple[str, ...]
+    tolerance: dict[str, DofTolerance]
+    source: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "LocatedConstraint":
+        return cls(
+            feature=data["feature"],
+            governs=tuple(data["governs"]),
+            tolerance={dof: DofTolerance.from_dict(t) for dof, t in data.get("tolerance", {}).items()},
+            source=data["source"],
+        )
+
+
+@dataclass(frozen=True)
+class Located:
+    """ADR-0031 D3: this module locates a carrier against machined datum
+    features. Declared on the LOCATING module (the conveyor), never on the
+    carrier. The constraint scheme must close -- every one of the six DOF
+    governed exactly once -- checked at resolve, not here."""
+
+    frame: str
+    constraints: tuple[LocatedConstraint, ...]
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Located":
+        return cls(
+            frame=data["frame"],
+            constraints=tuple(LocatedConstraint.from_dict(c) for c in data.get("constraints", [])),
+        )
+
+
+@dataclass(frozen=True)
 class Mechanical:
     mount: Mount
     frames: dict[str, Frame]
@@ -112,6 +165,8 @@ class Mechanical:
     inertia_kgm2: tuple[float, float, float, float, float, float] | None = None
     # ADR-0027 D3: module-owned structure as posed primitives.
     structure: tuple[StructurePrimitive, ...] = ()
+    # ADR-0031 D3: the located datum this module offers a carrier, if any.
+    located: Located | None = None
 
     @property
     def origin(self) -> Frame:
@@ -125,6 +180,7 @@ class Mechanical:
     def from_dict(cls, data: dict[str, Any]) -> "Mechanical":
         com = data.get("com_mm")
         inertia = data.get("inertia_kgm2")
+        located = data.get("located")
         return cls(
             mount=Mount.from_dict(data["mount"]),
             frames={name: Frame.from_dict(f) for name, f in data["frames"].items()},
@@ -133,6 +189,7 @@ class Mechanical:
             com_mm=tuple(com) if com else None,
             inertia_kgm2=tuple(inertia) if inertia else None,
             structure=tuple(StructurePrimitive.from_dict(sp) for sp in data.get("structure", [])),
+            located=Located.from_dict(located) if located else None,
         )
 
 

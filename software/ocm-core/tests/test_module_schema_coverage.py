@@ -35,6 +35,11 @@ REGISTRY: dict[str, object] = {
     "<root>.mechanical.geometry": module_mod.Geometry,
     "<root>.mechanical.structure[]": module_mod.StructurePrimitive,
     "<root>.mechanical.structure[].pose": module_mod.StructurePose,
+    # ADR-0031 D3: the located datum. The per-constraint tolerance map is a
+    # plain dict[str, DofTolerance]; its value shape is $defs.dof_tolerance.
+    "<root>.mechanical.located": module_mod.Located,
+    "<root>.mechanical.located.constraints[]": module_mod.LocatedConstraint,
+    "$defs.dof_tolerance": module_mod.DofTolerance,
     "<root>.electrical": module_mod.Electrical,
     "<root>.electrical.supplies[]": module_mod.Supply,
     "<root>.electrical.pneumatic": module_mod.Pneumatic,

@@ -236,6 +236,16 @@ def build_server(repo_root: str) -> FastMCP:
         return api.validate_component(id).to_dict()
 
     @mcp.tool(description=_doc(
+        "Validate a carrier TYPE manifest (carriers/<id>/carrier.yaml, ADR-0031): schema, the "
+        "no-control rule (state_machine/comms/capabilities refuse OCM_CARRIER_TYPE_HAS_CONTROL -- "
+        "a carrier has no controller), and that declared geometry artifacts exist and parse.",
+        '  call: validate_carrier(id="com.example.carrier.pallet")\n'
+        '  response: {"ok": true, "data": {"id": "com.example.carrier.pallet", "valid": true}}',
+    ))
+    def validate_carrier(id: str) -> dict[str, Any]:
+        return api.validate_carrier(id).to_dict()
+
+    @mcp.tool(description=_doc(
         "Validate, then set revision (must be >= 1.0.0 -- a real SemVer, not another 0.x draft) -- "
         "the component becomes referenceable from a module's components: list only after this "
         "succeeds.",
