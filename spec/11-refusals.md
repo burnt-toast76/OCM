@@ -70,6 +70,7 @@ field, a layer, or a runtime that does not exist yet).
 | `OCM_DUPLICATE_REFDES` | design | refuse | module | ADR-0014 | live |
 | `OCM_ENVELOPE_OVERLAP` | design | advise | module | ADR-0027 | live |
 | `OCM_ETHERCAT_CHAIN_BROKEN` | design | refuse | module | ADR-0015 | live |
+| `OCM_FRAGMENT_MALFORMED` | design | refuse | module | ADR-0028 | live |
 | `OCM_HUMAN_SIGNATURE_REQUIRED` | design | refuse | cell | ADR-0012 | live |
 | `OCM_INVALID_ARGUMENT` | design | refuse | api | ADR-0012 | live |
 | `OCM_INVALID_SOURCE` | design | refuse | module | ADR-0014 | live |

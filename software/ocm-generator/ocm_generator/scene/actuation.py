@@ -51,7 +51,10 @@ _MOVABLE_JOINT_TYPES = ("revolute", "continuous", "prismatic")
 
 
 def _joints_by_name(root: ET.Element) -> dict[str, ET.Element]:
-    return {j.get("name"): j for j in root.iter("joint") if j.get("name")}
+    # Top-level only (Erratum 1): these are the joints namespace_fragment will
+    # actually splice into the scene -- iter() would also match a <joint>
+    # nested in a <transmission>, which never exists in the composed scene.
+    return {j.get("name"): j for j in root.findall("joint") if j.get("name")}
 
 
 def _limits_of(joint: ET.Element) -> tuple[float, float] | None:
@@ -85,7 +88,11 @@ def check_module_actuation(
     try:
         root = load_fragment(module_dir / fragment_field)
     except FragmentError:
-        return refusals, advisories  # the fragment's own load path reports this
+        # Reported as OCM_FRAGMENT_MALFORMED by validate_module's own
+        # fragment-parse step (ocm-api authoring.py, ADR-0028 Erratum 1) --
+        # and by build_scene at scene time. Returning empty here is safe only
+        # because that refusal genuinely fires upstream.
+        return refusals, advisories
 
     joints = _joints_by_name(root)
     known = sorted(joints)

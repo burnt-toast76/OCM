@@ -156,6 +156,54 @@ def test_every_movable_joint_actuated_yields_no_advisory(tmp_path: Path):
     assert advisories == []
 
 
+def test_joint_nested_in_transmission_is_not_a_scene_joint(tmp_path: Path):
+    # Erratum 1 fix C: enumeration must match the composition path
+    # (namespace_fragment splices TOP-LEVEL joints only). A <joint> nested in
+    # a <transmission> never exists in the composed scene, so actuating it is
+    # unknown -- and it must not generate an unactuated advisory either.
+    fragment = """<robot name="t">
+  <link name="base"/>
+  <link name="jaw"/>
+  <joint name="jaw_slide" type="prismatic">
+    <parent link="base"/><child link="jaw"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="0.0" upper="0.012" effort="10" velocity="0.1"/>
+  </joint>
+  <transmission name="jaw_tx">
+    <joint name="phantom_motor_joint" type="revolute"/>
+  </transmission>
+</robot>
+"""
+    module_dir = tmp_path / "mod"
+    (module_dir / "urdf").mkdir(parents=True, exist_ok=True)
+    (module_dir / "urdf" / "t.urdf").write_text(fragment, encoding="utf-8")
+    module = Module.from_dict({
+        "ocm_version": "1.1",
+        "id": "com.example.fixture.synthetic",
+        "revision": "1.0.0",
+        "kind": "fixture",
+        "license": "CERN-OHL-S-2.0",
+        "mechanical": {
+            "mount": {"interface": "custom"},
+            "frames": {"origin": {"xyz_mm": [0, 0, 0]}},
+            "geometry": {"urdf_fragment": "urdf/t.urdf"},
+            "mass_kg": 1.0,
+        },
+        "state_machine": {"model": "packml", "abort_safe": True},
+        "capabilities": [
+            {"name": "clamp", "summary": "x", "timeout_s": 3.0, "on_timeout": "hold",
+             "actuates": [{"joint": "phantom_motor_joint", "to": 10.0, "units": "deg"}]},
+            {"name": "close", "summary": "x", "timeout_s": 3.0, "on_timeout": "hold",
+             "actuates": [{"joint": "jaw_slide", "to": 10.0, "units": "mm"}]},
+        ],
+    })
+    refusals, advisories = check_module_actuation(module, module_dir)
+    assert _codes(refusals) == ["OCM_ACTUATION_JOINT_UNKNOWN"]
+    assert "phantom_motor_joint" in refusals[0][2]
+    assert "(has: ['jaw_slide'])" in refusals[0][2]  # nested joint not listed as known either
+    assert advisories == []  # the nested joint is no scene joint, so never "unactuated"
+
+
 def test_no_actuates_anywhere_renders_static_and_advises_per_movable_joint(tmp_path: Path):
     # D4: absence is legitimate (a capability that moves nothing) -- no
     # refusal; every movable joint lands on the completion list as advice.

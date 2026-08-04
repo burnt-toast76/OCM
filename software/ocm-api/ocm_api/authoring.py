@@ -286,6 +286,28 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
                 hint="generate_geometry_stub(...) first, or point at a real file.",
             )
         )
+    elif urdf_fragment:
+        # ADR-0028 Erratum 1: a fragment that exists but is not well-formed XML
+        # must refuse HERE -- before this fix, the fragment-dependent checks
+        # (link existence, unit coherence, limits, ADR-0027's link check)
+        # silently returned nothing on a parse failure and the module
+        # validated green. One parser, one error type: the scene's own
+        # load_fragment. Underlying principle is ADR-0007's -- the fragment is
+        # the load-bearing field; a claim nothing can parse backs nothing.
+        from ocm_generator.scene.errors import FragmentError
+        from ocm_generator.scene.urdf import load_fragment
+
+        try:
+            load_fragment(module_dir / urdf_fragment)
+        except FragmentError as e:
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_FRAGMENT_MALFORMED,
+                    path="mechanical.geometry.urdf_fragment",
+                    message=str(e),
+                    hint="Fix the fragment's XML -- every fragment-dependent check (joints, links, limits) is blind until it parses.",
+                )
+            )
     esi = doc.get("comms", {}).get("esi")
     if esi and not (module_dir / esi).is_file():
         refusals.append(Refusal(code=Codes.OCM_NOT_FOUND, path="comms.esi", message=f"{esi!r} does not exist under {module_dir}"))

@@ -192,21 +192,33 @@ def _validate_joint_state(
                 f"module {name}: joint_state names {joint_name!r}, which is a fixed joint (no configurable position)"
             )
             continue
-        # ADR-0028 D3 retrofit: a cell-supplied joint value is the same class
-        # of claim as a capability's actuation target, so it gets the same
-        # limit check -- a joint driven through its own stop is a fabricated
-        # machine state. Continuous joints have no limits and are exempt.
-        limit_el = joint_el.find("limit")
-        if joint_el.get("type") != "continuous" and limit_el is not None:
-            lower_attr, upper_attr = limit_el.get("lower"), limit_el.get("upper")
-            if lower_attr is not None and upper_attr is not None:
-                lower, upper = float(lower_attr), float(upper_attr)
-                if not (lower <= float(value) <= upper):
-                    errors.append(
-                        f"OCM_JOINT_STATE_OUT_OF_LIMIT: instance {name!r}: joint_state drives "
-                        f"{joint_name!r} to {value}, outside its declared limit [{lower}, {upper}]"
-                    )
-                    continue
+        # ADR-0028 D3 retrofit (Erratum 1): a cell-supplied joint value is the
+        # same class of claim as a capability's actuation target, so it gets
+        # the same limit check -- a joint driven through its own stop is a
+        # fabricated machine state. Continuous joints have no limits and are
+        # exempt; a NON-continuous joint with a missing or incomplete <limit>
+        # is malformed URDF and refuses (mirroring scene/actuation.py) rather
+        # than silently accepting any value. Messages carry no code prefix --
+        # translate.py's scene_error_to_refusal maps them, like every other
+        # scene-build error.
+        if joint_el.get("type") != "continuous":
+            limit_el = joint_el.find("limit")
+            lower_attr = limit_el.get("lower") if limit_el is not None else None
+            upper_attr = limit_el.get("upper") if limit_el is not None else None
+            if lower_attr is None or upper_attr is None:
+                errors.append(
+                    f"instance {name!r}: joint_state drives {joint_name!r} but the "
+                    f"{joint_el.get('type')} joint declares no <limit> -- malformed URDF; a value "
+                    "cannot be checked against a limit that is missing"
+                )
+                continue
+            lower, upper = float(lower_attr), float(upper_attr)
+            if not (lower <= float(value) <= upper):
+                errors.append(
+                    f"instance {name!r}: joint_state drives {joint_name!r} to {value}, "
+                    f"outside its declared limit [{lower}, {upper}]"
+                )
+                continue
         joint_state_out[namespaced] = float(value)
 
 

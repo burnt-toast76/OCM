@@ -1,6 +1,6 @@
 # ADR-0028 — A capability declares the joints it actuates
 
-**Status:** Accepted. Extends ADR-0023 (plans are verbs) with the geometric half of a verb.
+**Status:** Accepted (Erratum 1). Extends ADR-0023 (plans are verbs) with the geometric half of a verb.
 Prerequisite for the verb-driven timeline (ADR-0029, not yet written).
 
 ## Context
@@ -150,3 +150,42 @@ does not exist until the schema says it does; there is no permissive interim.
 refuses the ways of stating it wrongly. Turning a sequence of those facts into a timeline —
 generalising `FasteningPlan`, adding an actuation row kind to `CycleTimeReport`, and removing
 `emitters/animation.py`'s robot-vs-static partition — is ADR-0029.
+
+## Erratum 1 (2026-08-04) — the D3 retrofit, fragment-parse failures, and joint enumeration
+
+Found in review of the initial implementation. Three places where what this ADR said and what
+the code did diverged, all on the permissive side.
+
+**The D3 retrofit was asymmetric across layers.** This ADR states that a non-`continuous`
+joint with no `<limit>` is malformed URDF and refuses. The module-layer check
+(`scene/actuation.py`) did that; the cell-layer retrofit (`_validate_joint_state` in
+`scene/build.py`) guarded on the `<limit>` element existing before checking it, so a
+`joint_state` value on a limitless revolute joint — the exact malformation — passed through
+unchecked into the scene. Same claim, same class of defect, opposite outcomes by layer. Both
+layers now refuse, and an incomplete `<limit>` (`lower` without `upper`, or the reverse) is as
+uncheckable as an absent one and refuses identically. The cell-layer message reuses
+`OCM_JOINT_STATE_OUT_OF_LIMIT` and says the limit is *missing*, mirroring the module layer's
+use of `OCM_ACTUATION_OUT_OF_LIMIT` for the same condition — no new code for a variant of a
+condition the catalogue already names.
+
+**A malformed fragment silently disabled every fragment-dependent check at validate time.**
+`check_module_actuation` and `fragment_link_names` (ADR-0027) both swallow fragment parse
+failures, on the grounds that the fragment's own load path reports them. At *scene* time that
+is true — `build_scene` refuses. At *validate* time nothing parsed the fragment at all:
+`validate_module` checked only that the file exists, so a fragment of unparseable XML
+validated green with every joint, link, and limit check silently skipped. That is the failure
+mode ADR-0025 exists to forbid — a check that cannot run must say so, not vanish.
+`validate_module` now parses a fragment that exists, through the scene's own `load_fragment`
+(one parser, one error type — a fragment must not validate under a laxer parser than the one
+that composes it), and refuses with **`OCM_FRAGMENT_MALFORMED`** (`phase: design`, `outcome:
+refuse`). The downstream swallows stay, and are now honest: the refusal they defer to
+genuinely fires upstream.
+
+**Joint enumeration must match the composition path.** `scene/actuation.py` collected joints
+with `iter("joint")`, which also matches a `<joint>` nested inside a `<transmission>` — an
+element `namespace_fragment` never splices into the scene. A capability actuating such a joint
+would have validated against a joint that does not exist in the composed cell, and a nested
+joint would have suppressed or generated `OCM_JOINT_UNACTUATED` advisories for phantoms.
+Enumeration is now top-level `findall("joint")`, the same shape the composition path walks.
+(`collision_geometry.py` has the same `iter` usage for links and joints; that is ADR-0027's
+decision surface and is recorded here as an observation, not changed.)

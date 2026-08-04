@@ -760,3 +760,14 @@ OCM_JOINT_UNACTUATED:
   # The advisory records the joint so every flagged fragment is identifiable.
   records: unactuated_joint
   message: "Module {id}: movable joint {joint} is actuated by no capability"
+OCM_FRAGMENT_MALFORMED:
+  phase: design
+  outcome: refuse
+  adr: ADR-0028
+  layer: module
+  # Discovered by ADR-0028 Erratum 1 (a malformed fragment silently disabled
+  # every fragment-dependent check at validate time); the underlying principle
+  # is ADR-0007's -- urdf_fragment is the load-bearing field, and a claim
+  # nothing can parse backs nothing. Emitted by validate_module's fragment-
+  # parse step, via the scene's own load_fragment (one parser, one error type).
+  message: "mechanical.geometry.urdf_fragment {path} exists but is not well-formed XML: {detail}"

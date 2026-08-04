@@ -80,6 +80,7 @@ class Codes:
     OCM_ACTUATION_CONFLICT = "OCM_ACTUATION_CONFLICT"  # one capability actuates the same joint twice
     OCM_JOINT_STATE_OUT_OF_LIMIT = "OCM_JOINT_STATE_OUT_OF_LIMIT"  # cell joint_state beyond the joint's <limit> (D3 retrofit)
     OCM_JOINT_UNACTUATED = "OCM_JOINT_UNACTUATED"  # advise: a movable joint no capability actuates (D4)
+    OCM_FRAGMENT_MALFORMED = "OCM_FRAGMENT_MALFORMED"  # urdf_fragment exists but is not well-formed XML (Erratum 1; underlying principle ADR-0007)
     # ADR-0023: the plan is verbs; conditions belong to modules.
     OCM_CONDITION_UNKNOWN_SIGNAL = "OCM_CONDITION_UNKNOWN_SIGNAL"  # a pre/postcondition names no known signal or requires key
     OCM_REQUIREMENT_UNBOUND = "OCM_REQUIREMENT_UNBOUND"  # a capability's requires key is unbound by the cell

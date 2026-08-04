@@ -36,4 +36,4 @@ context was.
 | [0025](0025-refusal-phases-and-catalogue.md) | One refusal source, three evaluation phases | Accepted |
 | [0026](0026-a-port-is-what-a-net-can-name.md) | A port is what a net can name; everything else is a subsystem block | Accepted (Erratum 1) |
 | [0027](0027-collision-geometry-derived-or-checked.md) | Collision geometry is derived from posed components, or authored and checked | Accepted |
-| [0028](0028-capabilities-actuate-joints.md) | A capability declares the joints it actuates | Accepted |
+| [0028](0028-capabilities-actuate-joints.md) | A capability declares the joints it actuates | Accepted (Erratum 1) |

@@ -4,9 +4,9 @@ Companion to `spec/11-refusals.md` / `spec/schema/ocm-refusals-1.0.yaml` (ADR-00
 catalogue entry: where it is evaluated **today**, and the gap flag. This is a worklist, not an
 essay.
 
-**Counts.** 94 entries: 52 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
+**Counts.** 95 entries: 53 `live` (an engine emits them now), 42 `deferred` (an ADR names them;
 no engine emits them yet). (ADR-0020 Erratum 1 split `OCM_IDENTITY_MISMATCH` into a local and a
-store code, +1 deferred.)
+store code, +1 deferred. ADR-0028 Erratum 1 added `OCM_FRAGMENT_MALFORMED`, +1 live.)
 
 ## Namespace — RESOLVED by rename
 
@@ -54,6 +54,7 @@ namespace.
 | `OCM_DUPLICATE_REFDES` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
 | `OCM_ENVELOPE_OVERLAP` | design/advise | ocm-generator collision_geometry → validate_module | — |
 | `OCM_ETHERCAT_CHAIN_BROKEN` | design/refuse | ocm-resolve → ocm-api/translate.py | — |
+| `OCM_FRAGMENT_MALFORMED` | design/refuse | ocm-api authoring.py (validate_module fragment parse) | — |
 | `OCM_HUMAN_SIGNATURE_REQUIRED` | design/refuse | ocm-api verb (direct) | — |
 | `OCM_INVALID_ARGUMENT` | design/refuse | ocm-api verb (direct) | **emitted-uncatalogued** |
 | `OCM_INVALID_SOURCE` | design/refuse | ocm-resolve → ocm-api/translate.py | — |

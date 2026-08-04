@@ -439,6 +439,13 @@ def resolve_error_to_refusal(error: str) -> Refusal:
 _RE_OVERHANG = re.compile(
     r"^module (?P<name>\S+): extends beyond the workspace footprint \((?P<footprint>[^)]+)\): (?P<overhangs>.+)$"
 )
+# ADR-0028 D3 (Erratum 1): a cell joint_state beyond the joint's <limit>, or
+# driving a non-continuous joint whose <limit> is missing/incomplete. One
+# pattern, both message shapes -- range violation and missing limit.
+_RE_JOINT_STATE_OUT_OF_LIMIT = re.compile(
+    r"^instance '(?P<inst>[^']+)': joint_state drives '(?P<joint>[^']+)' "
+    r"(?:to .+, outside its declared limit|but the \S+ joint declares no <limit>)"
+)
 
 
 def scene_error_to_refusal(error: str) -> Refusal:
@@ -450,6 +457,13 @@ def scene_error_to_refusal(error: str) -> Refusal:
             message=error,
             allowed={"footprint": m["footprint"], "overhangs": directions},
             hint=f"Move {m['name']} inside the base footprint ({m['footprint']}).",
+        )
+    if m := _RE_JOINT_STATE_OUT_OF_LIMIT.match(error):
+        return Refusal(
+            code=Codes.OCM_JOINT_STATE_OUT_OF_LIMIT,
+            path=f"modules['{m['inst']}'].joint_state['{m['joint']}']",
+            message=error,
+            hint=f"Keep {m['joint']!r} inside the fragment's own <limit> -- a joint driven through its stop is a fabricated machine state (ADR-0028 D3).",
         )
     return Refusal(code=Codes.OCM_CELL_INVALID, path="$", message=error)
 

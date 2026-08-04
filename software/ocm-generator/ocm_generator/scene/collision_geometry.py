@@ -197,8 +197,10 @@ def _point_inside(hs: _HalfSpaces, p_mm: tuple[float, float, float], tol_mm: flo
 
 def fragment_link_names(fragment_path: Path) -> tuple[set[str], str | None]:
     """All link names in the fragment, plus the root link (a link that is no
-    joint's child). Returns (set(), None) on a parse failure -- the fragment's
-    own load path reports that separately.
+    joint's child). Returns (set(), None) on a parse failure -- reported as
+    OCM_FRAGMENT_MALFORMED by validate_module's own fragment-parse step
+    (ocm-api authoring.py, ADR-0028 Erratum 1), and by build_scene at scene
+    time; safe to return empty here only because that refusal fires upstream.
     """
     try:
         root = ET.parse(fragment_path).getroot()
