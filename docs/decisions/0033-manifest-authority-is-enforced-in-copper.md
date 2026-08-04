@@ -1,4 +1,4 @@
-# ADR-0032 — Manifest authority is enforced in copper
+# ADR-0033 — Manifest authority is enforced in copper
 
 **Status:** Proposed. Extends ADR-0024's manifest-authority axis with a physical enforcement
 layer. Does not amend ADR-0022, and does not touch the certification boundary held in
@@ -131,7 +131,7 @@ the only kind of assurance that survives a procurement review.
 **What this does not cover.** Writes on the process network — setpoints, recipe selection, HMI
 tags — change cell behaviour without touching the program and are entirely outside this
 decision. They remain governed by ADR-0024's command-authority axis in software. Do not cite
-ADR-0032 as though it covered them.
+ADR-0033 as though it covered them.
 
 **Development friction is the point.** Every program download now requires a physical mode
 change. This is not incidental cost to be engineered away; it is the mechanism. Any proposal
