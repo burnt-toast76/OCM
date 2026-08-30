@@ -47,7 +47,7 @@ not just three folders (ADR-0017). `software/` is **Cellwright**.
 | [`hardware/`](hardware/) | Frame, datum plate, gantry, panel, module designs. DXF/STEP/CAD. | CERN-OHL-S v2 |
 | [`reference/`](reference/) | Tested BOMs, verified drive list, **measured** frame and sync data. | CC BY-SA 4.0 |
 | [`docs/decisions/`](docs/decisions/) | **Architecture Decision Records.** Why every choice was made. Read these first. | CC BY-SA 4.0 |
-| [`Fusion360 Designs/`](Fusion360 Designs/) | **Architecture Decision Records.** Why every choice was made. Read these first. | CERN-OHL-S v2 |
+| [`Fusion360_Designs/`](Fusion360_Designs/) | **Mechanical Design of a Suggested System** A simple version of something buildable but useful in OCM | CERN-OHL-S v2 |
 
 ⚠️ **Licensing is structural, not decorative.** Three licenses, three directories, three
 `LICENSE` files. Putting a CAD file in `software/` or a Python module in `hardware/` makes
