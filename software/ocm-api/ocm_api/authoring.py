@@ -31,7 +31,18 @@ _REVISION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 def _todo_capability() -> dict[str, Any]:
-    return {"name": "todo_op", "summary": "TODO: describe what this capability does (the agent-facing surface)."}
+    # ADR-0023: timeout_s and on_timeout are required on every capability.
+    # Placeholdered like mass_kg (a scalar design value the author will set),
+    # not omitted -- ADR-0016 Decision 3's omit-rather-than-fake rule is for
+    # geometry artifact PATHS to files that don't exist, not scalar facts.
+    # on_timeout is "abort" to match the skeleton's abort_safe: false
+    # (a "hold" there would be a OCM_TIMEOUT_DISPOSITION_CONFLICT).
+    return {
+        "name": "todo_op",
+        "summary": "TODO: describe what this capability does (the agent-facing surface).",
+        "timeout_s": 1.0,
+        "on_timeout": "abort",
+    }
 
 
 def _todo_comms() -> dict[str, Any]:
@@ -101,11 +112,11 @@ def _skeleton_manifest(module_id: str, kind: str) -> dict[str, Any]:
 
 def create_module_draft(ws: Workspace, module_id: str, kind: str) -> Envelope:
     if ws.module_exists(module_id):
-        return single_refusal(Codes.ALREADY_EXISTS, path=f"modules['{module_id}']", message=f"a module {module_id!r} already exists")
+        return single_refusal(Codes.OCM_ALREADY_EXISTS, path=f"modules['{module_id}']", message=f"a module {module_id!r} already exists")
 
     known_kinds = load_schema(ws.schema_path)["properties"]["kind"]["enum"]
     if kind not in known_kinds:
-        return single_refusal(Codes.INVALID_ARGUMENT, path="kind", message=f"{kind!r} is not a known kind", allowed={"values": known_kinds})
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="kind", message=f"{kind!r} is not a known kind", allowed={"values": known_kinds})
 
     doc = _skeleton_manifest(module_id, kind)
     write_yaml(ws.module_path(module_id), doc)
@@ -114,7 +125,7 @@ def create_module_draft(ws: Workspace, module_id: str, kind: str) -> Envelope:
 
 def _strip_verified_by(doc: dict[str, Any]) -> Refusal | None:
     """Spec/09 hard rule: "The API refuses to write `safety.verified_by`."
-    That field is a human signature (spec/06); code HUMAN_SIGNATURE_REQUIRED.
+    That field is a human signature (spec/06); code OCM_HUMAN_SIGNATURE_REQUIRED.
     Mutates `doc` in place (removes the field) so the caller's subsequent
     write genuinely never persists it -- not merely reports an error while
     still saving it.
@@ -123,7 +134,7 @@ def _strip_verified_by(doc: dict[str, Any]) -> Refusal | None:
     if isinstance(safety, dict) and safety.get("verified_by"):
         del safety["verified_by"]
         return Refusal(
-            code=Codes.HUMAN_SIGNATURE_REQUIRED,
+            code=Codes.OCM_HUMAN_SIGNATURE_REQUIRED,
             path="safety.verified_by",
             message="safety.verified_by is a human signature (spec/06) -- the API will not write it.",
             hint="Have a qualified person sign off out of band and commit that edit directly, not through this API.",
@@ -133,11 +144,11 @@ def _strip_verified_by(doc: dict[str, Any]) -> Refusal | None:
 
 def update_module(ws: Workspace, module_id: str, manifest: dict[str, Any] | None = None, patch: list[dict[str, Any]] | None = None) -> Envelope:
     if (manifest is None) == (patch is None):
-        return single_refusal(Codes.INVALID_ARGUMENT, path="$", message="update_module needs exactly one of `manifest` or `patch`")
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="$", message="update_module needs exactly one of `manifest` or `patch`")
 
     if patch is not None:
         if not ws.module_exists(module_id):
-            return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} to patch")
+            return single_refusal(Codes.OCM_NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} to patch")
         current = read_yaml(ws.module_path(module_id)) or {}
         try:
             doc = jsonpatch.apply_patch(current, patch)
@@ -148,7 +159,7 @@ def update_module(ws: Workspace, module_id: str, manifest: dict[str, Any] | None
             # bare TypeError/KeyError/IndexError (patching into the wrong
             # document shape) all come from the same untrusted input and
             # must land as a refusal, not an exception escaping the API.
-            return single_refusal(Codes.INVALID_ARGUMENT, path="$", message=f"invalid RFC-6902 patch: {e}")
+            return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="$", message=f"invalid RFC-6902 patch: {e}")
     else:
         doc = dict(manifest)  # type: ignore[arg-type]
 
@@ -176,7 +187,7 @@ def generate_geometry_stub(ws: Workspace, module_id: str, footprint_mm: tuple[fl
     hand-write URDF -- this is the generator.
     """
     if not ws.module_exists(module_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
 
     x_mm, y_mm = footprint_mm
     x_m, y_m, z_m = x_mm / 1000.0, y_mm / 1000.0, height_mm / 1000.0
@@ -202,6 +213,11 @@ def generate_geometry_stub(ws: Workspace, module_id: str, footprint_mm: tuple[fl
     mechanical.setdefault("mount", {})["footprint_mm"] = [x_mm, y_mm]
     mechanical.setdefault("geometry", {})["urdf_fragment"] = fragment_rel
     mechanical["geometry"]["collision"] = fragment_rel
+    # ADR-0027 D1: a stub mesh is a hand-(well, tool-)produced artifact the
+    # planner treats as authoritative until real CAD replaces it -- that is
+    # `authored`, declared, not inferred from the path's presence. A module
+    # whose author chooses `derived` instead simply doesn't call this stub.
+    mechanical["geometry"]["collision_source"] = "authored"
     write_yaml(ws.module_path(module_id), doc)
 
     return Envelope.succeed({"id": module_id, "urdf_fragment": fragment_rel, "fragment_path": str(fragment_path)})
@@ -222,7 +238,7 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
     file that exists -- a claim nothing backs is exactly what this catches.
     """
     if not ws.module_exists(module_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
 
     doc = read_yaml(ws.module_path(module_id)) or {}
     schema = load_schema(ws.schema_path)
@@ -234,44 +250,74 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
     draft = is_draft_revision(str(doc.get("revision", "0.0.0")))
 
     collision = geometry.get("collision")
-    if collision and not (module_dir / collision).is_file():
-        refusals.append(
-            Refusal(
-                code=Codes.NOT_FOUND,
-                path="mechanical.geometry.collision",
-                message=f"{collision!r} does not exist under {module_dir}",
-                hint="generate_geometry_stub(...) first, or point at a real collision mesh file.",
+    collision_source = geometry.get("collision_source")
+    # ADR-0027: when collision_source is 'authored', the generator-side check
+    # below owns the collision-path refusals (OCM_AUTHORED_COLLISION_MISSING);
+    # when 'derived', an absent collision is CORRECT (D1/D6). The two legacy
+    # branches here cover only the not-yet-migrated module with no declared
+    # source.
+    if collision_source is None:
+        if collision and not (module_dir / collision).is_file():
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_NOT_FOUND,
+                    path="mechanical.geometry.collision",
+                    message=f"{collision!r} does not exist under {module_dir}",
+                    hint="generate_geometry_stub(...) first, or point at a real collision mesh file.",
+                )
             )
-        )
-    elif not collision and not draft:
-        # ADR-0016 Decision 3: a draft may omit this; a published module cannot.
-        refusals.append(
-            Refusal(
-                code=Codes.NOT_FOUND,
-                path="mechanical.geometry.collision",
-                message=f"a published module must declare mechanical.geometry.collision; {module_id!r} does not",
-                hint="generate_geometry_stub(...) before publishing, or keep it a 0.x draft.",
+        elif not collision and not draft:
+            # ADR-0016 Decision 3: a draft may omit this; a published module cannot.
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_NOT_FOUND,
+                    path="mechanical.geometry.collision",
+                    message=f"a published module must declare mechanical.geometry.collision; {module_id!r} does not",
+                    hint="generate_geometry_stub(...) before publishing, or keep it a 0.x draft.",
+                )
             )
-        )
     urdf_fragment = geometry.get("urdf_fragment")
     if urdf_fragment and not (module_dir / urdf_fragment).is_file():
         refusals.append(
             Refusal(
-                code=Codes.NOT_FOUND,
+                code=Codes.OCM_NOT_FOUND,
                 path="mechanical.geometry.urdf_fragment",
                 message=f"{urdf_fragment!r} does not exist under {module_dir}",
                 hint="generate_geometry_stub(...) first, or point at a real file.",
             )
         )
+    elif urdf_fragment:
+        # ADR-0028 Erratum 1: a fragment that exists but is not well-formed XML
+        # must refuse HERE -- before this fix, the fragment-dependent checks
+        # (link existence, unit coherence, limits, ADR-0027's link check)
+        # silently returned nothing on a parse failure and the module
+        # validated green. One parser, one error type: the scene's own
+        # load_fragment. Underlying principle is ADR-0007's -- the fragment is
+        # the load-bearing field; a claim nothing can parse backs nothing.
+        from ocm_generator.scene.errors import FragmentError
+        from ocm_generator.scene.urdf import load_fragment
+
+        try:
+            load_fragment(module_dir / urdf_fragment)
+        except FragmentError as e:
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_FRAGMENT_MALFORMED,
+                    path="mechanical.geometry.urdf_fragment",
+                    message=str(e),
+                    hint="Fix the fragment's XML -- every fragment-dependent check (joints, links, limits) is blind until it parses.",
+                )
+            )
     esi = doc.get("comms", {}).get("esi")
     if esi and not (module_dir / esi).is_file():
-        refusals.append(Refusal(code=Codes.NOT_FOUND, path="comms.esi", message=f"{esi!r} does not exist under {module_dir}"))
+        refusals.append(Refusal(code=Codes.OCM_NOT_FOUND, path="comms.esi", message=f"{esi!r} does not exist under {module_dir}"))
 
     # ADR-0016 Decision 1: resolve this module's nets/links/ports against the
     # components they reference -- the same check resolve_cell runs per
     # instance, off the components search path _check_module_components already
     # threads (no second path). Only when the document is schema-clean, so a
     # typed Module can be built; schema errors are reported above, not piled on.
+    warnings: list[str] = []
     if not errors:
         try:
             module = Module.from_dict(doc)
@@ -280,19 +326,51 @@ def validate_module(ws: Workspace, module_id: str) -> Envelope:
         if module is not None:
             refusals.extend(resolve_error_to_refusal(e) for e in resolve_module(module, ws.components_dir))
 
+            # ADR-0027: the file-dependent collision-geometry checks (authored
+            # mesh existence + D2 containment, D4 link-in-fragment, D5 overlap
+            # advisory) -- generator-side because they need the module's own
+            # files, reached through this one validation surface (ADR-0016).
+            from ocm_generator.scene.collision_geometry import check_module_collision_geometry
+            from ocm_resolve.search import find_component
+
+            components = {}
+            for mc in module.components:
+                comp, _comp_errors = find_component(mc.ref, ws.components_dir)
+                if comp is not None:
+                    components[mc.refdes] = comp
+            geo_refusals, advisories = check_module_collision_geometry(module, module_dir, components)
+            refusals.extend(
+                Refusal(code=getattr(Codes, code), path=path, message=message)
+                for code, path, message in geo_refusals
+            )
+            warnings.extend(advisories)
+
+            # ADR-0028: the fragment-dependent actuation checks (joint exists,
+            # is movable, unit matches the joint's kind, target within its
+            # <limit>) plus the D4 unactuated-joint advisory -- same pattern,
+            # same one validation surface.
+            from ocm_generator.scene.actuation import check_module_actuation
+
+            act_refusals, act_advisories = check_module_actuation(module, module_dir)
+            refusals.extend(
+                Refusal(code=getattr(Codes, code), path=path, message=message)
+                for code, path, message in act_refusals
+            )
+            warnings.extend(act_advisories)
+
     if refusals:
-        return Envelope.refuse(refusals)
-    return Envelope.succeed({"id": module_id, "valid": True})
+        return Envelope.refuse(refusals, warnings=warnings)
+    return Envelope.succeed({"id": module_id, "valid": True}, warnings=warnings)
 
 
 def publish_module(ws: Workspace, module_id: str, revision: str) -> Envelope:
     if not ws.module_exists(module_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"modules['{module_id}']", message=f"no module {module_id!r} in this workspace")
     if not _REVISION_RE.match(revision):
-        return single_refusal(Codes.INVALID_ARGUMENT, path="revision", message=f"{revision!r} is not a valid SemVer (X.Y.Z)")
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="revision", message=f"{revision!r} is not a valid SemVer (X.Y.Z)")
     if is_draft_revision(revision):
         return single_refusal(
-            Codes.DRAFT_NOT_PUBLISHABLE,
+            Codes.OCM_DRAFT_NOT_PUBLISHABLE,
             path="revision",
             message=f"{revision!r} is itself a 0.x draft revision -- publishing requires a real (>=1.0.0) release",
             hint="Choose a revision whose major version is >= 1.",
@@ -303,16 +381,27 @@ def publish_module(ws: Workspace, module_id: str, revision: str) -> Envelope:
         return validation
 
     doc = read_yaml(ws.module_path(module_id)) or {}
-    # ADR-0016 Decision 3: a draft may omit its artifact claims, but publishing
-    # requires them -- a published module cannot claim (or lack) geometry it
-    # does not have. validate_module already proved any DECLARED collision's
-    # file exists; here we require it be declared at all.
-    if not doc.get("mechanical", {}).get("geometry", {}).get("collision"):
+    geometry = doc.get("mechanical", {}).get("geometry", {})
+    # ADR-0027 D6, amending ADR-0016 D3: publish requires a collision SOURCE,
+    # not a collision MESH. `derived` with no mesh artifact is correct and
+    # complete (validate_module above already proved the derived input set --
+    # poses, envelopes, units -- resolves); `authored` requires the mesh claim
+    # (validate proved the file exists). No source declared -> refuse: absence
+    # here would mean two different things (ADR-0027 D1's rejected inference).
+    collision_source = geometry.get("collision_source")
+    if collision_source is None:
         return single_refusal(
-            Codes.NOT_FOUND,
+            Codes.OCM_COLLISION_SOURCE_MISSING,
+            path="mechanical.geometry.collision_source",
+            message=f"cannot publish {module_id!r}: it declares no mechanical.geometry.collision_source",
+            hint="Choose 'derived' (proxy built from posed component envelopes + structure) or 'authored' (a hand-produced mesh, containment-checked) -- ADR-0027 D1/D6.",
+        )
+    if collision_source == "authored" and not geometry.get("collision"):
+        return single_refusal(
+            Codes.OCM_AUTHORED_COLLISION_MISSING,
             path="mechanical.geometry.collision",
-            message=f"cannot publish {module_id!r}: it declares no mechanical.geometry.collision",
-            hint="generate_geometry_stub(...) first, then publish.",
+            message=f"cannot publish {module_id!r}: collision_source 'authored' with no mechanical.geometry.collision",
+            hint="Point at the authored collision mesh, or switch to collision_source: derived.",
         )
     doc["revision"] = revision
     write_yaml(ws.module_path(module_id), doc)

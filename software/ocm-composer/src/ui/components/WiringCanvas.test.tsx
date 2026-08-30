@@ -111,7 +111,7 @@ describe("WiringCanvas -- component cards", () => {
       componentDocs: { [NOVG_ID]: noConnectorsDoc() },
       checklist: [
         {
-          code: "COMPONENT_HAS_NO_CONNECTORS",
+          code: "OCM_COMPONENT_HAS_NO_CONNECTORS",
           path: `modules['x'].components['VG1']`,
           message: "refdes 'VG1' has no connectors",
           allowed: null,

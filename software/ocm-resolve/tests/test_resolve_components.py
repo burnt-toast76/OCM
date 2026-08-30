@@ -65,6 +65,8 @@ def tool_with_components(components: list[dict[str, Any]], signal_source: str | 
                 "name": "drive_screw",
                 "summary": "Drive a screw to a target torque.",
                 "parameters": {"torque_nm": {"type": "number", "unit": "N.m", "min": 0.2, "max": 5.0}},
+                "timeout_s": 6.0,  # ADR-0023: required on every capability
+                "on_timeout": "abort",  # abort_safe is False below
             }
         ],
         "state_machine": {"model": "packml", "implements": ["idle", "execute"], "abort_safe": False},

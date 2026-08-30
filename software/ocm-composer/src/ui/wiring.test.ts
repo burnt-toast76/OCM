@@ -4,7 +4,7 @@ import { applyWireClick, endpointKey, endpointsEqual, moduleRefusalFieldKey, nex
 import type { ModuleEndpoint, ModuleNetRow, Refusal } from "../api/types";
 
 function refusal(overrides: Partial<Refusal>): Refusal {
-  return { code: "SCHEMA_INVALID", path: "$", message: "", allowed: null, hint: null, ...overrides };
+  return { code: "OCM_SCHEMA_INVALID", path: "$", message: "", allowed: null, hint: null, ...overrides };
 }
 
 const port = (id: string): ModuleEndpoint => ({ port: id });
@@ -100,7 +100,7 @@ describe("applyWireClick", () => {
 describe("moduleRefusalFieldKey", () => {
   it("extracts refdes/connector/pin from a component-pin message", () => {
     const r = refusal({
-      code: "PIN_ON_MULTIPLE_NETS",
+      code: "OCM_PIN_ON_MULTIPLE_NETS",
       path: "modules['dp8'].nets",
       message: "pin '1' of connector 'electrical' on refdes 'PS1' is on multiple nets",
     });
@@ -109,7 +109,7 @@ describe("moduleRefusalFieldKey", () => {
 
   it("extracts refdes/connector/pin from an unresolved-endpoint message", () => {
     const r = refusal({
-      code: "UNRESOLVED_ENDPOINT",
+      code: "OCM_UNRESOLVED_ENDPOINT",
       path: "modules['dp8']",
       message: "net 'N1' references pin '9' not on connector 'electrical' of refdes 'PS1'",
     });
@@ -118,7 +118,7 @@ describe("moduleRefusalFieldKey", () => {
 
   it("extracts a port id from a port-pin message", () => {
     const r = refusal({
-      code: "PIN_ON_MULTIPLE_NETS",
+      code: "OCM_PIN_ON_MULTIPLE_NETS",
       path: "modules['dp8'].nets",
       message: "pin '1' of port 'PWR_IN' is on multiple nets",
     });
@@ -127,43 +127,43 @@ describe("moduleRefusalFieldKey", () => {
 
   it("falls back to the net path when the message names nothing", () => {
     const r = refusal({
-      code: "NET_TOO_FEW_ENDPOINTS",
+      code: "OCM_NET_TOO_FEW_ENDPOINTS",
       path: "modules['dp8'].nets.electrical['N1']",
       message: "net 'N1' has fewer than two endpoints",
     });
     expect(moduleRefusalFieldKey(r)).toBe("net:N1");
   });
 
-  it("falls back to the component path for COMPONENT_HAS_NO_CONNECTORS", () => {
+  it("falls back to the component path for OCM_COMPONENT_HAS_NO_CONNECTORS", () => {
     const r = refusal({
-      code: "COMPONENT_HAS_NO_CONNECTORS",
+      code: "OCM_COMPONENT_HAS_NO_CONNECTORS",
       path: "modules['dp8'].components['PS1']",
       message: "refdes 'PS1' has no connectors",
     });
     expect(moduleRefusalFieldKey(r)).toBe("component:PS1");
   });
 
-  it("falls back to the port path for PORT_UNCONNECTED", () => {
+  it("falls back to the port path for OCM_PORT_UNCONNECTED", () => {
     const r = refusal({
-      code: "PORT_UNCONNECTED",
+      code: "OCM_PORT_UNCONNECTED",
       path: "modules['dp8'].ports['PWR_IN']",
       message: "port 'PWR_IN' is unconnected",
     });
     expect(moduleRefusalFieldKey(r)).toBe("port:PWR_IN");
   });
 
-  it("falls back to the link path for LINK_PROTOCOL_MISMATCH", () => {
+  it("falls back to the link path for OCM_LINK_PROTOCOL_MISMATCH", () => {
     const r = refusal({
-      code: "LINK_PROTOCOL_MISMATCH",
+      code: "OCM_LINK_PROTOCOL_MISMATCH",
       path: "modules['dp8'].links['L1']",
       message: "link 'L1' has mismatched protocols",
     });
     expect(moduleRefusalFieldKey(r)).toBe("link:L1");
   });
 
-  it("returns null for a whole-list refusal like ETHERCAT_CHAIN_BROKEN", () => {
+  it("returns null for a whole-list refusal like OCM_ETHERCAT_CHAIN_BROKEN", () => {
     const r = refusal({
-      code: "ETHERCAT_CHAIN_BROKEN",
+      code: "OCM_ETHERCAT_CHAIN_BROKEN",
       path: "modules['dp8'].links",
       message: "EtherCAT chain is broken",
     });

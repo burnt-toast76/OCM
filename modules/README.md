@@ -1,5 +1,8 @@
 # modules
 
+This is the **module** layer — the second of OCM's three context layers (ADR-0017): what an
+assembly does, and how its components are wired to each other.
+
 The manifest registry. One directory per module:
 
 ```

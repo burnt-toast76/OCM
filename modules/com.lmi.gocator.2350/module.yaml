@@ -63,6 +63,8 @@ capabilities:
       unit: "%"
       summary: "Match confidence. The coordinator should gate on this before releasing downstream steps."
   nominal_duration_s: 0.3
+  timeout_s: 2.0               # ADR-0023 default (~5x nominal, the clamp anchor's ratio); pending owner calibration
+  on_timeout: hold             # a snapshot that won't resolve strands nothing; operator clears and resumes (abort-safe)
 
 state_machine:
   model: packml

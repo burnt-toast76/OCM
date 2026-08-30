@@ -34,7 +34,7 @@ def _draft_component_refusals(location: str, module: Module) -> list[Refusal]:
         if is_draft_revision(mc.ref.revision):
             refusals.append(
                 Refusal(
-                    code=Codes.DRAFT_MODULE_REFERENCED,
+                    code=Codes.OCM_DRAFT_MODULE_REFERENCED,
                     path=f"modules['{location}'].components['{mc.refdes}']",
                     message=f"{location} ({module.id}) references component {mc.refdes} ({mc.ref}), a draft (0.x) -- it cannot be resolved into a cell",
                     hint=f"publish_component({mc.ref.id!r}, <semver>) first, then repoint {mc.refdes} at the published revision.",
@@ -48,7 +48,7 @@ def _draft_refusals(resolved: ResolvedCell) -> list[Refusal]:
     if is_draft_revision(resolved.base.revision):
         refusals.append(
             Refusal(
-                code=Codes.DRAFT_MODULE_REFERENCED,
+                code=Codes.OCM_DRAFT_MODULE_REFERENCED,
                 path="base.module",
                 message=f"base module {resolved.base.id}@{resolved.base.revision} is a draft (0.x) -- it cannot be resolved into a cell",
                 hint=f"publish_module({resolved.base.id!r}, <semver>) first.",
@@ -59,7 +59,7 @@ def _draft_refusals(resolved: ResolvedCell) -> list[Refusal]:
         if is_draft_revision(ri.module.revision):
             refusals.append(
                 Refusal(
-                    code=Codes.DRAFT_MODULE_REFERENCED,
+                    code=Codes.OCM_DRAFT_MODULE_REFERENCED,
                     path=f"modules['{name}']",
                     message=f"{name} references {ri.module.id}@{ri.module.revision}, a draft (0.x) -- it cannot be resolved into a cell",
                     hint=f"publish_module({ri.module.id!r}, <semver>) first, then repoint {name} at the published revision.",
@@ -71,7 +71,7 @@ def _draft_refusals(resolved: ResolvedCell) -> list[Refusal]:
 
 def resolve_with_refusals(cell: Cell, ws: Workspace) -> tuple[ResolvedCell | None, list[Refusal]]:
     try:
-        resolved = resolve_cell(cell, ws.modules_dir, ws.components_dir)
+        resolved = resolve_cell(cell, ws.modules_dir, ws.components_dir, carriers_search_path=ws.carriers_dir)
     except CellResolutionError as e:
         return None, [resolve_error_to_refusal(err) for err in e.errors]
 

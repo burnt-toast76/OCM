@@ -57,12 +57,12 @@ def _component_kind_is_valid(kind: str, schema: dict[str, Any]) -> bool:
 
 def create_component_draft(ws: Workspace, component_id: str, kind: str) -> Envelope:
     if ws.component_exists(component_id):
-        return single_refusal(Codes.ALREADY_EXISTS, path=f"components['{component_id}']", message=f"a component {component_id!r} already exists")
+        return single_refusal(Codes.OCM_ALREADY_EXISTS, path=f"components['{component_id}']", message=f"a component {component_id!r} already exists")
 
     schema = load_schema(ws.component_schema_path)
     if not _component_kind_is_valid(kind, schema):
         known = _known_component_kinds(schema)
-        return single_refusal(Codes.INVALID_ARGUMENT, path="kind", message=f"{kind!r} is not a known kind", allowed={"values": known})
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="kind", message=f"{kind!r} is not a known kind", allowed={"values": known})
 
     doc: dict[str, Any] = {"ocm_version": "1.1", "id": component_id, "revision": DRAFT_REVISION, "kind": kind}
     write_yaml(ws.component_path(component_id), doc)
@@ -73,16 +73,16 @@ def create_component_draft(ws: Workspace, component_id: str, kind: str) -> Envel
 
 def update_component(ws: Workspace, component_id: str, manifest: dict[str, Any] | None = None, patch: list[dict[str, Any]] | None = None) -> Envelope:
     if (manifest is None) == (patch is None):
-        return single_refusal(Codes.INVALID_ARGUMENT, path="$", message="update_component needs exactly one of `manifest` or `patch`")
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="$", message="update_component needs exactly one of `manifest` or `patch`")
 
     if patch is not None:
         if not ws.component_exists(component_id):
-            return single_refusal(Codes.NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} to patch")
+            return single_refusal(Codes.OCM_NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} to patch")
         current = read_yaml(ws.component_path(component_id)) or {}
         try:
             doc = jsonpatch.apply_patch(current, patch)
         except (jsonpatch.JsonPatchException, jsonpointer.JsonPointerException, TypeError, KeyError, IndexError) as e:
-            return single_refusal(Codes.INVALID_ARGUMENT, path="$", message=f"invalid RFC-6902 patch: {e}")
+            return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="$", message=f"invalid RFC-6902 patch: {e}")
     else:
         doc = dict(manifest)  # type: ignore[arg-type]
 
@@ -106,7 +106,7 @@ def validate_component(ws: Workspace, component_id: str) -> Envelope:
     reference), so schema validation alone is the whole story.
     """
     if not ws.component_exists(component_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
 
     doc = read_yaml(ws.component_path(component_id)) or {}
     schema = load_schema(ws.component_schema_path)
@@ -120,12 +120,12 @@ def validate_component(ws: Workspace, component_id: str) -> Envelope:
 
 def publish_component(ws: Workspace, component_id: str, revision: str) -> Envelope:
     if not ws.component_exists(component_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
     if not _REVISION_RE.match(revision):
-        return single_refusal(Codes.INVALID_ARGUMENT, path="revision", message=f"{revision!r} is not a valid SemVer (X.Y.Z)")
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="revision", message=f"{revision!r} is not a valid SemVer (X.Y.Z)")
     if is_draft_revision(revision):
         return single_refusal(
-            Codes.DRAFT_NOT_PUBLISHABLE,
+            Codes.OCM_DRAFT_NOT_PUBLISHABLE,
             path="revision",
             message=f"{revision!r} is itself a 0.x draft revision -- publishing requires a real (>=1.0.0) release",
             hint="Choose a revision whose major version is >= 1.",
@@ -169,7 +169,7 @@ def delete_component(ws: Workspace, component_id: str) -> Envelope:
     gated behind resolving that first.
     """
     if not ws.component_exists(component_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
 
     referencing_modules = []
     for module_id in ws.list_module_ids():
@@ -204,7 +204,7 @@ def describe_component(ws: Workspace, component_id: str) -> Envelope:
     hard pass/fail already has validate_component for that.
     """
     if not ws.component_exists(component_id):
-        return single_refusal(Codes.NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
+        return single_refusal(Codes.OCM_NOT_FOUND, path=f"components['{component_id}']", message=f"no component {component_id!r} in this workspace")
 
     data = read_yaml(ws.component_path(component_id)) or {}
     schema = load_schema(ws.component_schema_path)

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Two cell-editing guardrails found by cold-testing the composition
 verbs: place_instance never evicts/swaps onto an already-occupied tool
-mount (TOOL_SLOT_OCCUPIED), and a mutation that orphans a plan step or a
+mount (OCM_TOOL_SLOT_OCCUPIED), and a mutation that orphans a plan step or a
 stale `tool:` cross-reference says so in `warnings[]`, on the same call
 that causes it -- whether or not that call also ends up refused for
 other, harder reasons.
@@ -20,12 +20,23 @@ def _place_robot_and_sd1(api: OcmApi, cell_id: str) -> None:
     api.create_cell(cell_id, "com.accelsolutions.base.frame1200@2.0.0")
     api.place_instance(cell_id, "robot1", "com.universal-robots.ur5e@3.1.0", {"pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}})
     api.set_joint_state(cell_id, "robot1", {"shoulder_lift_joint": -1.5707963267948966, "elbow_joint": 1.5707963267948966})
-    e = api.place_instance(cell_id, "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"})
+    # ADR-0023: sd50's drive_screw declares requires.workpiece_secured, so
+    # the cell must bind it or resolve refuses OCM_REQUIREMENT_UNBOUND. These
+    # fixtures exercise mount-slot / orphan guardrails, not the interlock
+    # itself, and don't place a holding fixture -- bind to sd1's own
+    # screw_present (an input bool that exists here) so resolve is satisfied.
+    e = api.place_instance(
+        cell_id,
+        "sd1",
+        "com.accelsolutions.screwdriver.sd50@1.2.0",
+        {"on": "robot1.flange"},
+        requires={"workpiece_secured": "sd1.screw_present"},
+    )
     assert e.ok, e.refusals
 
 
 # ---------------------------------------------------------------------------
-# TOOL_SLOT_OCCUPIED
+# OCM_TOOL_SLOT_OCCUPIED
 # ---------------------------------------------------------------------------
 
 
@@ -35,7 +46,7 @@ def test_place_instance_onto_occupied_mount_is_refused(api: OcmApi):
     e = api.place_instance("c-slot1", "grip1", "com.acme.gripper.vg25@1.0.0", {"on": "robot1.flange"})
 
     assert not e.ok
-    assert e.refusals[0].code == Codes.TOOL_SLOT_OCCUPIED
+    assert e.refusals[0].code == Codes.OCM_TOOL_SLOT_OCCUPIED
     assert "'sd1'" in e.refusals[0].hint  # names the incumbent
     assert "robot1.flange" in e.refusals[0].message
     assert e.refusals[0].allowed == {"incumbent": "sd1", "mount_on": "robot1.flange"}
@@ -58,7 +69,7 @@ def test_move_instance_onto_occupied_mount_is_refused(api: OcmApi):
     e = api.move_instance("c-slot3", "cam1", {"on": "robot1.flange"})
 
     assert not e.ok
-    assert e.refusals[0].code == Codes.TOOL_SLOT_OCCUPIED
+    assert e.refusals[0].code == Codes.OCM_TOOL_SLOT_OCCUPIED
     assert "'sd1'" in e.refusals[0].hint
 
 
@@ -102,12 +113,12 @@ def test_remove_instance_orphans_plan_steps_warning_appears_on_the_same_call(api
     # Removing sd1 leaves 3 plan steps (load_screw + drive_screw x3 = 6
     # sequence entries total, but only the ones naming sd1) referencing a
     # module instance that no longer exists -- resolve_cell's own
-    # UNKNOWN_MODULE check correctly refuses this (the plan genuinely
+    # OCM_UNKNOWN_MODULE check correctly refuses this (the plan genuinely
     # can't resolve any more), but the SAME call also carries the
     # human-readable summary of what just broke, not just six separate
     # per-step errors.
     assert not e.ok
-    assert any(r.code == Codes.UNKNOWN_MODULE for r in e.refusals)
+    assert any(r.code == Codes.OCM_UNKNOWN_MODULE for r in e.refusals)
     assert any("orphans" in w and "sd1" in w for w in e.warnings)
 
 

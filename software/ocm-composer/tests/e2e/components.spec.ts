@@ -153,7 +153,7 @@ test("attaching a datasheet before creating uploads it to the new draft and auto
 
   // Chat auto-fires a transcription request -- no manual send needed --
   // and (since this test doesn't mock /agent/chat) the real backend
-  // degrades cleanly to AGENT_UNAVAILABLE with no key configured, proving
+  // degrades cleanly to OCM_AGENT_UNAVAILABLE with no key configured, proving
   // the request genuinely reached the server rather than silently no-op-ing.
   await expect(page.locator(".chat-turn--user")).toContainText("I've attached a datasheet");
   await expect(page.locator(".chat-panel__transcript")).toContainText("ANTHROPIC_API_KEY");

@@ -5,10 +5,17 @@ The first link in the generator chain (ROADMAP Step 1): scene/, planner/,
 and emitters/ all consume a typed Module or Cell instead of walking raw YAML.
 """
 
+from .carrier import (
+    CARRIER_CONTROL_FIELDS,
+    Carrier,
+    CarrierMechanical,
+    CarrierMount,
+)
 from .cell import (
     Base,
     Cell,
     CellSafety,
+    CarrierInstance,
     Consumable,
     Controller,
     InstanceAddress,
@@ -16,6 +23,7 @@ from .cell import (
     ModuleInstance,
     ModuleRef,
     Pose,
+    TransitOffsets,
     validate_cell_dict,
 )
 from .component import (
@@ -34,17 +42,21 @@ from .component import (
     ComponentSupply,
 )
 from .errors import CellLoadError, ManifestValidationError, OcmCoreError
-from .loader import load_cell, load_component, load_module, load_schema, validate_module_dict
+from .loader import load_carrier, load_cell, load_component, load_module, load_schema, validate_module_dict
 from .module import (
+    Actuation,
     Capability,
     Comms,
     ComponentRef,
     Connector,
+    DofTolerance,
     Electrical,
     Endpoint,
     Geometry,
     InstancePose,
     Link,
+    Located,
+    LocatedConstraint,
     Maintenance,
     Mechanical,
     Module,
@@ -57,22 +69,39 @@ from .module import (
     Pin,
     Port,
     Process,
+    Requirement,
     Safety,
     Signal,
     StateMachine,
+    StructurePose,
+    StructurePrimitive,
     Supply,
     WearItem,
 )
 from .parameter import Frame, Parameter
+from .units import UnknownUnitError, angle_to_rad, known_angle_units, known_length_units, length_to_mm
 from .yaml_rt import new_yaml_rt
 
 __all__ = [
+    "Actuation",
+    "known_angle_units",
+    "angle_to_rad",
+    "length_to_mm",
+    "known_length_units",
+    "UnknownUnitError",
+    "StructurePrimitive",
+    "StructurePose",
     "Base",
     "Capability",
     "Cell",
     "CellLoadError",
     "CellSafety",
     "Comms",
+    "CARRIER_CONTROL_FIELDS",
+    "Carrier",
+    "CarrierMechanical",
+    "CarrierInstance",
+    "CarrierMount",
     "Component",
     "ComponentComms",
     "ComponentCommsConnector",
@@ -88,6 +117,7 @@ __all__ = [
     "ComponentSource",
     "ComponentSupply",
     "Connector",
+    "DofTolerance",
     "Consumable",
     "Controller",
     "Electrical",
@@ -98,6 +128,8 @@ __all__ = [
     "InstanceMount",
     "InstancePose",
     "Link",
+    "Located",
+    "LocatedConstraint",
     "Maintenance",
     "ManifestValidationError",
     "Mechanical",
@@ -116,16 +148,19 @@ __all__ = [
     "Port",
     "Pose",
     "Process",
+    "Requirement",
     "Safety",
     "Signal",
     "StateMachine",
     "Supply",
     "WearItem",
     "load_cell",
+    "load_carrier",
     "load_component",
     "load_module",
     "load_schema",
     "new_yaml_rt",
+    "TransitOffsets",
     "validate_cell_dict",
     "validate_module_dict",
 ]

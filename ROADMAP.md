@@ -39,12 +39,19 @@ cell.yaml + plan.yaml
 
 Everything in that chain exists and is free. Nothing needs to be invented.
 
-- [ ] `ocm-core` — manifest load + validate
-- [ ] `scene/` — cell.yaml → Tesseract environment
-- [ ] `planner/` — Tesseract + Ruckig
-- [ ] `emitters/urscript.py`
-- [ ] `emitters/plcopen.py`
-- [ ] **`validate/`** — the refusal logic. *The most valuable output of this tool is "no."*
+- [x] `ocm-core` — manifest load + validate
+- [x] `scene/` — cell.yaml → Tesseract environment
+- [x] `planner/` — Tesseract + Ruckig (IK/collision need the Tesseract extra)
+- [x] `emitters/urscript.py`
+- [ ] `emitters/plcopen.py` — *not built yet*
+- [x] **`validate/`** — the refusal logic, now in `ocm-resolve` + `ocm-api` (ADR-0012,
+  ADR-0016). *The most valuable output of this tool is "no."*
+
+**Status (as of this commit):** the chain runs on a laptop — `ocm-core` + `ocm-resolve` +
+`ocm-api` + `ocm-generator` take a resolved cell to a Tesseract scene, a collision-checked
+plan, URScript, a cycle-time estimate, and a PackML coordinator on **simulated** I/O, with
+the refusal engine live. Remaining before the exit criterion is met: the PLCopen-XML emitter
+and the demo video. Nothing has run on real fieldbus I/O yet.
 
 **Exit criterion:** a video of a cell being generated from a YAML file, collision-checked,
 with the tool refusing an out-of-spec torque. That video is the marketing artifact.

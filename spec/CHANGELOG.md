@@ -1,5 +1,57 @@
 # Spec changelog
 
+## Collision geometry: derived or checked (ADR-0027) — additive schema; **breaking** for publish
+
+Module schema additions: `mechanical.geometry.collision_source` (`derived` | `authored`),
+`mechanical.structure[]` (posed box/cylinder/mesh primitives, per-shape required fields
+schema-enforced), and `link` on component instances and structure primitives (ADR-0027 D4;
+defaults to the fragment root). All additive — every existing manifest still validates.
+
+**The publish contract changes** (ADR-0027 D6, amending ADR-0016 D3): `publish_module` now
+requires a collision *source*, not a collision *mesh* — `OCM_COLLISION_SOURCE_MISSING` without
+one; `authored` additionally requires the `collision` claim. A published `derived` module with
+no mesh artifact is correct. Existing published modules predate the field and are unaffected
+until they republish; the migration worklist is `docs/adr-0027-migration.md`.
+
+Also normative from this change: manifests are parsed under **YAML 1.2 core schema** (see
+spec/00) — bare `on`/`off`/`yes`/`no` are strings, never booleans.
+
+## Refusal codes namespaced `OCM_` (ADR-0025 D4) — **breaking** for the API surface
+
+Every refusal code is now prefixed `OCM_`. The 37 codes the engines emitted bare
+(`SCHEMA_INVALID` → `OCM_SCHEMA_INVALID`, `PARAM_OUT_OF_BOUNDS` → `OCM_PARAM_OUT_OF_BOUNDS`, …)
+were renamed everywhere they appear: `ocm-api`'s `Codes` and every emitted string, the
+`ocm-composer` frontend that switches on them, tests, spec text, and the catalogue keys. This
+is a breaking change to the API's refusal contract — a client matching on `"SCHEMA_INVALID"`
+will no longer match. Nothing external consumes it yet (ADR-0012 scopes v1 as a single-user
+local service), which is why the rename is cheap now and would not be later; it is filed as a
+breaking change regardless, not a tidy-up. The catalogue (`spec/schema/ocm-refusals-1.0.yaml`)
+is now single-namespace.
+
+## Conditions belong to modules (ADR-0023) — **breaking** for capabilities
+
+The plan is verbs; everything a step must wait for is declared on the capability whose module
+owns the sensing signal. Three additions to the capability schema
+(`spec/schema/ocm-module-1.0.schema.json`):
+
+- **`timeout_s`** (number, > 0) and **`on_timeout`** (`hold` | `abort`) are now **REQUIRED on
+  every capability** — how long before the operation is wrong, and how to dispose the part when
+  it is. This is a breaking change: a capability without them no longer validates. Per ADR-0014
+  the refusals are the completion list, not a reason to default the value; a plan may not
+  override `timeout_s`.
+- **`requires`** (optional map, `name → {type: bool, summary}`) lets a capability declare an
+  abstract boolean fact it needs without naming who provides it. The cell binds each requirement
+  on each instance to a concrete `instance.signal` (the cell model gains a per-instance
+  `requires:` map). This is ADR-0015's ports-and-nets pattern applied to logic — it makes a
+  cross-module interlock (`drive_screw` needs `workpiece_secured`, bound to `nest1.clamped`)
+  expressible with no new plan syntax.
+
+`preconditions`/`postconditions`/`requires` references now resolve **statically**
+(`validate_module`, `set_plan`): a condition naming an unknown signal, an unbound requirement, a
+dangling binding, or `on_timeout: hold` on a not-`abort_safe` capability all refuse at resolve
+time rather than at first contact with hardware. The expression grammar is unchanged
+(`signal == literal`); binding resolves to `(instance, signal)` before evaluation.
+
 ## v1.1 (additive — every valid 1.0 manifest remains valid)
 
 **Custom protocols.** `comms.protocol` accepts `x-<name>` (e.g. `x-gocator-gsdk`,

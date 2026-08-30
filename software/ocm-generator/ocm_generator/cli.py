@@ -7,7 +7,7 @@
                              [--collision [--collision-margin-mm MM]]
     ocm plan     <cell.yaml> [--modules DIR] --emit-urscript FILE.script
                              [--collision-margin-mm MM] [--path-samples N]
-                             [--view-animation FILE.html]
+                             [--emit-trace FILE.json] [--view-animation FILE.html]
     ocm fmt      [PATH ...] [--check]
 
 Each stage's collected-violations error (ManifestValidationError,
@@ -165,8 +165,10 @@ def cmd_scene_collision(scene, args: argparse.Namespace) -> int:
 
 def cmd_plan(args: argparse.Namespace) -> int:
     from ocm_core import load_cell
-    from ocm_generator.emitters import emit_urscript, render_cycle_time_table, render_html_animation
-    from ocm_generator.planner import PlanningError, PlanningUnavailable, estimate_cycle_time, plan_fastening_sequence
+    import json
+
+    from ocm_generator.emitters import build_trace, emit_urscript, render_cycle_time_table, render_html_animation
+    from ocm_generator.planner import PlanningError, PlanningUnavailable, build_timeline, plan_fastening_sequence
     from ocm_generator.scene import SceneBuildError, build_scene
     from ocm_resolve import CellResolutionError, resolve_cell
 
@@ -189,9 +191,11 @@ def cmd_plan(args: argparse.Namespace) -> int:
         return 1
 
     try:
-        plan = plan_fastening_sequence(
+        plan = plan_fastening_sequence(resolved, scene)
+        timeline = build_timeline(
             resolved,
             scene,
+            plan,
             collision_margin_mm=args.collision_margin_mm,
             path_samples=args.path_samples,
         )
@@ -208,12 +212,17 @@ def cmd_plan(args: argparse.Namespace) -> int:
           f"{', '.join(h.hole_id for h in plan.holes)}")
     print(f"  wrote URScript to {args.emit_urscript}")
 
-    report = estimate_cycle_time(plan)
     print()
-    print(render_cycle_time_table(plan, report))
+    print(render_cycle_time_table(plan, timeline.report))
 
+    # D7: the trace is THE artifact; the animated HTML below is a
+    # renderer over the same object, not a second producer.
+    trace = build_trace(scene, resolved, timeline) if (args.emit_trace or args.view_animation) else None
+    if args.emit_trace:
+        args.emit_trace.write_text(json.dumps(trace), encoding="utf-8")
+        print(f"  wrote timeline trace to {args.emit_trace}")
     if args.view_animation:
-        args.view_animation.write_text(render_html_animation(scene, resolved, plan, report), encoding="utf-8")
+        args.view_animation.write_text(render_html_animation(trace), encoding="utf-8")
         print(f"  wrote animated HTML viewer to {args.view_animation}")
 
     return 0
@@ -361,6 +370,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default=50,
         metavar="N",
         help="Number of joint-space states to collision-check along home->standoff (default: 50).",
+    )
+    p_plan.add_argument(
+        "--emit-trace",
+        type=Path,
+        default=None,
+        metavar="FILE.json",
+        help="Write the timeline as a JSON trace: the ordered rows with their labels, kinds, durations, "
+        "sources, and already-checked frames; the total; and the static scene payload (ADR-0029 D7). "
+        "The trace is the artifact -- --view-animation renders this same object.",
     )
     p_plan.add_argument(
         "--view-animation",

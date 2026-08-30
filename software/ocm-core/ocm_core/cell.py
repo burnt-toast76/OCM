@@ -1,12 +1,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Typed object model for a cell composition file (cells/<id>/cell.yaml).
 
-There is no published JSON Schema for this shape yet (ADR-0011's mount grid
-is still open, and everything hangs off it), so `validate_cell_dict` does
-structural checks rather than schema validation. `Cell.part` and `Cell.plan`
-are deliberately kept as raw dicts/lists: that's the assembly-sequence DSL
-the generator's planner interprets — typing it here would be reaching into
-the planner, which this task explicitly leaves alone.
+Validated against `spec/schema/ocm-cell-1.0.schema.json` (ADR-0026) by
+`load_cell`, the same way `load_module` validates a module. `validate_cell_dict`
+is kept for the one thing JSON Schema can't express -- duplicate instance names.
+The port shape and the ports-vs-subsystem-block split follow ADR-0026: a port is
+what a net or link can name; `identity`, `carriers`, `record_sink`, `produces`,
+and `mode_selector` are top-level subsystem blocks, not ports.
+
+`Cell.part` and `Cell.plan` are deliberately kept as raw dict/list (the schema
+leaves them open too): that's the assembly-sequence DSL the generator's planner
+interprets -- typing it here would be reaching into the planner.
 """
 
 from __future__ import annotations
@@ -112,6 +116,11 @@ class ModuleInstance:
     # values are written everywhere else in robotics tooling. Absent ->
     # every joint defaults to zero.
     joint_state: dict[str, float] = field(default_factory=dict)
+    # ADR-0023: binds this instance's capability `requires` keys to concrete
+    # signals -- requirement name -> "instance.signal". Parsed here, never
+    # resolved: whether the target instance/signal exists is a resolve-time
+    # concern (ocm-resolve), like every other cross-instance reference.
+    requires: dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ModuleInstance":
@@ -128,6 +137,7 @@ class ModuleInstance:
             },
             calibration=data.get("calibration"),
             joint_state={k: float(v) for k, v in data.get("joint_state", {}).items()},
+            requires={k: str(v) for k, v in data.get("requires", {}).items()},
         )
 
 
@@ -180,6 +190,330 @@ class CellSafety:
         )
 
 
+# ---------------------------------------------------------------------------
+# ADR-0026 connectivity: a port is what a net/link can name; the rest are
+# subsystem blocks. The cell layer inherits ADR-0015's flat port shape (no
+# nested signals, no direction, no behaviour) one scope up.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Endpoint:
+    """One end of a net or link. Names a cell `port` (+ optional `pin`), or
+    reaches into a contained module via `{instance, port, pin}` (ADR-0026 D3).
+    Nothing else -- ADR-0026 Erratum 1 removed the `sink` endpoint (a link
+    endpoint names a port; the record_sink is reached from the port via
+    `record_sink.port`, never named by a link). Which combination is valid is a
+    resolve-time concern, not enforced here.
+    """
+
+    port: str | None = None
+    instance: str | None = None
+    pin: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Endpoint":
+        return cls(port=data.get("port"), instance=data.get("instance"), pin=data.get("pin"))
+
+
+@dataclass(frozen=True)
+class Net:
+    """N unordered endpoints on a common node (ADR-0015). `active` (ADR-0026 D4)
+    is declared here, on the net -- never on a port or a pin.
+    """
+
+    id: str
+    endpoints: tuple[Endpoint, ...] = ()
+    active: str | None = None
+    pressure: float | None = None
+    pressure_units: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Net":
+        return cls(
+            id=data["id"],
+            endpoints=tuple(Endpoint.from_dict(e) for e in data.get("endpoints", [])),
+            active=data.get("active"),
+            pressure=data.get("pressure"),
+            pressure_units=data.get("pressure_units"),
+        )
+
+
+@dataclass(frozen=True)
+class Nets:
+    """Electrical, pneumatic, or safety connectivity as nets (ADR-0015/0026)."""
+
+    electrical: tuple[Net, ...] = ()
+    pneumatic: tuple[Net, ...] = ()
+    safety: tuple[Net, ...] = ()
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Nets":
+        return cls(
+            electrical=tuple(Net.from_dict(n) for n in data.get("electrical", [])),
+            pneumatic=tuple(Net.from_dict(n) for n in data.get("pneumatic", [])),
+            safety=tuple(Net.from_dict(n) for n in data.get("safety", [])),
+        )
+
+
+@dataclass(frozen=True)
+class Port:
+    """ADR-0026 D1: a cell boundary endpoint a net/link can name. Flat, like a
+    module port -- an identifier, a domain, the domain's descriptor. No signals,
+    no direction, no `domain: identification`.
+    """
+
+    id: str
+    domain: str
+    type: str | None = None
+    thread: str | None = None
+    function: str | None = None
+    protocol: str | None = None
+    role: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Port":
+        return cls(
+            id=data["id"],
+            domain=data["domain"],
+            type=data.get("type"),
+            thread=data.get("thread"),
+            function=data.get("function"),
+            protocol=data.get("protocol"),
+            role=data.get("role"),
+        )
+
+
+@dataclass(frozen=True)
+class Link:
+    """Exactly two endpoints -- a cable between two ports, or a port and the
+    record_sink (ADR-0015/0026).
+    """
+
+    id: str
+    a: Endpoint
+    b: Endpoint
+    protocol: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Link":
+        return cls(id=data["id"], a=Endpoint.from_dict(data["a"]), b=Endpoint.from_dict(data["b"]), protocol=data.get("protocol"))
+
+
+# ---------------------------------------------------------------------------
+# ADR-0026 D2 subsystem blocks: top-level siblings of `ports`, not ports.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Identity:
+    """ADR-0020 + ADR-0026 D2: reader configuration for part identity at cell
+    entry. Not a port -- nothing is netted to a reader.
+    """
+
+    reader: str
+    protocol: str | None = None
+    carrier_id_source: str | None = None
+    unit_id_source: str | None = None
+    read_at: str | None = None
+    on_mismatch: str | None = None
+    on_absent: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Identity":
+        return cls(
+            reader=data["reader"],
+            protocol=data.get("protocol"),
+            carrier_id_source=data.get("carrier_id_source"),
+            unit_id_source=data.get("unit_id_source"),
+            read_at=data.get("read_at"),
+            on_mismatch=data.get("on_mismatch"),
+            on_absent=data.get("on_absent"),
+        )
+
+
+@dataclass(frozen=True)
+class Carriers:
+    """ADR-0020: carrier fleet declaration and wear budget."""
+
+    tag: str
+    warn_at_fraction: float | None = None
+    refuse_at_fraction: float | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Carriers":
+        return cls(tag=data["tag"], warn_at_fraction=data.get("warn_at_fraction"), refuse_at_fraction=data.get("refuse_at_fraction"))
+
+
+@dataclass(frozen=True)
+class TransitOffsets:
+    """ADR-0031 D2: offsets from the located datum, millimetres, NEGATIVE
+    by construction -- both joints at zero IS the located pose, and a
+    positive value would put the carrier past the hard stop the datum is
+    machined at (schema-enforced: maximum 0)."""
+
+    travel: float
+    lift: float
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "TransitOffsets":
+        return cls(travel=data["travel"], lift=data["lift"])
+
+
+@dataclass(frozen=True)
+class CarrierInstance:
+    """ADR-0031: the cell's carrier instance -- which carrier TYPE and
+    where it enters. `located_on` names the module whose mechanical.located
+    datum roots the chain (D2/D3); `entry_mm` (optional) is where the
+    carrier enters -- a place, never a commanded travel; `transit_mm`
+    (optional, requires entry_mm) is where it currently sits, absent
+    meaning seated at the located datum. Identity and wear stay ADR-0020's
+    `carriers` block."""
+
+    instance: str
+    type: str  # id@revision of a carriers/ entry
+    located_on: str
+    entry_mm: TransitOffsets | None = None
+    transit_mm: TransitOffsets | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "CarrierInstance":
+        entry = data.get("entry_mm")
+        transit = data.get("transit_mm")
+        return cls(
+            instance=data["instance"],
+            type=data["type"],
+            located_on=data["located_on"],
+            entry_mm=TransitOffsets.from_dict(entry) if entry else None,
+            transit_mm=TransitOffsets.from_dict(transit) if transit else None,
+        )
+
+
+@dataclass(frozen=True)
+class Journal:
+    """ADR-0021: the on-cell journal within a record_sink."""
+
+    path: str
+    fsync: str | None = None
+    retention_days: int | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Journal":
+        return cls(path=data["path"], fsync=data.get("fsync"), retention_days=data.get("retention_days"))
+
+
+@dataclass(frozen=True)
+class ForwardTarget:
+    """ADR-0021: one downstream sink a record_sink forwards to."""
+
+    type: str
+    dsn_env: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ForwardTarget":
+        return cls(type=data["type"], dsn_env=data.get("dsn_env"))
+
+
+@dataclass(frozen=True)
+class RecordSink:
+    """ADR-0021: where the cell's records drain to. Declared, not wired.
+    `port` (ADR-0026 Erratum 1) names the cell port this sink drains through --
+    the subsystem block references the port; a link never names the sink.
+    """
+
+    journal: Journal
+    forward: tuple[ForwardTarget, ...] = ()
+    on_journal_unavailable: str | None = None
+    on_forward_unavailable: str | None = None
+    buffer_max_events: int | None = None
+    on_buffer_full: str | None = None
+    port: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "RecordSink":
+        return cls(
+            journal=Journal.from_dict(data["journal"]),
+            forward=tuple(ForwardTarget.from_dict(f) for f in data.get("forward", [])),
+            on_journal_unavailable=data.get("on_journal_unavailable"),
+            on_forward_unavailable=data.get("on_forward_unavailable"),
+            buffer_max_events=data.get("buffer_max_events"),
+            on_buffer_full=data.get("on_buffer_full"),
+            port=data.get("port"),
+        )
+
+
+@dataclass(frozen=True)
+class Measurement:
+    """ADR-0021: one thing the cell measures. `unit` is verbatim (ADR-0014)."""
+
+    name: str
+    source: str
+    unit: str | None = None
+    type: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Measurement":
+        return cls(name=data["name"], source=data["source"], unit=data.get("unit"), type=data.get("type"))
+
+
+@dataclass(frozen=True)
+class Verdict:
+    """ADR-0021: the cell's pass/fail verdict field."""
+
+    name: str
+    values: tuple[str, ...] = ()
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Verdict":
+        return cls(name=data["name"], values=tuple(data.get("values", [])))
+
+
+@dataclass(frozen=True)
+class RecordKeys:
+    """ADR-0021: which identity keys every record carries."""
+
+    primary: str | None = None
+    include: tuple[str, ...] = ()
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "RecordKeys":
+        return cls(primary=data.get("primary"), include=tuple(data.get("include", [])))
+
+
+@dataclass(frozen=True)
+class Produces:
+    """ADR-0021: what the cell measures and records. Derived from components."""
+
+    measurements: tuple[Measurement, ...] = ()
+    verdict: Verdict | None = None
+    record_keys: RecordKeys | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Produces":
+        verdict = data.get("verdict")
+        record_keys = data.get("record_keys")
+        return cls(
+            measurements=tuple(Measurement.from_dict(m) for m in data.get("measurements", [])),
+            verdict=Verdict.from_dict(verdict) if verdict else None,
+            record_keys=RecordKeys.from_dict(record_keys) if record_keys else None,
+        )
+
+
+@dataclass(frozen=True)
+class ModeSelector:
+    """ADR-0024 + ADR-0026 D2: the AUTO/MANUAL/EDIT keyswitch. Declares intent;
+    does not certify the mode (spec/06).
+    """
+
+    component: str
+    positions: tuple[str, ...] = ()
+    manual_mode_safety: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ModeSelector":
+        return cls(component=data["component"], positions=tuple(data.get("positions", [])), manual_mode_safety=data.get("manual_mode_safety"))
+
+
 @dataclass(frozen=True)
 class Cell:
     """The instance layer: which modules, where, wired how."""
@@ -189,11 +523,25 @@ class Cell:
     license: str
     base: Base
     modules: tuple[ModuleInstance, ...]
+    kind: str = "cell"
     name: str | None = None
     controller: Controller | None = None
     safety: CellSafety | None = None
     part: dict[str, Any] | None = None
     plan: list[Any] = field(default_factory=list)
+    # ADR-0026: connectivity (a port is what a net/link can name) ...
+    ports: tuple[Port, ...] = ()
+    nets: Nets | None = None
+    links: tuple[Link, ...] = ()
+    # ... and the subsystem blocks that are NOT ports.
+    identity: Identity | None = None
+    carriers: Carriers | None = None
+    # ADR-0031: the geometric carrier instance -- a different question about
+    # the same object as `carriers` (identity/wear) above.
+    carrier: CarrierInstance | None = None
+    record_sink: RecordSink | None = None
+    produces: Produces | None = None
+    mode_selector: ModeSelector | None = None
 
     def module(self, instance: str) -> ModuleInstance:
         for m in self.modules:
@@ -205,10 +553,18 @@ class Cell:
     def from_dict(cls, data: dict[str, Any]) -> "Cell":
         controller = data.get("controller")
         safety = data.get("safety")
+        nets = data.get("nets")
+        identity = data.get("identity")
+        carriers = data.get("carriers")
+        carrier = data.get("carrier")
+        record_sink = data.get("record_sink")
+        produces = data.get("produces")
+        mode_selector = data.get("mode_selector")
         return cls(
             ocm_version=data["ocm_version"],
             id=data["id"],
             license=data["license"],
+            kind=data.get("kind", "cell"),
             name=data.get("name"),
             base=Base.from_dict(data["base"]),
             modules=tuple(ModuleInstance.from_dict(m) for m in data.get("modules", [])),
@@ -216,6 +572,15 @@ class Cell:
             safety=CellSafety.from_dict(safety) if safety else None,
             part=data.get("part"),
             plan=data.get("plan", []),
+            ports=tuple(Port.from_dict(p) for p in data.get("ports", [])),
+            nets=Nets.from_dict(nets) if nets else None,
+            links=tuple(Link.from_dict(link) for link in data.get("links", [])),
+            identity=Identity.from_dict(identity) if identity else None,
+            carriers=Carriers.from_dict(carriers) if carriers else None,
+            carrier=CarrierInstance.from_dict(carrier) if carrier else None,
+            record_sink=RecordSink.from_dict(record_sink) if record_sink else None,
+            produces=Produces.from_dict(produces) if produces else None,
+            mode_selector=ModeSelector.from_dict(mode_selector) if mode_selector else None,
         )
 
 

@@ -82,8 +82,13 @@ def test_sd50_capability_bounds_are_hard_limits(sd50_path):
     assert (torque.min, torque.max) == (0.20, 5.00)
     assert drive.motion.hold_still is True
     assert drive.motion.approach_vec == (0, 0, 1)
-    assert drive.preconditions == ("screw_present == true",)
+    # ADR-0023: drive_screw gates on a cell-bound requirement (workpiece_secured)
+    # alongside its own local screw_present.
+    assert drive.preconditions == ("screw_present == true", "workpiece_secured == true")
     assert drive.postconditions == ("screw_present == false", "result_ok == true")
+    assert drive.timeout_s == 6.0
+    assert drive.on_timeout == "abort"
+    assert "workpiece_secured" in drive.requires
 
 
 def test_sd50_signals_carry_packml_roles(sd50_path):

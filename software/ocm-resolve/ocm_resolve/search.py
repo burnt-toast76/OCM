@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Sequence, Union
 
-from ocm_core import Component, Module, ModuleRef, load_component, load_module
+from ocm_core import Carrier, Component, Module, ModuleRef, load_carrier, load_component, load_module
 from ocm_core.errors import ManifestValidationError
 from ocm_core.module import ComponentRef
 
@@ -99,4 +99,43 @@ def find_component(ref: ComponentRef, search_path: SearchPath) -> tuple[Componen
 
     tried_str = ", ".join(str(p) for p in tried)
     errors.append(f"{ref}: component not found (looked in: {tried_str})")
+    return None, errors
+
+
+def find_carrier(ref: ModuleRef, search_path: SearchPath) -> tuple[Carrier | None, list[str]]:
+    """Look up `ref` under each root of `search_path` -- ADR-0031's
+    `carriers/<id>/carrier.yaml` layout, mirroring find_module exactly.
+
+    Returns (carrier, errors): `carrier` is None if it could not be
+    resolved, in which case `errors` explains why (not found anywhere it
+    was looked for, found but schema-invalid, or found but declaring a
+    different id/revision than requested).
+    """
+    errors: list[str] = []
+    roots = _as_roots(search_path)
+    tried: list[Path] = []
+
+    for root in roots:
+        candidate = root / ref.id / "carrier.yaml"
+        tried.append(candidate)
+        if not candidate.is_file():
+            continue
+
+        try:
+            carrier = load_carrier(candidate)
+        except ManifestValidationError as e:
+            errors.append(f"{ref}: found {candidate} but it failed carrier validation: {e}")
+            return None, errors
+
+        if carrier.id != ref.id or carrier.revision != ref.revision:
+            errors.append(
+                f"{ref}: found {candidate} but it declares "
+                f"{carrier.id}@{carrier.revision}, not {ref}"
+            )
+            return None, errors
+
+        return carrier, errors
+
+    tried_str = ", ".join(str(p) for p in tried)
+    errors.append(f"{ref}: carrier not found (looked in: {tried_str})")
     return None, errors

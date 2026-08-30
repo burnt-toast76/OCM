@@ -1,0 +1,727 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencellmodule.org/schema/ocm-cell-1.0.schema.json",
+  "title": "OCM Cell Composition v1.0",
+  "description": "The instance layer (ADR-0017): which modules, placed where, wired how, and what the cell reads/records/produces. Authored via ocm-api (ADR-0012); consumed by ocm-resolve, the generator, and the coordinator. Port shape and the ports-vs-subsystem-block split follow ADR-0026.",
+  "type": "object",
+  "required": [
+    "ocm_version",
+    "id",
+    "kind",
+    "license",
+    "base",
+    "modules"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "ocm_version": {
+      "enum": [
+        "1.0"
+      ],
+      "description": "Spec version this cell is written against. cell.py accepts only '1.0' today."
+    },
+    "kind": {
+      "const": "cell"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9_-]+)+$",
+      "description": "Reverse-DNS unique identifier for the cell.",
+      "examples": [
+        "com.accelsolutions.cell.bracket-asm-01"
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX identifier."
+    },
+    "base": {
+      "type": "object",
+      "required": [
+        "module",
+        "datum",
+        "grid"
+      ],
+      "additionalProperties": false,
+      "description": "The base module the cell is built on, plus the datum frame and bolt grid everything places against.",
+      "properties": {
+        "module": {
+          "$ref": "#/$defs/module_ref"
+        },
+        "datum": {
+          "type": "string"
+        },
+        "grid": {
+          "type": "string"
+        }
+      }
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The placed module instances.",
+      "items": {
+        "$ref": "#/$defs/module_instance"
+      }
+    },
+    "controller": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Which runtime/target/fieldbus the generated coordinator is emitted for.",
+      "properties": {
+        "runtime": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "fieldbus": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "string"
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "NOT a risk assessment. Hardwired and separately certified; the generator only refuses a build whose declared safety hardware doesn't meet it. `verified_by` is a human signature -- the API refuses to write it (spec/06, OCM_HUMAN_SIGNATURE_REQUIRED).",
+      "properties": {
+        "circuit": {
+          "type": "string"
+        },
+        "relay": {
+          "type": "string"
+        },
+        "performance_level": {
+          "type": "string"
+        },
+        "verified_by": {
+          "type": "string"
+        }
+      }
+    },
+    "part": {
+      "type": "object",
+      "description": "The physical part and its named features (e.g. part.features.hole_1) -- the assembly-sequence DSL the planner interprets. Kept opaque here (additionalProperties: true) on purpose: typing it would reach into the planner (cell.py leaves it a raw dict).",
+      "additionalProperties": true
+    },
+    "plan": {
+      "type": "array",
+      "description": "The assembly plan -- verbs only (ADR-0023 D1). Kept opaque here (items: true) for the same reason as `part`: the planner owns its shape, not this schema.",
+      "items": true
+    },
+    "ports": {
+      "type": "array",
+      "description": "ADR-0026 D1: a cell's external boundary, one entry per connection a net or link can name. Same flat shape as a module port (ADR-0015) -- an identifier, a domain, the domain's descriptor. NO nested signals, NO direction, NO behaviour, and NO `domain: identification` (ADR-0026 D2/D3/D4).",
+      "items": {
+        "$ref": "#/$defs/port"
+      }
+    },
+    "nets": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ADR-0015/0026: electrical, pneumatic, or safety connectivity as NETS -- N unordered endpoints on a common node. Optional; a cell declaring none stays valid (a single-cell install has no interconnect), mirroring the module layer.",
+      "properties": {
+        "electrical": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/net"
+          }
+        },
+        "pneumatic": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/net"
+          }
+        },
+        "safety": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/net"
+          }
+        }
+      }
+    },
+    "links": {
+      "type": "array",
+      "description": "ADR-0015/0026 (Erratum 1): communication connectivity as LINKS -- exactly two endpoints, each naming a port. Optional. The record_sink is NOT a valid endpoint; it is reached from the traceability port via record_sink.port, not named by a link.",
+      "items": {
+        "$ref": "#/$defs/link"
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reader"
+      ],
+      "description": "ADR-0020 + ADR-0026 D2: reader configuration for part identity at cell entry. A top-level subsystem block, NOT a port -- nothing is netted to a reader; it reads a tag that arrives on a carrier.",
+      "properties": {
+        "reader": {
+          "type": "string",
+          "description": "Resolvable component ref for the reader head."
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "carrier_id_source": {
+          "type": "string"
+        },
+        "unit_id_source": {
+          "type": "string"
+        },
+        "read_at": {
+          "type": "string",
+          "enum": [
+            "entry"
+          ]
+        },
+        "on_mismatch": {
+          "type": "string",
+          "enum": [
+            "refuse",
+            "degrade"
+          ]
+        },
+        "on_absent": {
+          "type": "string",
+          "enum": [
+            "refuse",
+            "degrade"
+          ]
+        }
+      }
+    },
+    "carriers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tag"
+      ],
+      "description": "ADR-0020: carrier fleet declaration and wear budget. Not a boundary object -- a fleet fact.",
+      "properties": {
+        "tag": {
+          "type": "string",
+          "description": "Resolvable component ref for the carrier tag (ADR-0014)."
+        },
+        "warn_at_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "refuse_at_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "carrier": {
+      "type": "object",
+      "description": "ADR-0031: the cell's carrier instance -- which carrier TYPE (a carriers/ entry) and where it enters. The carrier's kinematic chain is rooted at the LOCATED datum the `located_on` module declares (mechanical.located, D3), never at the mechanism that brings it there: both transit joints at zero IS the located pose, transit is negative offset, and the part datum derives from machined geometry and nothing else (D2). Identity and wear stay ADR-0020's `carriers` block -- a different question about the same object.",
+      "required": [
+        "instance",
+        "type",
+        "located_on"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "instance": {
+          "type": "string",
+          "description": "This cell's own name for the carrier instance (like a module instance name)."
+        },
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(\\.[a-z0-9_-]+)+@\\d+\\.\\d+\\.\\d+$",
+          "description": "id@revision of a carriers/ entry (ocm-carrier-1.0.schema.json)."
+        },
+        "located_on": {
+          "type": "string",
+          "description": "The module instance whose mechanical.located datum roots this carrier's chain (D2/D3). The module must declare `located`; a cell naming one that does not refuses at resolve."
+        },
+        "entry_mm": {
+          "type": "object",
+          "description": "Where the carrier ENTERS the cell -- the far end of the transit chain, as negative offsets from the located datum (D2: 'travel: -400 mm at the entry opening, lift: -12 mm riding the belt'). Declaring it is what makes the transit joints' range a stated fact rather than a fabrication: the chain's prismatic joints carry limit [entry, 0], where 0 is the hard stop the datum is machined at. OPTIONAL: a cell that never models transit omits it, and the carrier is composed seated (welded) at the located datum. Nothing anywhere declares a COMMANDED travel -- entry is a place, not a target.",
+          "required": [
+            "travel",
+            "lift"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "travel": {
+              "type": "number",
+              "maximum": 0
+            },
+            "lift": {
+              "type": "number",
+              "maximum": 0
+            }
+          }
+        },
+        "transit_mm": {
+          "type": "object",
+          "description": "The carrier's CURRENT offsets from the located datum, if it is mid-transit -- requires entry_mm (the range the values must sit in). OPTIONAL: absent means seated at the located datum, both joints at zero, which is the state the cell's work happens in.",
+          "required": [
+            "travel",
+            "lift"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "travel": {
+              "type": "number",
+              "maximum": 0
+            },
+            "lift": {
+              "type": "number",
+              "maximum": 0
+            }
+          }
+        }
+      }
+    },
+    "record_sink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journal"
+      ],
+      "description": "ADR-0021: where the cell's records drain to. Declared, not wired.",
+      "properties": {
+        "journal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "fsync": {
+              "type": "string",
+              "enum": [
+                "per_event",
+                "periodic",
+                "none"
+              ]
+            },
+            "retention_days": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "forward": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "dsn_env": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "on_journal_unavailable": {
+          "type": "string",
+          "enum": [
+            "refuse"
+          ]
+        },
+        "on_forward_unavailable": {
+          "type": "string",
+          "enum": [
+            "buffer",
+            "refuse"
+          ]
+        },
+        "buffer_max_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "on_buffer_full": {
+          "type": "string",
+          "enum": [
+            "refuse"
+          ]
+        },
+        "port": {
+          "type": "string",
+          "description": "ADR-0026 Erratum 1: the cell ports[].id this sink drains through (e.g. the traceability communication port). The subsystem block references the port -- a link never names the sink."
+        }
+      }
+    },
+    "produces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurements"
+      ],
+      "description": "ADR-0021: what the cell measures and records. Derived from components, not wired.",
+      "properties": {
+        "measurements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "source"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string",
+                "description": "Verbatim unit as the source prints it (ADR-0014 -- never converted, never enum-constrained). Whether `source` can actually produce it is a resolve-time check (OCM_MEASUREMENT_SOURCE_INVALID), not schema."
+              },
+              "source": {
+                "type": "string",
+                "description": "Resolvable `instance.component`-style ref that produces this measurement."
+              },
+              "type": {
+                "type": "string",
+                "description": "e.g. 'series' for a curve; absent means a scalar."
+              }
+            }
+          }
+        },
+        "verdict": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "values"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "values": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "record_keys": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "primary": {
+              "type": "string"
+            },
+            "include": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "mode_selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component",
+        "positions"
+      ],
+      "description": "ADR-0024 + ADR-0026 D2: the AUTO/MANUAL/EDIT keyswitch. Wired to this cell's own safety circuit, not across a boundary, so it is a subsystem block, not a port. Declares intent; does not certify the mode (spec/06).",
+      "properties": {
+        "component": {
+          "type": "string",
+          "description": "Resolvable component ref for the keyswitch."
+        },
+        "positions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual",
+              "edit"
+            ]
+          }
+        },
+        "manual_mode_safety": {
+          "type": "string",
+          "description": "e.g. 'hardwired' -- declared, not implemented (spec/06)."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "module_ref": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9_-]+)+@\\d+\\.\\d+\\.\\d+$",
+      "description": "A module manifest reference, 'id@x.y.z' (ADR-0017)."
+    },
+    "instance_pose": {
+      "type": "object",
+      "required": [
+        "xyz_mm"
+      ],
+      "additionalProperties": false,
+      "description": "An instance's pose relative to the cell's base datum.",
+      "properties": {
+        "xyz_mm": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "rpy_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "default": [
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "consumable": {
+      "type": "object",
+      "required": [
+        "part"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "part": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    },
+    "module_instance": {
+      "type": "object",
+      "required": [
+        "instance",
+        "module"
+      ],
+      "additionalProperties": false,
+      "description": "One placed module. `address` is intentionally open (additionalProperties: true) -- its shape varies by protocol, matching InstanceAddress.raw in cell.py.",
+      "properties": {
+        "instance": {
+          "type": "string",
+          "description": "Unique instance name within the cell."
+        },
+        "module": {
+          "$ref": "#/$defs/module_ref"
+        },
+        "mount": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Where the instance sits: a grid station + pose, or `on` another instance's flange.",
+          "properties": {
+            "station": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "pose": {
+              "$ref": "#/$defs/instance_pose"
+            },
+            "on": {
+              "type": "string"
+            }
+          }
+        },
+        "address": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Fieldbus/network address; known keys lifted, the rest kept verbatim (cell.py InstanceAddress.raw). Open by design.",
+          "properties": {
+            "ip": {
+              "type": "string"
+            },
+            "ethercat_position": {
+              "type": "integer"
+            }
+          }
+        },
+        "tool": {
+          "type": "string",
+          "description": "spec/02: which end effector instance is mounted."
+        },
+        "consumables": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/consumable"
+          }
+        },
+        "calibration": {
+          "type": "string"
+        },
+        "joint_state": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Named joint -> radians, applied when composing the scene."
+        },
+        "requires": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "ADR-0023: binds this instance's capability `requires` keys to concrete 'instance.signal' targets. Whether the target exists is a resolve-time concern."
+        }
+      }
+    },
+    "port": {
+      "type": "object",
+      "required": [
+        "id",
+        "domain"
+      ],
+      "additionalProperties": false,
+      "description": "ADR-0026 D1: a cell boundary endpoint a net/link can name. No signals, no direction, no behaviour.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string",
+          "enum": [
+            "electrical",
+            "pneumatic",
+            "communication",
+            "safety"
+          ],
+          "description": "ADR-0026 D2: NO 'identification' -- identity is a top-level block, not a port."
+        },
+        "type": {
+          "type": "string",
+          "description": "Electrical/handoff connector type, e.g. 'smema-14'."
+        },
+        "thread": {
+          "type": "string",
+          "description": "Pneumatic thread, e.g. 'G1/8'."
+        },
+        "function": {
+          "type": "string",
+          "enum": [
+            "supply",
+            "exhaust",
+            "work"
+          ]
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Communication protocol, e.g. 'opc-ua'."
+        },
+        "role": {
+          "type": "string",
+          "description": "Boundary role as the design labels it, e.g. 'smema-downstream', 'smema-upstream', 'fsoe-slave'. Open vocabulary -- cell roles are domain-specific and broader than the module comms enum."
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "ADR-0015/0026 (Erratum 1): one end of a net or link. Names a cell `port` (+ optional `pin`), or reaches into a contained module via `{instance, port, pin}` (ADR-0026 D3, reference-downward). Nothing else -- a link endpoint naming a non-port is rejected structurally (OCM_LINK_ENDPOINT_NOT_A_PORT, surfacing as OCM_SCHEMA_INVALID). Exactly-one-primary-reference and downward resolution are resolve-time concerns.",
+      "properties": {
+        "port": {
+          "type": "string",
+          "description": "A cell ports[].id."
+        },
+        "instance": {
+          "type": "string",
+          "description": "A modules[].instance, when reaching into that module's own port."
+        },
+        "pin": {
+          "type": "string",
+          "description": "A pin on the named port -- resolves downward to a module port (ADR-0026 D3); the cell cannot create a pin."
+        }
+      }
+    },
+    "net": {
+      "type": "object",
+      "required": [
+        "id",
+        "endpoints"
+      ],
+      "additionalProperties": false,
+      "description": "ADR-0015: N unordered endpoints on a common node. `active` (ADR-0026 D4) is a design choice declared HERE, on the net -- never on a port or a pin.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "active": {
+          "type": "string",
+          "enum": [
+            "high",
+            "low"
+          ],
+          "description": "ADR-0026 D4: active state, declared on the net."
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/endpoint"
+          }
+        },
+        "pressure": {
+          "type": "number"
+        },
+        "pressure_units": {
+          "type": "string",
+          "description": "Verbatim, e.g. 'bar' -- never convert."
+        }
+      }
+    },
+    "link": {
+      "type": "object",
+      "required": [
+        "id",
+        "a",
+        "b"
+      ],
+      "additionalProperties": false,
+      "description": "ADR-0015: exactly two endpoints (a cable between two ports, or a port and the record_sink).",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "a": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "b": {
+          "$ref": "#/$defs/endpoint"
+        }
+      }
+    }
+  }
+}

@@ -50,7 +50,7 @@ test("dragging the feeder out of bounds shows the engine's own overhang refusal"
   await page.mouse.move(start!.x + 900, start!.y, { steps: 10 });
   await page.mouse.up();
 
-  const toast = page.locator(".toast", { hasText: "WORKSPACE_OVERHANG" });
+  const toast = page.locator(".toast", { hasText: "OCM_WORKSPACE_OVERHANG" });
   await expect(toast).toBeVisible({ timeout: 10_000 });
 
   const toastText = await toast.innerText();
@@ -62,7 +62,7 @@ test("dragging the feeder out of bounds shows the engine's own overhang refusal"
   expect(toastText).toMatch(/by \d+(\.\d+)? mm/);
 
   // The issues panel agrees -- same refusal, same verbatim hint.
-  const issue = page.locator(".issues-panel__item", { hasText: "WORKSPACE_OVERHANG" });
+  const issue = page.locator(".issues-panel__item", { hasText: "OCM_WORKSPACE_OVERHANG" });
   await expect(issue).toBeVisible();
   await expect(issue).toContainText("Move feed1 inside the base footprint");
 });

@@ -8,12 +8,12 @@ containment check (ocm_generator.scene.containment) -- two different
 consumers computing where things physically are should never be two
 different pieces of FK math that can quietly drift apart.
 
-Revolute/continuous joints rotate about their <axis> by the value given in
-an (optional) joint_state map (namespaced joint name -> radians); anything
-absent from that map -- and every prismatic joint, and every fixed joint --
-is evaluated at zero/its bare <origin>. That is a deliberate simplification
-for a static snapshot (a debug view, a one-off containment check), not a
-live simulator.
+Revolute/continuous joints rotate about their <axis>, and prismatic joints
+translate along it, by the value given in an (optional) joint_state map
+(namespaced joint name -> radians for the rotary types, metres for
+prismatic); any joint absent from that map -- and every fixed joint -- is
+evaluated at zero/its bare <origin>. That is a static snapshot (a debug
+view, a one-off containment check), not a live simulator.
 """
 
 from __future__ import annotations

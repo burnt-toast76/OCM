@@ -44,7 +44,7 @@ MAX_TOOL_TURNS = 8  # a hard ceiling -- a misbehaving loop reports itself instea
 # creative writing, not schema-constrained JSON tool calls. Label text is
 # for the Components page's own picker; id is the literal string sent to
 # the Anthropic API, validated against this same dict before every call
-# (Codes.INVALID_ARGUMENT, not a raw 400 from the API, for a typo'd or
+# (Codes.OCM_INVALID_ARGUMENT, not a raw 400 from the API, for a typo'd or
 # retired model id -- the same "surface it, don't swallow it" lesson the
 # earlier stream_turn/parsed_output fixes exist for).
 ALLOWED_MODELS: dict[str, str] = {
@@ -147,7 +147,7 @@ def build_system_prompt(component_id: str | None) -> str:
         f"\n\nA draft for `{component_id}` already exists -- the Components page always creates it "
         "(via its own \"New draft\" action) before you are ever asked to transcribe into it. Use "
         "update_component to write into it. Do NOT call create_component_draft for this id: it "
-        "already exists, so that call will only be refused as ALREADY_EXISTS."
+        "already exists, so that call will only be refused as OCM_ALREADY_EXISTS."
         if component_id
         else ""
     )
@@ -183,7 +183,7 @@ def _call_tool(api: OcmApi, name: str, arguments: dict[str, Any]) -> dict[str, A
         # check, not a real branch this code expects to take.
         return {
             "ok": False,
-            "refusals": [{"code": Codes.INVALID_ARGUMENT, "path": "$", "message": f"unknown tool {name!r}", "allowed": None, "hint": None}],
+            "refusals": [{"code": Codes.OCM_INVALID_ARGUMENT, "path": "$", "message": f"unknown tool {name!r}", "allowed": None, "hint": None}],
             "warnings": [],
             "data": None,
         }
@@ -213,14 +213,14 @@ def _envelope_event(event: str, code: str, message: str, hint: str | None = None
 
 def agent_unavailable_stream(reason: str) -> Iterable[str]:
     yield _envelope_event(
-        "error", Codes.AGENT_UNAVAILABLE, reason, hint="Set ANTHROPIC_API_KEY in the ocm-api server's environment and restart it."
+        "error", Codes.OCM_AGENT_UNAVAILABLE, reason, hint="Set ANTHROPIC_API_KEY in the ocm-api server's environment and restart it."
     )
 
 
 def invalid_model_stream(model: str) -> Iterable[str]:
     yield _envelope_event(
         "error",
-        Codes.INVALID_ARGUMENT,
+        Codes.OCM_INVALID_ARGUMENT,
         f"{model!r} is not one of this agent's allowed models",
         hint="Choose one of the models GET /agent/models returns.",
         allowed={"values": list(ALLOWED_MODELS)},
@@ -336,7 +336,7 @@ def run_agent_chat(
         except Exception as e:  # noqa: BLE001 -- deliberately broad, see docstring
             yield _envelope_event(
                 "error",
-                Codes.INVALID_ARGUMENT,
+                Codes.OCM_INVALID_ARGUMENT,
                 f"the agent's call to the model failed: {e}",
                 hint="Try again, or check the ocm-api server's own logs for the underlying error.",
             )
@@ -347,7 +347,7 @@ def run_agent_chat(
         if stop_reason == "refusal":
             yield _envelope_event(
                 "error",
-                Codes.INVALID_ARGUMENT,
+                Codes.OCM_INVALID_ARGUMENT,
                 "the model declined to continue this turn (Anthropic reported stop_reason: refusal)",
                 hint="Try rephrasing the request, narrowing it, or filling in the remaining fields yourself.",
             )
@@ -377,7 +377,7 @@ def run_agent_chat(
 
     yield _envelope_event(
         "error",
-        Codes.INVALID_ARGUMENT,
+        Codes.OCM_INVALID_ARGUMENT,
         f"the agent used {MAX_TOOL_TURNS} tool-call turns without finishing",
         hint="Ask a narrower question, or continue in a new message.",
     )

@@ -233,7 +233,7 @@ a correctly transcribed `G1/8` supply port, and is refused with *"its pinout is 
 That message is false for that component, and a purely pneumatic fitting would hit the same
 thing. A component declaring only pneumatic ports declares connectors.
 
-**Correction D — the refusal message must fit the domain.** `COMPONENT_HAS_NO_CONNECTORS`
+**Correction D — the refusal message must fit the domain.** `OCM_COMPONENT_HAS_NO_CONNECTORS`
 should not say "pinout" on a pneumatic net. Name what is actually absent for the domain the
 endpoint sits in.
 

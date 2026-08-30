@@ -1,39 +1,27 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Embed a planned FasteningPlan's motion into the same self-contained
-HTML viewer `ocm_generator.scene.viewer` builds statically, and animate it
--- `ocm plan --view-animation`.
+"""Render a TRACE (ADR-0029 D7 -- `.emitters.trace.build_trace`'s output,
+in memory or read back from the JSON `ocm plan --emit-trace` wrote) as
+the same self-contained HTML viewer `ocm_generator.scene.viewer` builds
+statically, animated -- `ocm plan --view-animation`.
 
-## Reuse the collision-check states -- never recompute or re-derive motion
+This module is a CONSUMER of the trace, not a second producer: it never
+touches the planner, never re-interpolates a path, never re-derives
+sequencing. Every frame it draws is a joint-state dict the timeline
+already collision-checked (D6's invariant: one grade of frame), run
+through the same forward kinematics (`.scene.kinematics.
+compute_world_poses`) the static viewer and the workspace containment
+check use, to get link poses to draw.
 
-Every animation frame is a joint-angle state `ocm_generator.planner.path.
-check_joint_segment` already interpolated and ran through a real discrete
-collision check for THIS plan (`PathSegment.frames` -- see that module's
-own docstring). This module never re-interpolates a path of its own; it
-only runs each ALREADY-CHECKED state through the same forward kinematics
-(`.scene.kinematics.compute_world_poses`) the static viewer and the
-workspace containment check use, to get link poses to draw. An animation
-frame is therefore always a state that has already been proven
-collision-free -- not a separately-interpolated, unchecked one.
+## Rows
 
-## Segments and dwells
-
-`DATA.animation` is a flat, ordered list matching `ocm_generator.planner.
-cycle_time.CycleTimeReport.rows` one-for-one -- literally the same rows
-the printed cycle-time table shows, so a segment's caption and duration in
-the viewer are the exact numbers in that table, not a separately-computed
-estimate. Two kinds:
-
-- **motion** rows (`source == "ESTIMATE"`) carry every frame from the
-  matching `PathSegment.frames` -- real per-frame motion, reused wholesale.
-- **dwell** rows (`source in {"overlapped", "nominal_duration_s"}`) --
-  drive_screw actually driving, or a wait at standoff for load_screw's own
-  precondition -- carry exactly ONE held frame, looked up via
-  `CycleTimeRow.held_at_segment` (the matching PathSegment's own LAST
-  frame -- e.g. drive_screw's held pose is the approach segment's last
-  frame, i.e. contact). The pause is real and visible: this is where
-  spec/08's handshake actually lives (a standoff sync withholding
-  hs_done_step, a contact sync running drive_screw's own PackML cycle) --
-  see spec/08-robot-handshake.md.
+`DATA.animation` is a flat, ordered list matching the trace's rows
+one-for-one -- literally the same rows the printed cycle-time table
+shows, so a segment's caption and duration in the viewer are the exact
+numbers in that table. Motion and actuation rows carry their full checked
+sweep; a dwell carries exactly ONE frame -- its predecessor's final state
+(so a dwell after `clamp` shows the jaws closed, never a frame captured
+before they moved). The pause is real and visible: this is where
+spec/08's handshake actually lives -- see spec/08-robot-handshake.md.
 
 No smoothing, no retiming: playback is linear between whatever frames were
 actually checked, at a constant per-frame timestep within each motion
@@ -42,12 +30,14 @@ timing arrives with Ruckig later (ADR-0007).
 
 ## Dynamic vs static geometry
 
-"The robot and everything mounted on it" (transitively -- sd1 rides
-robot1's flange) gets a NEW world pose every frame; everything else
-(base, feed1, nest1, cam1, ...) is emitted once, exactly as the plain
-`--view` output already does (`.scene.viewer.scene_to_payload`, reused
-directly and filtered) -- a static module's mesh is built once in JS and
-never touched again during playback.
+Dynamic is derived from the FRAMES THEMSELVES, not from mount topology:
+a joint whose value varies anywhere across the trace makes every link
+downstream of it move, and every instance owning such a link is dynamic
+-- the robot and whatever rides its flange, but equally a nest whose jaw
+an actuation row sweeps. Everything else is emitted once, exactly as the
+plain `--view` output already does (the trace embeds `scene_to_payload`'s
+own output, reused directly and filtered) -- a static module's mesh is
+built once in JS and never touched again during playback.
 
 ## Vendored three.js -- no CDN
 
@@ -69,65 +59,93 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from ocm_resolve import ResolvedCell
-
 from ocm_generator.errors import OcmGeneratorError
-from ocm_generator.planner import CycleTimeReport, FasteningPlan, UR_JOINT_ORDER
-from ocm_generator.scene.build import WORLD_LINK, Scene
+from ocm_generator.scene.build import WORLD_LINK
 from ocm_generator.scene.kinematics import compute_world_poses, list_collision_primitives
 from ocm_generator.scene.transforms import Pose
-from ocm_generator.scene.viewer import _instance_kinds, _instance_of, scene_to_payload
 
 _VENDOR_DIR = Path(__file__).resolve().parent.parent / "scene" / "vendor" / "three"
 
 
 class AnimationError(OcmGeneratorError):
-    """The cycle-time report and the plan's own segments disagree about
-    what exists -- an internal-consistency bug (both are built from the
-    same FasteningPlan in the same call), not a user-facing refusal.
+    """The trace is internally inconsistent (e.g. a row with no frames) --
+    a producer bug, not a user-facing refusal: `.planner.timeline` gives
+    every row at least one checked frame by construction.
     """
 
 
-def _dynamic_instances(scene: Scene, robot_instance: str) -> set[str]:
-    """`robot_instance` plus every instance mounted on it, transitively
-    (sd1 on robot1's flange; a future tool mounted ON sd1 would count too)
-    -- everything that needs a fresh world pose per animation frame.
+def _varying_joints(trace: dict[str, Any]) -> set[str]:
+    """Every joint whose value differs anywhere across the trace's frames
+    (or from the authored base state) -- the trace's own answer to "what
+    moves?", replacing any assumption about mount topology: a robot moves,
+    but so does a nest jaw an actuation row sweeps.
     """
-    dynamic = {robot_instance}
-    changed = True
-    while changed:
-        changed = False
-        for name, inst in scene.instances.items():
-            if name in dynamic:
-                continue
-            parent_instance = "base" if inst.parent_link == WORLD_LINK else _instance_of(inst.parent_link, scene)
-            if parent_instance in dynamic:
-                dynamic.add(name)
-                changed = True
-    return dynamic
+    base = trace["base_joint_state"]
+    reference: dict[str, float] = {}
+    varying: set[str] = set()
+    for row in trace["rows"]:
+        for frame in row["frames"]:
+            for name, value in frame.items():
+                first = reference.setdefault(name, base.get(name, value))
+                if value != first:
+                    varying.add(name)
+    return varying
 
 
-def _dynamic_link_names(scene: Scene, dynamic_instances: set[str]) -> set[str]:
-    names: set[str] = set()
-    for name in dynamic_instances:
-        names |= scene.base.link_names if name == "base" else scene.instance(name).link_names
-    return names
+def _dynamic_instances(root: ET.Element, trace: dict[str, Any]) -> set[str]:
+    """Every instance owning a link DOWNSTREAM of a varying joint. The
+    joints come from the frames themselves (`_varying_joints`); the walk
+    down the URDF tree is what carries "robot1's wrist moves" into "sd1
+    (bolted to the flange) needs a fresh pose every frame" -- and "nest1's
+    jaw sweeps" into nest1 being dynamic -- without consulting mount
+    topology at all.
+    """
+    joints_by_parent: dict[str, list[ET.Element]] = {}
+    for joint in root.findall("joint"):
+        parent = joint.find("parent")
+        if parent is not None and parent.get("link"):
+            joints_by_parent.setdefault(parent.get("link"), []).append(joint)
+
+    varying = _varying_joints(trace)
+    stack: list[str | None] = [
+        joint.find("child").get("link")
+        for joint in root.findall("joint")
+        if joint.get("name") in varying and joint.find("child") is not None
+    ]
+    dynamic_links: set[str] = set()
+    while stack:
+        link = stack.pop()
+        if not link or link in dynamic_links:
+            continue
+        dynamic_links.add(link)
+        for joint in joints_by_parent.get(link, []):
+            child = joint.find("child")
+            if child is not None:
+                stack.append(child.get("link"))
+
+    links_to_instance = trace["links"]
+    return {links_to_instance[link] for link in dynamic_links if link in links_to_instance}
 
 
-def _dynamic_primitive_specs(root: ET.Element, dynamic_link_names: set[str], scene: Scene, resolved: ResolvedCell) -> list[dict[str, Any]]:
+def _dynamic_link_names(trace: dict[str, Any], dynamic_instances: set[str]) -> set[str]:
+    return {link for link, instance in trace["links"].items() if instance in dynamic_instances}
+
+
+def _dynamic_primitive_specs(root: ET.Element, dynamic_link_names: set[str], trace: dict[str, Any]) -> list[dict[str, Any]]:
     """Static metadata only (kind/dims/instance/instance_kind/link/
     placeholder) for every dynamic-instance collision primitive, in URDF
     document order -- that order is authoritative: every animation frame's
     per-primitive transform list (`_frame_transforms`) is built by the
     exact same walk, so the two stay index-aligned by construction.
     """
-    instance_kinds = _instance_kinds(resolved)
+    instance_kinds = trace["instance_kinds"]
+    links_to_instance = trace["links"]
     specs: list[dict[str, Any]] = []
     for link in root.findall("link"):
         name = link.get("name")
         if not name or name not in dynamic_link_names:
             continue
-        instance = _instance_of(name, scene)
+        instance = links_to_instance.get(name, "?")
         for prim in list_collision_primitives(link, Pose.identity()):
             specs.append(
                 {
@@ -142,16 +160,13 @@ def _dynamic_primitive_specs(root: ET.Element, dynamic_link_names: set[str], sce
     return specs
 
 
-def _frame_transforms(
-    root: ET.Element, base_joint_state: dict[str, float], robot_instance: str, joints: tuple[float, ...], dynamic_link_names: set[str]
-) -> list[dict[str, Any]]:
+def _frame_transforms(root: ET.Element, frame: dict[str, float], dynamic_link_names: set[str]) -> list[dict[str, Any]]:
     """Every dynamic primitive's {position, quaternion} for one already-
-    checked joint state `joints` -- the same document-order walk
+    checked frame -- which IS a full namespaced joint-state dict (ADR-0029
+    D2), fed straight to forward kinematics. The same document-order walk
     `_dynamic_primitive_specs` used, so index `i` here is index `i` there.
     """
-    joint_state = dict(base_joint_state)
-    joint_state.update(zip((f"{robot_instance}__{j}" for j in UR_JOINT_ORDER), joints))
-    world_poses = compute_world_poses(root, joint_state, WORLD_LINK)
+    world_poses = compute_world_poses(root, frame, WORLD_LINK)
 
     transforms: list[dict[str, Any]] = []
     for link in root.findall("link"):
@@ -163,63 +178,35 @@ def _frame_transforms(
     return transforms
 
 
-_DWELL_OP_BY_SOURCE = {
-    "nominal_duration_s": "drive_screw",
-    "overlapped": "load_screw",
-}
-
-
-def build_animation_payload(scene: Scene, resolved: ResolvedCell, plan: FasteningPlan, cycle_report: CycleTimeReport) -> dict[str, Any]:
-    """Everything the animated viewer needs beyond the plain `scene_to_
-    payload` output: dynamic-primitive metadata (built once) and the
-    ordered `animation` segment list (one entry per `cycle_report.rows`
-    row), each carrying real per-frame transforms already proven
-    collision-free -- see module docstring.
+def build_animation_payload(trace: dict[str, Any]) -> dict[str, Any]:
+    """Everything the animated viewer needs beyond the trace's own static
+    scene payload: dynamic-primitive metadata (built once) and the ordered
+    `animation` list, one entry per trace row, each carrying real
+    per-frame transforms computed from the row's own already-checked
+    frames -- see module docstring.
     """
-    root = ET.fromstring(scene.urdf_xml)
-    dynamic_instances = _dynamic_instances(scene, plan.robot_instance)
-    dynamic_link_names = _dynamic_link_names(scene, dynamic_instances)
-    dynamic_primitives = _dynamic_primitive_specs(root, dynamic_link_names, scene, resolved)
-
-    segments_by_label = {segment.label: segment for segment in plan.segments}
-
-    def frames_for(joints_seq: tuple[tuple[float, ...], ...]) -> list[list[dict[str, Any]]]:
-        return [_frame_transforms(root, scene.joint_state, plan.robot_instance, joints, dynamic_link_names) for joints in joints_seq]
+    root = ET.fromstring(trace["urdf_xml"])
+    dynamic_instances = _dynamic_instances(root, trace)
+    dynamic_link_names = _dynamic_link_names(trace, dynamic_instances)
+    dynamic_primitives = _dynamic_primitive_specs(root, dynamic_link_names, trace)
 
     animation: list[dict[str, Any]] = []
-    for row in cycle_report.rows:
-        if row.source == "ESTIMATE":
-            segment = segments_by_label.get(row.label)
-            if segment is None or not segment.frames:
-                raise AnimationError(f"cycle-time row {row.label!r} has no matching checked PathSegment frames")
-            animation.append(
-                {
-                    "name": row.label,
-                    "kind": "motion",
-                    "hole_id": segment.hole_id,
-                    "duration_s": row.duration_s,
-                    "frames": frames_for(segment.frames),
-                }
-            )
-        else:
-            held_segment = segments_by_label.get(row.held_at_segment) if row.held_at_segment else None
-            if held_segment is None or not held_segment.frames:
-                raise AnimationError(f"cycle-time row {row.label!r} (dwell) has no held_at_segment frame to show")
-            op = _DWELL_OP_BY_SOURCE.get(row.source, row.source)
-            animation.append(
-                {
-                    "name": f"{op} @ {held_segment.hole_id}",
-                    "kind": "dwell",
-                    "hole_id": held_segment.hole_id,
-                    "duration_s": row.duration_s,
-                    "frames": frames_for((held_segment.frames[-1],)),
-                }
-            )
+    for row in trace["rows"]:
+        if not row["frames"]:
+            raise AnimationError(f"trace row {row['label']!r} carries no frames")
+        animation.append(
+            {
+                "name": row["label"],
+                "kind": row["kind"],
+                "duration_s": row["duration_s"],
+                "frames": [_frame_transforms(root, frame, dynamic_link_names) for frame in row["frames"]],
+            }
+        )
 
     return {
         "dynamic_primitives": dynamic_primitives,
         "animation": animation,
-        "total_duration_s": cycle_report.naive_serial_total_s,
+        "total_duration_s": trace["total_s"],
     }
 
 
@@ -545,16 +532,19 @@ requestAnimationFrame(tick);
 """
 
 
-def render_html_animation(scene: Scene, resolved: ResolvedCell, plan: FasteningPlan, cycle_report: CycleTimeReport) -> str:
-    """Render `scene`'s composed geometry PLUS `plan`'s already-checked
-    motion into one self-contained, animated HTML file -- vendored
-    three.js, no CDN, no server, no build step. Open by double-clicking.
+def render_html_animation(trace: dict[str, Any]) -> str:
+    """Render a trace (`.emitters.trace.build_trace`'s output, in memory
+    or loaded back from `--emit-trace`'s JSON) into one self-contained,
+    animated HTML file -- vendored three.js, no CDN, no server, no build
+    step. Open by double-clicking. Rendering from the freshly-built dict
+    and from its JSON round-trip produces the same page: the trace is the
+    interface (ADR-0029 D7), and this is one consumer of it.
     """
-    static_payload = scene_to_payload(scene, resolved)
-    dynamic_instances = _dynamic_instances(scene, plan.robot_instance)
+    static_payload = dict(trace["scene"])
+    dynamic_instances = _dynamic_instances(ET.fromstring(trace["urdf_xml"]), trace)
     static_payload["primitives"] = [p for p in static_payload["primitives"] if p["instance"] not in dynamic_instances]
 
-    animation_payload = build_animation_payload(scene, resolved, plan, cycle_report)
+    animation_payload = build_animation_payload(trace)
     payload = {**static_payload, **animation_payload}
 
     cell_id = html.escape(payload["cell_id"])

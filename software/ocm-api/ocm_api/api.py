@@ -16,7 +16,7 @@ import functools
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
-from . import authoring, components, composition, discovery, generation
+from . import authoring, carriers, components, composition, discovery, generation
 from .envelope import Codes, Envelope, single_refusal
 from .workspace import Workspace
 
@@ -32,7 +32,7 @@ def _never_raise(fn: _F) -> _F:
     malformed argument reaching some third-party parser (jsonpatch,
     jsonschema, ...) in a shape nothing here anticipated. Genuine
     programming bugs still show up in `message` (via `str(e)`), just as an
-    INVALID_ARGUMENT refusal instead of a crash.
+    OCM_INVALID_ARGUMENT refusal instead of a crash.
     """
 
     @functools.wraps(fn)
@@ -40,7 +40,7 @@ def _never_raise(fn: _F) -> _F:
         try:
             return fn(*args, **kwargs)
         except Exception as e:  # noqa: BLE001 -- deliberately broad, see docstring
-            return single_refusal(Codes.INVALID_ARGUMENT, path="$", message=f"{type(e).__name__}: {e}")
+            return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="$", message=f"{type(e).__name__}: {e}")
 
     return wrapper  # type: ignore[return-value]
 
@@ -119,6 +119,12 @@ class OcmApi:
     def publish_component(self, id: str, revision: str) -> Envelope:
         return components.publish_component(self.workspace, id, revision)
 
+    # -- Carrier types (ADR-0031) ---------------------------------------------------------
+
+    @_never_raise
+    def validate_carrier(self, id: str) -> Envelope:
+        return carriers.validate_carrier(self.workspace, id)
+
     @_never_raise
     def list_components(self) -> Envelope:
         return components.list_components(self.workspace)
@@ -138,8 +144,20 @@ class OcmApi:
         return composition.create_cell(self.workspace, id, base_module)
 
     @_never_raise
-    def place_instance(self, cell: str, instance: str, module: str, mount: dict[str, Any]) -> Envelope:
-        return composition.place_instance(self.workspace, cell, instance, module, mount)
+    def place_instance(
+        self,
+        cell: str,
+        instance: str,
+        module: str,
+        mount: dict[str, Any],
+        requires: dict[str, str] | None = None,
+    ) -> Envelope:
+        # ADR-0023 Decision 4: a module may declare abstract `requires:`; the
+        # cell binds each to a concrete `instance.signal`. This is where a cell
+        # composed through the API expresses that binding -- without it, an
+        # instance carrying a requires-capable capability (e.g. sd50's
+        # drive_screw) would resolve straight to OCM_REQUIREMENT_UNBOUND.
+        return composition.place_instance(self.workspace, cell, instance, module, mount, requires=requires)
 
     @_never_raise
     def move_instance(self, cell: str, instance: str, mount: dict[str, Any]) -> Envelope:

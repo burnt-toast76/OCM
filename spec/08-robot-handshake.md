@@ -46,8 +46,20 @@ declared pose (the emitter guarantees the write happens after the motion command
 A capability's `preconditions` (e.g. `drive_screw` requires `screw_present == true`) are
 enforced by the coordinator **before** it writes `hs_done_step` for the standoff step. The
 robot is therefore physically unable to descend to contact until the precondition holds.
-Manifest preconditions compile to real gates on real motion — not comments (ADR-0004,
+Manifest preconditions compile to real gates on real motion — not comments (ADR-0023,
 spec/00 item 7).
+
+A precondition may name a signal on a **peer** instance, not only the acting module's own:
+`drive_screw` requires `workpiece_secured`, which the cell binds to `nest1.clamped` (ADR-0023
+Decision 4). The read path is instance-qualified; the expression grammar is not — binding
+resolves to a concrete `(instance, signal)` pair before any condition is evaluated. This is
+how the dogfood cell declares its single most important interlock — do not apply torque to an
+unheld part — with no wait syntax in the plan at all.
+
+Symmetrically, a capability's `postconditions` are verified **after** the module reports PackML
+Complete and **before** the step advances (ADR-0023 Decision 2). PackML Complete is necessary,
+not sufficient: a module reporting Complete while one of its own declared postconditions reads
+false against the live bus is faulted, not believed.
 
 ### Abort
 
@@ -61,6 +73,27 @@ halt; Held/resume choreography is deliberately out of scope until a real cell ne
   (operator door, feeder empty). The coordinator owns timing policy.
 - Coordinator side: `hs_heartbeat` static for > 2 s while a program should be running =
   robot program dead or connection lost -> coordinator faults the cell.
+
+### Timeout disposition
+
+Every capability declares a `timeout_s` alongside `nominal_duration_s`, and an `on_timeout` of
+`hold` or `abort` (ADR-0023 Decision 6). The coordinator bounds each per-op wait — for a
+capability's preconditions to hold, and for it to report Complete — by that capability's own
+`timeout_s`. This is distinct from `hs_heartbeat` liveness above: the heartbeat watches the
+robot *program*, `timeout_s` watches a single *operation*.
+
+On expiry the part is disposed by the capability's own declaration, never the plan's:
+
+- `on_timeout: hold` → PackML **Held**. Nothing is damaged and the part is where it was; an
+  operator clears the cause and resumes. `on_timeout: hold` on a module that is not
+  `abort_safe` is incoherent and refuses at validate (`OCM_TIMEOUT_DISPOSITION_CONFLICT`).
+- `on_timeout: abort` → **Abort** (`hs_abort`); the part is compromised and surfaces for the
+  plan's `on_fail` routing.
+
+`timeout_s` is a module fact — how long before this operation is wrong — and a plan may not
+override it. It composes with the plan's `on_fail` (the disposition of *this part*): the
+timeout fires, the module goes Held or Aborted per `on_timeout`, and `on_fail` decides eject
+and reject.
 
 ## Transport bindings
 

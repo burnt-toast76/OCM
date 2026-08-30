@@ -1,6 +1,9 @@
 # ADR-0016 — One validation surface: authoring sees what resolution sees
 
-**Status:** Accepted
+**Status:** Accepted. Decision 3's publish requirement is amended by ADR-0027 D6: publish
+requires a collision *source* (`collision_source: derived | authored`), not a collision *mesh*
+— a published `derived` module with no mesh artifact is correct and complete. Nothing else
+changes; the claim is now about producibility rather than a file existing.
 
 ## Context
 

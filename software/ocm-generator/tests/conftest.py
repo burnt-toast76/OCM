@@ -146,6 +146,9 @@ def minimal_tool_manifest(
                 "name": "drive_screw",
                 "summary": "Drive a screw to a target torque.",
                 "parameters": {"torque_nm": {"type": "number", "unit": "N.m", "min": 0.2, "max": 5.0}},
+                # ADR-0023: timeout_s/on_timeout required; abort_safe is False so on_timeout must be "abort".
+                "timeout_s": 6.0,
+                "on_timeout": "abort",
             }
         ],
         "state_machine": {"model": "packml", "implements": ["idle", "execute"], "abort_safe": False},
@@ -219,3 +222,20 @@ def modules_root(tmp_path: Path) -> Path:
 def tiny_resolved_cell(modules_root: Path) -> ResolvedCell:
     cell = Cell.from_dict(build_cell_dict())
     return resolve_cell(cell, modules_root)
+
+
+@pytest.fixture
+def no_collision_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Replace the Bullet contact backend (`planner.path.check_collisions`)
+    with a no-violation stub, so the REAL check_joint_segment /
+    check_actuation_segment interpolation and the REAL timeline walk run
+    without the tesseract extra (CI never installs it -- test.yml). The
+    unit under test is the sweep/walk machinery, not Bullet; tests of the
+    actual contact math stay tesseract-gated.
+    """
+    from ocm_generator.scene.collision import CollisionCheckResult
+
+    monkeypatch.setattr(
+        "ocm_generator.planner.path.check_collisions",
+        lambda scene, contact_distance_mm=1.0: CollisionCheckResult(contacts=(), margin_mm=contact_distance_mm),
+    )

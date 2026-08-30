@@ -139,6 +139,10 @@ def build_app(repo_root: str) -> FastAPI:
     def validate_component(id: str = Body(..., embed=True)) -> dict[str, Any]:
         return envelope_response(api.validate_component(id))
 
+    @app.post("/validate_carrier")
+    def validate_carrier(id: str = Body(..., embed=True)) -> dict[str, Any]:
+        return envelope_response(api.validate_carrier(id))
+
     @app.post("/publish_component")
     def publish_component(id: str = Body(...), revision: str = Body(...)) -> dict[str, Any]:
         return envelope_response(api.publish_component(id, revision))
@@ -163,9 +167,13 @@ def build_app(repo_root: str) -> FastAPI:
 
     @app.post("/place_instance")
     def place_instance(
-        cell: str = Body(...), instance: str = Body(...), module: str = Body(...), mount: dict[str, Any] = Body(...)
+        cell: str = Body(...),
+        instance: str = Body(...),
+        module: str = Body(...),
+        mount: dict[str, Any] = Body(...),
+        requires: dict[str, str] | None = Body(default=None),
     ) -> dict[str, Any]:
-        return envelope_response(api.place_instance(cell, instance, module, mount))
+        return envelope_response(api.place_instance(cell, instance, module, mount, requires=requires))
 
     @app.post("/move_instance")
     def move_instance(cell: str = Body(...), instance: str = Body(...), mount: dict[str, Any] = Body(...)) -> dict[str, Any]:

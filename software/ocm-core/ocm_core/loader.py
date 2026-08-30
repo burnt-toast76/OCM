@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 from jsonschema import Draft202012Validator
 
+from .carrier import Carrier
 from .cell import Cell, validate_cell_dict
 from .component import Component
 from .errors import CellLoadError, ManifestValidationError
@@ -22,6 +23,12 @@ DEFAULT_SCHEMA_PATH = (
 )
 DEFAULT_COMPONENT_SCHEMA_PATH = (
     Path(__file__).resolve().parents[3] / "spec" / "schema" / "ocm-component-1.0.schema.json"
+)
+DEFAULT_CELL_SCHEMA_PATH = (
+    Path(__file__).resolve().parents[3] / "spec" / "schema" / "ocm-cell-1.0.schema.json"
+)
+DEFAULT_CARRIER_SCHEMA_PATH = (
+    Path(__file__).resolve().parents[3] / "spec" / "schema" / "ocm-carrier-1.0.schema.json"
 )
 
 
@@ -99,16 +106,38 @@ def load_component(path: Path | str, schema_path: Path | str = DEFAULT_COMPONENT
     return Component.from_dict(data)
 
 
-def load_cell(path: Path | str) -> Cell:
-    """Load a cell composition YAML file into a typed Cell.
+def load_carrier(path: Path | str, schema_path: Path | str = DEFAULT_CARRIER_SCHEMA_PATH) -> Carrier:
+    """Load a carrier type manifest YAML file (ADR-0031 D1), validate it
+    against the OCM carrier schema, and return a typed Carrier -- the same
+    path load_component takes for components.
 
-    No JSON Schema exists yet for the cell-composition shape, so this
-    performs structural checks (see cell.validate_cell_dict) rather than
-    full schema validation.
+    Raises ManifestValidationError (carrying every violation, not just the
+    first) if the manifest doesn't conform.
     """
     path = Path(path)
     data = _read_yaml(path)
-    errors = validate_cell_dict(data)
+    schema = load_schema(schema_path)
+    errors = validate_module_dict(data, schema)
+    if errors:
+        raise ManifestValidationError(path, errors)
+    return Carrier.from_dict(data)
+
+
+def load_cell(path: Path | str, schema_path: Path | str = DEFAULT_CELL_SCHEMA_PATH) -> Cell:
+    """Load a cell composition YAML file, validate it against the OCM cell
+    schema (ADR-0026), and return a typed Cell -- the same path load_module
+    takes for modules.
+
+    Raises CellLoadError (carrying every violation, not just the first) if the
+    cell doesn't conform. Schema validation is the primary check; the structural
+    `validate_cell_dict` pass is kept for the one thing JSON Schema can't express
+    -- duplicate instance names -- and its messages concatenate with the schema's.
+    """
+    path = Path(path)
+    data = _read_yaml(path)
+    schema = load_schema(schema_path)
+    errors = validate_module_dict(data, schema)  # schema-agnostic validator, reused
+    errors += validate_cell_dict(data)
     if errors:
         raise CellLoadError(path, errors)
     return Cell.from_dict(data)

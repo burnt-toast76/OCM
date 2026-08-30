@@ -67,6 +67,8 @@ def _instance_kinds(resolved: ResolvedCell) -> dict[str, str]:
     """
     kinds = {name: ri.module.kind for name, ri in resolved.instances.items()}
     kinds["base"] = resolved.base.kind
+    if resolved.carrier is not None:
+        kinds[resolved.carrier.name] = "carrier"  # ADR-0031: its own kind, not a module's
     return kinds
 
 

@@ -54,7 +54,7 @@ def test_describe_schema_component_target(api: OcmApi):
 def test_describe_schema_unknown_target_is_refused(api: OcmApi):
     e = api.describe_schema(target="cell")
     assert not e.ok
-    assert e.refusals[0].code == Codes.INVALID_ARGUMENT
+    assert e.refusals[0].code == Codes.OCM_INVALID_ARGUMENT
 
 
 def test_get_example_for_every_registered_kind(api: OcmApi):
@@ -181,7 +181,7 @@ def test_update_module_rejects_a_malformed_components_pose(api: OcmApi):
         patch=[{"op": "add", "path": "/components/0/pose", "value": {"xyz_mm": [10.0, 20.0], "bogus": True}}],
     )
     assert not e.ok
-    assert any(r.code == Codes.SCHEMA_INVALID for r in e.refusals)
+    assert any(r.code == Codes.OCM_SCHEMA_INVALID for r in e.refusals)
 
 
 def test_generate_geometry_stub(api: OcmApi, workspace_root: Path):
@@ -223,19 +223,20 @@ def test_validate_module_resolves_connectivity(api: OcmApi):
 
     validated = api.validate_module("com.example.fix.conn1")
     assert not validated.ok
-    assert any(r.code == Codes.PORT_UNCONNECTED for r in validated.refusals), [(r.code, r.message) for r in validated.refusals]
+    assert any(r.code == Codes.OCM_PORT_UNCONNECTED for r in validated.refusals), [(r.code, r.message) for r in validated.refusals]
 
 
-def test_publish_requires_geometry_a_draft_may_omit(api: OcmApi):
-    # ADR-0016 Decision 3: a fresh draft omits its geometry artifact claim and
-    # validates clean (a reachable done state); publish_module is what requires
-    # the geometry, and generate_geometry_stub supplies it.
+def test_publish_requires_a_collision_source_a_draft_may_omit(api: OcmApi):
+    # ADR-0016 Decision 3 as amended by ADR-0027 D6: a fresh draft omits its
+    # geometry claims AND its collision_source and validates clean (a reachable
+    # done state); publish_module requires a collision SOURCE, not a mesh --
+    # generate_geometry_stub supplies both (the stub is `authored`).
     api.create_module_draft("com.example.fix.pub1", "fixture")
     assert api.validate_module("com.example.fix.pub1").ok  # draft: artifacts pending, still valid
 
     refused = api.publish_module("com.example.fix.pub1", "1.0.0")
     assert not refused.ok
-    assert any(r.code == Codes.NOT_FOUND and r.path == "mechanical.geometry.collision" for r in refused.refusals)
+    assert any(r.code == Codes.OCM_COLLISION_SOURCE_MISSING for r in refused.refusals)
 
     api.generate_geometry_stub("com.example.fix.pub1", (100.0, 100.0), 50.0)
     assert api.publish_module("com.example.fix.pub1", "1.0.0").ok
@@ -277,7 +278,12 @@ def test_place_move_remove_instance(api: OcmApi):
 def test_set_plan(api: OcmApi):
     api.create_cell("assembly-b", "com.accelsolutions.base.frame1200@2.0.0")
     api.place_instance("assembly-b", "robot1", "com.universal-robots.ur5e@3.1.0", {"pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}})
-    api.place_instance("assembly-b", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"})
+    # ADR-0023: bind sd50's drive_screw requirement (no fixture here -- bind to
+    # sd1's own screw_present, an input bool that exists, so resolve is satisfied).
+    api.place_instance(
+        "assembly-b", "sd1", "com.accelsolutions.screwdriver.sd50@1.2.0", {"on": "robot1.flange"},
+        requires={"workpiece_secured": "sd1.screw_present"},
+    )
     api.set_joint_state("assembly-b", "robot1", {"shoulder_lift_joint": -1.5707963267948966, "elbow_joint": 1.5707963267948966})
 
     e = api.set_plan("assembly-b", [{"step": "fasten", "module": "sd1", "op": "drive_screw", "params": {"torque_nm": 2.4}}])
@@ -335,16 +341,27 @@ def test_plan_cell_and_emit(api: OcmApi, workspace_root: Path, tmp_path: Path):
     e = api.plan_cell("bracket-asm-01")
     assert e.ok, e.refusals
     assert e.data["holes"] == ["hole_1", "hole_2", "hole_3"]
-    assert e.data["naive_serial_total_s"] > 0
+    # ADR-0029 D4: one strictly serial total -- re-derived, not re-baselined:
+    # it is the plain sum of the table's own rows, whose stated
+    # (non-ESTIMATE) part is the manifests' own durations with no overlap:
+    # nest1 clamp 0.6 + 3 * (load_screw 0.9 + drive_screw 1.8) + unclamp 0.4 = 9.1 s.
+    assert e.data["total_s"] == pytest.approx(sum(row["duration_s"] for row in e.data["cycle_table"]))
+    stated = sum(row["duration_s"] for row in e.data["cycle_table"] if row["source"] == "nominal_duration_s")
+    assert stated == pytest.approx(0.6 + 3 * (0.9 + 1.8) + 0.4)
     assert len(e.data["cycle_table"]) > 0
-    # Every row's full structure is populated -- the GUI/agent both need
-    # duration/source AND which segment an overlapped load_screw hides
-    # inside or a dwell is held at, not just a label.
-    overlapped_rows = [row for row in e.data["cycle_table"] if row["source"] == "overlapped"]
-    assert overlapped_rows
-    for row in overlapped_rows:
-        assert row["overlapped_with"]
-        assert row["held_at_segment"]
+    # Every row is typed (D3), nothing is "overlapped" (D4), and a
+    # stationary row names the segment it is held at -- except one that
+    # precedes all motion (the opening clamp), which holds the initial state.
+    assert all(row["source"] != "overlapped" for row in e.data["cycle_table"])
+    for row in e.data["cycle_table"]:
+        assert row["kind"] in ("motion", "actuation", "dwell")
+    assert e.data["cycle_table"][0]["label"] == "nest1.clamp"
+    assert e.data["cycle_table"][0]["held_at"] is None
+    drive_rows = [row for row in e.data["cycle_table"] if row["label"].startswith("drive_screw @ ")]
+    assert len(drive_rows) == 3
+    for row in drive_rows:
+        assert row["kind"] == "dwell"
+        assert row["held_at"]
 
     script_path = tmp_path / "out.script"
     view_path = tmp_path / "view.html"

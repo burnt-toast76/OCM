@@ -13,6 +13,9 @@ name: fmt-check
 # sibling-package imports at all), so it needs neither ocm-api
 # (fastapi/anthropic/mcp) nor ocm-resolve/ocm_generator.scene just to
 # format YAML. Verified in a venv with only these two installed.
+#
+# Installs pass `-c ci/requirements.txt` (the CI dependency lock) so third-party
+# versions are pinned and reproducible -- see that file and .github/dependabot.yml.
 
 on:
   push:
@@ -23,15 +26,15 @@ jobs:
   fmt-check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Install ocm-core, ocm-generator
         run: |
-          pip install -e software/ocm-core
-          pip install -e software/ocm-generator
+          pip install -c ci/requirements.txt -e software/ocm-core
+          pip install -c ci/requirements.txt -e software/ocm-generator
 
       - run: ocm fmt --check

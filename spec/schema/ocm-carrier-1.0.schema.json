@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencellmodule.org/schema/ocm-carrier-1.0.schema.json",
+  "title": "OCM Carrier Type Definition v1.0",
+  "description": "ADR-0031 D1: a carrier (pallet) as a first-class kind -- transcribed hardware with frames, geometry, joints, and meshes, and DELIBERATELY no state_machine, comms, or capabilities: a carrier has no controller, no states, and nothing to command it with. Per ADR-0014 the absent fields stay absent rather than acquiring placeholders; a manifest carrying them refuses OCM_CARRIER_TYPE_HAS_CONTROL. Identity and wear stay ADR-0020's carriers block -- a different question about the same object.",
+  "type": "object",
+  "required": [
+    "ocm_version",
+    "id",
+    "revision",
+    "license",
+    "mechanical"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "ocm_version": {
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
+      "description": "Spec version this manifest is written against."
+    },
+    "id": {
+      "type": "string",
+      "description": "Reverse-DNS unique identifier. Immutable.",
+      "pattern": "^[a-z0-9]+(\\.[a-z0-9_-]+)+$",
+      "examples": [
+        "com.accelsolutions.carrier.pallet-240"
+      ]
+    },
+    "revision": {
+      "type": "string",
+      "description": "SemVer. MAJOR bump = breaking change to frames or joints.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "vendor": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX identifier. Hardware should use CERN-OHL-S-2.0."
+    },
+    "description": {
+      "type": "string"
+    },
+    "mechanical": {
+      "type": "object",
+      "required": [
+        "frames",
+        "geometry",
+        "mass_kg"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mount": {
+          "type": "object",
+          "description": "The carrier's footprint on whatever locates it, if meaningful. A carrier declares no mounting interface -- it is placed by being located (ADR-0031 D2), not bolted.",
+          "additionalProperties": false,
+          "properties": {
+            "footprint_mm": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "[x, y] envelope on the resting plane."
+            }
+          }
+        },
+        "frames": {
+          "type": "object",
+          "description": "Named coordinate frames. 'origin' is REQUIRED and is the carrier's own datum; all other frames are relative to it. `part_datum` -- where a correctly seated part's own origin lands -- becomes load-bearing with ADR-0031 D4 (part 2).",
+          "required": [
+            "origin"
+          ],
+          "additionalProperties": {
+            "$ref": "#/$defs/frame"
+          },
+          "properties": {
+            "origin": {
+              "$ref": "#/$defs/frame"
+            }
+          }
+        },
+        "geometry": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "visual": {
+              "type": "string",
+              "description": "Path to display mesh (GLB preferred)."
+            },
+            "collision": {
+              "type": "string",
+              "description": "Path to collision mesh. Convex hull or convex decomposition strongly preferred."
+            },
+            "urdf_fragment": {
+              "type": "string",
+              "description": "Path to a URDF snippet declaring this carrier's links and joints (e.g. a spring clamp's jaw)."
+            }
+          }
+        },
+        "mass_kg": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "com_mm": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "Center of mass in the origin frame."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "frame": {
+      "type": "object",
+      "required": [
+        "xyz_mm"
+      ],
+      "properties": {
+        "xyz_mm": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "rpy_deg": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "default": [
+            0,
+            0,
+            0
+          ],
+          "description": "Fixed-axis roll-pitch-yaw, degrees. Matches URDF convention (which uses radians — the loader converts)."
+        },
+        "parent": {
+          "type": "string",
+          "default": "origin"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

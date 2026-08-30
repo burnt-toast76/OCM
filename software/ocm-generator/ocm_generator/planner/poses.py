@@ -7,13 +7,13 @@ feature it targets and the capability's own motion block.
 
 `locate_part`'s real vision result isn't modeled -- this isn't a live
 simulator any more than .scene.kinematics is (see that module's own
-docstring). Instead, the part is assumed seated exactly at whatever
-fixture the plan's own `clamp` step names: that fixture's manifest
-declares a `part_datum` frame -- "where a correctly seated part's own
-origin lands... what cam1's locate_part corrects against" (see
-com.accelsolutions.fixture.pneumatic-nest's own manifest note). Using it
-directly isn't a simulation of the vision system; it's the exact nominal
-placement that system exists to verify.
+docstring). Instead, the part is assumed seated exactly at the DECLARED
+part datum (ADR-0031 D4): the cell's carrier instance's `part_datum`
+frame, or the one placed fixture module that declares one -- "where a
+correctly seated part's own origin lands... what cam1's locate_part
+corrects against" (see com.accelsolutions.fixture.pneumatic-nest's own
+manifest note). Using it directly isn't a simulation of the vision
+system; it's the exact nominal placement that system exists to verify.
 
 ## Frame math
 
@@ -190,31 +190,55 @@ def find_fastening_plan(cell: Cell) -> FastenPlan:
     return FastenPlan(steps=tuple(steps), load_screw_module=load_screw_module, on_fail_summary=on_fail_summary)
 
 
-def _find_clamp_fixture(plan: list[Any]) -> str | None:
-    for entry in plan:
-        if isinstance(entry, dict) and entry.get("op") == "clamp" and "module" in entry:
-            return entry["module"]
-    return None
-
-
 def compute_part_datum_world(resolved: ResolvedCell, scene: Scene, world_poses: dict[str, Pose]) -> tuple[str, Pose]:
-    """(fixture_instance_name, world pose of its part_datum frame).
+    """(owner_instance_name, world pose of its part_datum frame).
 
-    The plan's own `clamp` step names which fixture the part is seated in;
-    that fixture's `part_datum` frame is where a correctly-seated part's
-    own origin lands (see module docstring).
+    ADR-0031 D4: the part datum is DECLARED, never scraped from a `clamp`
+    verb -- the old `_find_clamp_fixture` heuristic is deleted, not kept as
+    a fallback, because a heuristic and a declaration are two answers to
+    one question and the heuristic is wrong in every cell but the first
+    (in a line, the part arrives already clamped and no downstream cell
+    has a clamp step).
+
+    Owner precedence: the cell's carrier instance (its TYPE's
+    frames.part_datum, composed through the carrier's root link -- which
+    the D2 chain places at the located datum when both transit joints sit
+    at zero); otherwise the one placed module whose manifest declares
+    frames.part_datum. Nothing declaring one refused at resolve
+    (OCM_PART_DATUM_UNDECLARED); more than one fixture declaring it with
+    no carrier is ambiguous and refuses here rather than guessing.
     """
-    fixture_name = _find_clamp_fixture(resolved.cell.plan)
-    if fixture_name is None:
-        raise PlanningError("plan has no 'clamp' step -- can't tell which fixture the part is seated in")
+    rc = resolved.carrier
+    if rc is not None:
+        part_datum = rc.carrier.mechanical.frames.get("part_datum")
+        if part_datum is None:
+            # Resolve only passes a carrier without part_datum when a
+            # fixture declares one instead -- fall through to the fixtures.
+            pass
+        else:
+            root_link = scene.instance(rc.name).root_link
+            if root_link not in world_poses:
+                raise PlanningError(f"scene has no world pose for carrier {rc.name}'s root link {root_link!r}")
+            local = Pose.from_xyz_rpy(_mm(part_datum.xyz_mm), _deg_to_rad(part_datum.rpy_deg))
+            return rc.name, world_poses[root_link].compose(local)
 
-    fixture_ri = resolved.instances.get(fixture_name)
-    if fixture_ri is None:
-        raise PlanningError(f"clamp step names unknown module instance {fixture_name!r}")
+    candidates = sorted(
+        name for name, ri in resolved.instances.items() if "part_datum" in ri.module.mechanical.frames
+    )
+    if not candidates:
+        raise PlanningError(
+            "no carrier or fixture declares frames.part_datum -- the part's location is a stated "
+            "fact, not a guess (ADR-0031 D4; resolve refuses this earlier as OCM_PART_DATUM_UNDECLARED)"
+        )
+    if len(candidates) > 1:
+        raise PlanningError(
+            f"multiple fixtures declare frames.part_datum ({candidates}) and the cell places no "
+            "carrier -- ambiguous, and it will not be guessed (ADR-0031 D4)"
+        )
 
-    part_datum = fixture_ri.module.mechanical.frames.get("part_datum")
-    if part_datum is None:
-        raise PlanningError(f"{fixture_ri.module.id} declares no mechanical.frames.part_datum")
+    fixture_name = candidates[0]
+    fixture_ri = resolved.instances[fixture_name]
+    part_datum = fixture_ri.module.mechanical.frames["part_datum"]
 
     fixture_root_link = scene.instance(fixture_name).root_link
     if fixture_root_link not in world_poses:

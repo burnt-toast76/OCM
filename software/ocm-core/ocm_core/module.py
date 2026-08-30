@@ -34,9 +34,14 @@ class Mount:
 
 @dataclass(frozen=True)
 class Geometry:
+    # ADR-0027 D1: `collision_source` declares how collision geometry is
+    # produced -- 'derived' (built from posed component envelopes + structure
+    # primitives; no mesh artifact) or 'authored' (`collision` is the mesh,
+    # authoritative, containment-checked). None on a draft that hasn't chosen.
     visual: str | None = None
     collision: str | None = None
     urdf_fragment: str | None = None
+    collision_source: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Geometry":
@@ -44,6 +49,109 @@ class Geometry:
             visual=data.get("visual"),
             collision=data.get("collision"),
             urdf_fragment=data.get("urdf_fragment"),
+            collision_source=data.get("collision_source"),
+        )
+
+
+@dataclass(frozen=True)
+class StructurePose:
+    """A structure primitive's pose in its owning link's frame -- xyz in the
+    primitive's own `units`, rpy in degrees (ADR-0027 D3)."""
+
+    xyz: tuple[float, float, float]
+    rpy: tuple[float, float, float] = (0.0, 0.0, 0.0)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "StructurePose":
+        xyz = data["xyz"]
+        rpy = data.get("rpy", (0.0, 0.0, 0.0))
+        return cls(xyz=(xyz[0], xyz[1], xyz[2]), rpy=(rpy[0], rpy[1], rpy[2]))
+
+
+@dataclass(frozen=True)
+class StructurePrimitive:
+    """ADR-0027 D3: one module-owned structural element -- a bracket, plate,
+    or standoff -- declared as a posed primitive (box | cylinder | mesh).
+    Fabricated, no datasheet, nothing to transcribe: module-layer DESIGN.
+    `link` (D4) names the urdf_fragment link it rides; None = fragment root.
+    """
+
+    id: str
+    shape: str
+    pose: StructurePose
+    size: tuple[float, float, float] | None = None
+    radius: float | None = None
+    length: float | None = None
+    path: str | None = None
+    units: str | None = None
+    link: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "StructurePrimitive":
+        size = data.get("size")
+        return cls(
+            id=data["id"],
+            shape=data["shape"],
+            pose=StructurePose.from_dict(data["pose"]),
+            size=tuple(size) if size else None,
+            radius=data.get("radius"),
+            length=data.get("length"),
+            path=data.get("path"),
+            units=data.get("units"),
+            link=data.get("link"),
+        )
+
+
+@dataclass(frozen=True)
+class DofTolerance:
+    """One DOF's declared tolerance ($defs/dof_tolerance, ADR-0031 D3) --
+    an explicit value and a VERBATIM unit, resolved through ocm_core.units
+    and type-checked against the DOF at resolve. Never converted here."""
+
+    value: float
+    unit: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "DofTolerance":
+        return cls(value=data["value"], unit=data["unit"])
+
+
+@dataclass(frozen=True)
+class LocatedConstraint:
+    """One physical feature of a located datum: the DOF it governs and how
+    well (ADR-0031 D3). `tolerance` is keyed by DOF name; `source` is
+    measured|datasheet|estimated, required, never defaulted."""
+
+    feature: str
+    governs: tuple[str, ...]
+    tolerance: dict[str, DofTolerance]
+    source: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "LocatedConstraint":
+        return cls(
+            feature=data["feature"],
+            governs=tuple(data["governs"]),
+            tolerance={dof: DofTolerance.from_dict(t) for dof, t in data.get("tolerance", {}).items()},
+            source=data["source"],
+        )
+
+
+@dataclass(frozen=True)
+class Located:
+    """ADR-0031 D3: this module locates a carrier against machined datum
+    features. Declared on the LOCATING module (the conveyor), never on the
+    carrier. The constraint scheme must close -- every one of the six DOF
+    governed exactly once -- checked at resolve, not here."""
+
+    frame: str
+    constraints: tuple[LocatedConstraint, ...]
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Located":
+        return cls(
+            frame=data["frame"],
+            constraints=tuple(LocatedConstraint.from_dict(c) for c in data.get("constraints", [])),
         )
 
 
@@ -55,6 +163,10 @@ class Mechanical:
     mass_kg: float
     com_mm: tuple[float, float, float] | None = None
     inertia_kgm2: tuple[float, float, float, float, float, float] | None = None
+    # ADR-0027 D3: module-owned structure as posed primitives.
+    structure: tuple[StructurePrimitive, ...] = ()
+    # ADR-0031 D3: the located datum this module offers a carrier, if any.
+    located: Located | None = None
 
     @property
     def origin(self) -> Frame:
@@ -68,6 +180,7 @@ class Mechanical:
     def from_dict(cls, data: dict[str, Any]) -> "Mechanical":
         com = data.get("com_mm")
         inertia = data.get("inertia_kgm2")
+        located = data.get("located")
         return cls(
             mount=Mount.from_dict(data["mount"]),
             frames={name: Frame.from_dict(f) for name, f in data["frames"].items()},
@@ -75,6 +188,8 @@ class Mechanical:
             mass_kg=data["mass_kg"],
             com_mm=tuple(com) if com else None,
             inertia_kgm2=tuple(inertia) if inertia else None,
+            structure=tuple(StructurePrimitive.from_dict(sp) for sp in data.get("structure", [])),
+            located=Located.from_dict(located) if located else None,
         )
 
 
@@ -270,6 +385,40 @@ class Motion:
 
 
 @dataclass(frozen=True)
+class Actuation:
+    """ADR-0028 D1: one joint a capability drives, and the value it holds when
+    the postcondition is true. `joint` is the module's own urdf_fragment joint
+    name, unnamespaced; `units` is required and resolved through
+    ocm_core.units, type-checked against the joint's type at resolve (D2).
+    No `from` -- the precondition already asserts where the machine was.
+    """
+
+    joint: str
+    to: float
+    units: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Actuation":
+        return cls(joint=data["joint"], to=float(data["to"]), units=data["units"])
+
+
+@dataclass(frozen=True)
+class Requirement:
+    """ADR-0023: one entry in a capability's `requires` -- an abstract boolean
+    fact the capability needs, named without saying who provides it. The cell
+    binds each requirement to a concrete `instance.signal` (ADR-0015's
+    ports-and-nets pattern applied to logic).
+    """
+
+    type: str
+    summary: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Requirement":
+        return cls(type=data["type"], summary=data["summary"])
+
+
+@dataclass(frozen=True)
 class Capability:
     """A verb this module offers. The agent-facing surface."""
 
@@ -282,6 +431,15 @@ class Capability:
     results: dict[str, Parameter] = field(default_factory=dict)
     nominal_duration_s: float | None = None
     consumes: tuple[str, ...] = ()
+    # ADR-0023. `requires` is a mapping (requirement name -> Requirement),
+    # not a tuple: the cell binds each key to an instance.signal. `timeout_s`
+    # / `on_timeout` are schema-required on every capability; None only on an
+    # incomplete draft (ADR-0014), which the resolver refuses.
+    requires: dict[str, Requirement] = field(default_factory=dict)
+    timeout_s: float | None = None
+    on_timeout: str | None = None
+    # ADR-0028 D1: the joints this verb drives. Empty = moves nothing (D4).
+    actuates: tuple[Actuation, ...] = ()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Capability":
@@ -298,6 +456,10 @@ class Capability:
             results={k: Parameter.from_dict(v) for k, v in data.get("results", {}).items()},
             nominal_duration_s=data.get("nominal_duration_s"),
             consumes=tuple(data.get("consumes", [])),
+            requires={k: Requirement.from_dict(v) for k, v in data.get("requires", {}).items()},
+            timeout_s=data.get("timeout_s"),
+            on_timeout=data.get("on_timeout"),
+            actuates=tuple(Actuation.from_dict(a) for a in data.get("actuates", [])),
         )
 
 
@@ -438,11 +600,16 @@ class InstancePose:
 class ModuleComponent:
     """One entry in a module's `components:` list -- a purchased part this
     module is assembled from, by its own reference designator (ADR-0014).
+    `link` (ADR-0027 D4) names the urdf_fragment link this instance attaches
+    to, so a component riding a moving axis travels with it; None = the
+    fragment root. Link names are our own authored fragment's -- not the
+    STEP node-path binding ADR-0015 D1 rejected.
     """
 
     refdes: str
     ref: ComponentRef
     pose: InstancePose | None = None
+    link: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ModuleComponent":
@@ -451,6 +618,7 @@ class ModuleComponent:
             refdes=data["refdes"],
             ref=ComponentRef.parse(data["ref"]),
             pose=InstancePose.from_dict(pose) if pose else None,
+            link=data.get("link"),
         )
 
 

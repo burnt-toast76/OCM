@@ -10,7 +10,7 @@ import { create } from "zustand";
 import * as api from "../api/client";
 import { ApiTransportError } from "../api/client";
 import type { CellInstanceRow, DescribeModuleData, Envelope, ModuleSummary, Mount, RawCellModule, Refusal, ScenePayload } from "../api/types";
-import { TOOL_SLOT_OCCUPIED } from "../api/types";
+import { OCM_TOOL_SLOT_OCCUPIED } from "../api/types";
 
 export interface Toast {
   id: string;
@@ -185,9 +185,9 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
         await get().refreshScene();
         return;
       }
-      const toolSlot = env.refusals.find((r) => r.code === TOOL_SLOT_OCCUPIED);
+      const toolSlot = env.refusals.find((r) => r.code === OCM_TOOL_SLOT_OCCUPIED);
       // A ghost only makes sense for a POSE attempt (workspace overhang,
-      // collision, ...) -- a mount.on conflict (TOOL_SLOT_OCCUPIED) has no
+      // collision, ...) -- a mount.on conflict (OCM_TOOL_SLOT_OCCUPIED) has no
       // "attempted xyz" to draw; the incumbent highlight covers that case.
       const ghost: Ghost | null = mount.pose
         ? { moduleId, position: mount.pose.xyz_mm.map((v) => v / 1000) as [number, number, number], rpyDeg: mount.pose.rpy_deg }
@@ -224,7 +224,7 @@ export const useComposerStore = create<ComposerState>((set, get) => ({
         await get().refreshScene();
         return;
       }
-      const toolSlot = env.refusals.find((r) => r.code === TOOL_SLOT_OCCUPIED);
+      const toolSlot = env.refusals.find((r) => r.code === OCM_TOOL_SLOT_OCCUPIED);
       // Deliberately does NOT refresh the scene here. spec/09's writes are
       // unconditional, so the server already persisted the refused pose to
       // disk -- but the composer's own render stays at the last CONFIRMED

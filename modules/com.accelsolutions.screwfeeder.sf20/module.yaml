@@ -65,6 +65,8 @@ capabilities:
   results:
     ok: {type: boolean}
   nominal_duration_s: 1.2
+  timeout_s: 6.0               # ADR-0023 default (~5x nominal, the clamp anchor's ratio); pending owner calibration
+  on_timeout: hold             # a bowl that won't singulate strands nothing; operator clears and resumes (abort-safe)
   consumes: [screw]
 
 state_machine:

@@ -52,3 +52,34 @@ class PlanningUnavailable(PlanningError):
     """tesseract-robotics isn't installed, or no IK/collision backend could
     be loaded from it. Same shape as scene.collision.CollisionCheckUnavailable.
     """
+
+
+class PlanStepUnplannableError(PlanningError):
+    """A plan step's capability declares no `at:` target, no `actuates`
+    (ADR-0028), and no `nominal_duration_s` -- nothing to place on a
+    timeline (ADR-0029 D1)."""
+
+    def __init__(self, step: str, instance: str, op: str):
+        self.step = step
+        self.instance = instance
+        self.op = op
+        super().__init__(
+            f"plan step {step!r} calls {instance}.{op}, which declares no 'at:' target, "
+            "no actuates, and no nominal_duration_s -- nothing to place on a timeline"
+        )
+
+
+class ActuationDurationMissingError(PlanningError):
+    """A capability declares `actuates` but no `nominal_duration_s`: the
+    endpoint is stated, the time is not, and it will not be invented
+    (ADR-0029's fabrication guard)."""
+
+    def __init__(self, instance: str, module_id: str, capability: str):
+        self.instance = instance
+        self.module_id = module_id
+        self.capability = capability
+        super().__init__(
+            f"capability {capability!r} on {module_id} (instance {instance}) declares "
+            "actuates but no nominal_duration_s -- the endpoint is stated, the time is "
+            "not, and it will not be invented"
+        )

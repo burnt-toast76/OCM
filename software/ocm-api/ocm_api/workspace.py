@@ -58,7 +58,12 @@ from typing import Any
 
 import jsonpatch
 from ocm_core import new_yaml_rt as _new_yaml_rt
-from ocm_core.loader import DEFAULT_COMPONENT_SCHEMA_PATH, DEFAULT_SCHEMA_PATH, _read_yaml  # noqa: F401 -- see module docstring
+from ocm_core.loader import (  # noqa: F401 -- see module docstring
+    DEFAULT_CARRIER_SCHEMA_PATH,
+    DEFAULT_COMPONENT_SCHEMA_PATH,
+    DEFAULT_SCHEMA_PATH,
+    _read_yaml,
+)
 from ruamel.yaml.comments import CommentedMap
 
 
@@ -172,6 +177,15 @@ class Workspace:
         return candidate if candidate.is_file() else Path(DEFAULT_COMPONENT_SCHEMA_PATH)
 
     @property
+    def carriers_dir(self) -> Path:
+        return self.root / "carriers"
+
+    @property
+    def carrier_schema_path(self) -> Path:
+        candidate = self.root / "spec" / "schema" / "ocm-carrier-1.0.schema.json"
+        return candidate if candidate.is_file() else Path(DEFAULT_CARRIER_SCHEMA_PATH)
+
+    @property
     def changelog_path(self) -> Path:
         return self.root / "spec" / "CHANGELOG.md"
 
@@ -207,8 +221,22 @@ class Workspace:
         # lives under modules/<id>/attachments/, not a separate tree.
         return self.module_dir(module_id) / "attachments"
 
+    def carrier_dir(self, carrier_id: str) -> Path:
+        return self.carriers_dir / carrier_id
+
+    def carrier_path(self, carrier_id: str) -> Path:
+        return self.carrier_dir(carrier_id) / "carrier.yaml"
+
+    def carrier_attachments_dir(self, carrier_id: str) -> Path:
+        # Same convention as attachments_dir/module_attachments_dir: a
+        # carrier's uploads live under carriers/<id>/attachments/.
+        return self.carrier_dir(carrier_id) / "attachments"
+
     def module_exists(self, module_id: str) -> bool:
         return self.module_path(module_id).is_file()
+
+    def carrier_exists(self, carrier_id: str) -> bool:
+        return self.carrier_path(carrier_id).is_file()
 
     def cell_exists(self, cell_id: str) -> bool:
         return self.cell_path(cell_id).is_file()
@@ -230,3 +258,8 @@ class Workspace:
         if not self.components_dir.is_dir():
             return []
         return sorted(p.parent.name for p in self.components_dir.glob("*/component.yaml"))
+
+    def list_carrier_ids(self) -> list[str]:
+        if not self.carriers_dir.is_dir():
+            return []
+        return sorted(p.parent.name for p in self.carriers_dir.glob("*/carrier.yaml"))

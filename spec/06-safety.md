@@ -33,6 +33,9 @@ It will not design your safety system. It will stop you from shipping one that d
 - That STO lands on a **hardwired circuit through a certified relay** (Pilz PNOZ, Banner, AB
   Guardmaster). **A physical wire, not a network message.**
 - FSoE exists. The certified devices are closed and expensive. Not for v1.
+  (This exclusion is no longer in tension with ADR-0019 D1's channel list: ADR-0034 makes the
+  safety domain internal to a cell — no safety transport crosses a cell boundary — so nothing
+  needs FSoE between cells and the question closes by removal, not by decision.)
 - ⚠️ **Z-axis gantry brake** (spring-applied, electrically released) is a safety item, not a
   convenience. Ball screws backdrive — a Z head falls on power loss, under where a human
   reaches in.

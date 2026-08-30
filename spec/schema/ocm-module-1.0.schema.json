@@ -140,11 +140,86 @@
             },
             "collision": {
               "type": "string",
-              "description": "Path to collision mesh. Convex hull or convex decomposition STRONGLY preferred \u2014 Tesseract's Bullet backend is far faster on convex geometry. ADR-0016: a DRAFT (revision 0.x) may omit this artifact claim -- absence, not a placeholder path to a file that does not exist; publish_module requires it."
+              "description": "Path to collision mesh. Convex hull or convex decomposition STRONGLY preferred -- Tesseract's Bullet backend is far faster on convex geometry. ADR-0027: required when collision_source is 'authored' (and checked for envelope containment); ABSENT when 'derived' (the proxy is built from posed envelopes + structure primitives -- a mesh here would be the second artifact D1 exists to remove). ADR-0016: a DRAFT (revision 0.x) may omit this artifact claim."
             },
             "urdf_fragment": {
               "type": "string",
               "description": "Path to a URDF snippet declaring this module's links and joints. THIS IS THE KEY FIELD: it is what allows cell.yaml to compile straight into a Tesseract scene graph with zero manual CAD work."
+            },
+            "collision_source": {
+              "type": "string",
+              "enum": [
+                "derived",
+                "authored"
+              ],
+              "description": "ADR-0027 D1: how this module's collision geometry is produced. `derived` -- the resolver builds the collision proxy from posed component envelopes plus mechanical.structure primitives; NO collision mesh artifact is declared. `authored` -- `collision` names a hand-produced mesh, authoritative, and checked for containment of every posed component envelope (D2). Required at publish (publish_module refuses without it -- the claim is producibility, ADR-0027 D6 amending ADR-0016 D3); a draft omits it until the choice is made (design, not a default). One mode per module."
+            }
+          }
+        },
+        "located": {
+          "type": "object",
+          "description": "ADR-0031 D3: this module locates a carrier against machined datum features. Lives on the LOCATING module (the conveyor), never on the carrier -- the datum features are machined into this module's structure and do not travel. Each constraint names a physical feature, the degrees of freedom it governs, and a per-feature tolerance; every one of the six DOF must be governed exactly once (OCM_LOCATED_DOF_UNGOVERNED / OCM_LOCATED_DOF_OVERCONSTRAINED), each governed DOF carries a tolerance (OCM_LOCATED_TOLERANCE_MISSING), and units are type-checked against the DOF (OCM_LOCATED_UNIT_MISMATCH). Tolerances are declared, not yet consumed -- a located pose without them is a claim of infinite precision.",
+          "required": [
+            "frame",
+            "constraints"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "frame": {
+              "type": "string",
+              "description": "A frame in this module's own mechanical.frames: the pose a correctly seated carrier lands at (ADR-0031 D2 -- the ROOT of the carrier's chain, with transit a negative offset from it). Unknown refuses (OCM_LOCATED_FRAME_UNKNOWN)."
+            },
+            "constraints": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "feature",
+                  "governs",
+                  "tolerance",
+                  "source"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "feature": {
+                    "type": "string",
+                    "description": "The physical feature doing the constraining, as the drawing names it (e.g. 'lift_stop_surface', 'locating_pins')."
+                  },
+                  "governs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "x",
+                        "y",
+                        "z",
+                        "rx",
+                        "ry",
+                        "rz"
+                      ]
+                    },
+                    "description": "Which degrees of freedom this feature constrains. Across all constraints, each of the six is governed exactly once -- ungoverned and doubly-governed are the same failure: a constraint scheme that does not close."
+                  },
+                  "tolerance": {
+                    "type": "object",
+                    "description": "Per governed DOF: how well this feature constrains it. Per feature, not per datum -- the plane and the pins are different features with genuinely different numbers, and averaging them would be an invented value.",
+                    "additionalProperties": {
+                      "$ref": "#/$defs/dof_tolerance"
+                    }
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "measured",
+                      "datasheet",
+                      "estimated"
+                    ],
+                    "description": "Where these numbers came from -- ADR-0029's convention on durations, applied here. Required; never defaulted. Anything quoting a positional accuracy derived from this tolerance inherits the label."
+                  }
+                }
+              }
             }
           }
         },
@@ -169,6 +244,142 @@
           "minItems": 6,
           "maxItems": 6,
           "description": "[Ixx, Iyy, Izz, Ixy, Ixz, Iyz]. Optional; required for high-dynamic payloads."
+        },
+        "structure": {
+          "type": "array",
+          "description": "ADR-0027 D3: module-owned structure -- brackets, plates, standoffs -- declared as posed primitives. Fabricated parts have no datasheet and nothing to transcribe (ADR-0014); this is module-layer DESIGN, authored. It is what makes `derived` collision mode viable for a real assembly rather than only a rack of purchased devices.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "shape",
+              "pose"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "shape": {
+                "type": "string",
+                "enum": [
+                  "box",
+                  "cylinder",
+                  "mesh"
+                ]
+              },
+              "size": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "minItems": 3,
+                "maxItems": 3,
+                "description": "box: [x, y, z] extents in `units`."
+              },
+              "radius": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "cylinder only."
+              },
+              "length": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "description": "cylinder only (along local Z)."
+              },
+              "path": {
+                "type": "string",
+                "description": "mesh only: path to the fabricated part's own mesh -- we produce it, so we own the CAD (ADR-0027 D3)."
+              },
+              "units": {
+                "type": "string",
+                "description": "Length unit for size/radius/length, resolved by ocm_core.units' explicit table (unrecognised -> OCM_UNIT_UNRECOGNISED). Required for box/cylinder."
+              },
+              "pose": {
+                "type": "object",
+                "required": [
+                  "xyz"
+                ],
+                "additionalProperties": false,
+                "description": "Pose in the owning link's frame; xyz in `units`, rpy in degrees.",
+                "properties": {
+                  "xyz": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "rpy": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "default": [
+                      0,
+                      0,
+                      0
+                    ]
+                  }
+                }
+              },
+              "link": {
+                "type": "string",
+                "description": "ADR-0027 D4: the urdf_fragment link this primitive rides; defaults to the fragment root. A link absent from the fragment refuses (OCM_LINK_UNKNOWN)."
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "shape": {
+                      "const": "box"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "size",
+                    "units"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "shape": {
+                      "const": "cylinder"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "radius",
+                    "length",
+                    "units"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "shape": {
+                      "const": "mesh"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "path"
+                  ]
+                }
+              }
+            ]
+          }
         }
       }
     },
@@ -436,7 +647,9 @@
         "type": "object",
         "required": [
           "name",
-          "summary"
+          "summary",
+          "timeout_s",
+          "on_timeout"
         ],
         "additionalProperties": false,
         "properties": {
@@ -568,6 +781,73 @@
                 "screw_m3x8"
               ]
             ]
+          },
+          "requires": {
+            "type": "object",
+            "description": "ADR-0023: abstract boolean facts this capability needs, named without saying who provides them. The cell binds each key to a concrete `instance.signal`; a precondition may reference a key by name. Unbound at cell resolve -> OCM_REQUIREMENT_UNBOUND.",
+            "propertyNames": {
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "summary"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "bool"
+                  ]
+                },
+                "summary": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "timeout_s": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "ADR-0023: how long before this op is wrong -- distinct from nominal_duration_s, and NOT overridable by a plan. On expiry the module is disposed per on_timeout."
+          },
+          "on_timeout": {
+            "type": "string",
+            "enum": [
+              "hold",
+              "abort"
+            ],
+            "description": "ADR-0023: disposition when timeout_s expires. hold -> PackML Held (nothing damaged; operator clears and resumes). abort -> Abort (part compromised, routes to reject). hold on a capability whose state_machine.abort_safe is false refuses (OCM_TIMEOUT_DISPOSITION_CONFLICT)."
+          },
+          "actuates": {
+            "type": "array",
+            "minItems": 1,
+            "description": "ADR-0028 D1: the joints this verb drives and the value each holds when the postcondition is true -- the geometric half of the verb. Joint names are this module's own urdf_fragment's, unnamespaced. `to` is the endpoint only (no `from`: the precondition asserts where the machine was); `units` is REQUIRED and resolved through ocm_core.units, type-checked against the joint (D2 -- a bare number meaning metres-or-radians by context is the silent-plausible-value failure the refusal engine exists to exclude). Optional: a capability with no `actuates` moves nothing (D4), which is a legitimate description, not a gap.",
+            "items": {
+              "type": "object",
+              "required": [
+                "joint",
+                "to",
+                "units"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "joint": {
+                  "type": "string",
+                  "description": "A joint name in this module's own urdf_fragment (unnamespaced). Unknown, fixed, or limit-violating targets refuse at resolve (OCM_ACTUATION_*)."
+                },
+                "to": {
+                  "type": "number",
+                  "description": "The value the joint holds when the postcondition is true, in `units`."
+                },
+                "units": {
+                  "type": "string",
+                  "description": "Verbatim unit, resolved by ocm_core.units' explicit tables -- length for prismatic, angle for revolute/continuous; a mismatch refuses (OCM_ACTUATION_UNIT_MISMATCH)."
+                }
+              }
+            }
           }
         }
       }
@@ -760,6 +1040,10 @@
           "pose": {
             "$ref": "#/$defs/instance_pose",
             "description": "Where this component instance sits in the module's own local scene (Modules-page authoring UI). Optional -- a components: entry with no pose is still valid."
+          },
+          "link": {
+            "type": "string",
+            "description": "ADR-0027 D4: the urdf_fragment link this component instance attaches to (a component riding a moving axis travels with it); defaults to the fragment root. NOT ADR-0015 D1's rejected STEP node-path binding -- link names are authored by us in our own fragment; one that does not exist refuses (OCM_LINK_UNKNOWN)."
           }
         }
       }
@@ -966,6 +1250,25 @@
     }
   ],
   "$defs": {
+    "dof_tolerance": {
+      "type": "object",
+      "description": "ADR-0031 D3: one DOF's tolerance -- an explicit value and a verbatim unit, resolved through ocm_core.units' tables and type-checked against the DOF (length for x/y/z, angle for rx/ry/rz).",
+      "required": [
+        "value",
+        "unit"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "description": "Verbatim, e.g. 'mm' or 'deg' -- never convert; a unit in neither table refuses (OCM_UNIT_UNRECOGNISED), a unit in the wrong table for the DOF refuses (OCM_LOCATED_UNIT_MISMATCH)."
+        }
+      }
+    },
     "frame": {
       "type": "object",
       "required": [

@@ -250,7 +250,7 @@ export interface AgentChatHandlers {
 }
 
 function transportErrorEnvelope(message: string): Envelope {
-  return { ok: false, refusals: [{ code: "UNAVAILABLE", path: "$", message, allowed: null, hint: null }], warnings: [], data: null };
+  return { ok: false, refusals: [{ code: "OCM_UNAVAILABLE", path: "$", message, allowed: null, hint: null }], warnings: [], data: null };
 }
 
 function dispatchSseChunk(chunk: string, handlers: AgentChatHandlers): void {

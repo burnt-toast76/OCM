@@ -5,7 +5,12 @@ import yaml
 from ocm_core import load_cell, load_module
 from ocm_core.cell import Cell
 from ocm_core.errors import CellLoadError
-from ocm_core.loader import load_schema, validate_module_dict
+from ocm_core.loader import _read_yaml, load_schema, validate_module_dict
+
+# Round-trip the real cell through ocm-core's own YAML 1.2 loader, not
+# yaml.safe_load: PyYAML's YAML-1.1 default parses sd1's `mount.on:` key as the
+# boolean True, which the cell schema (rightly) rejects. `_read_yaml` matches
+# what load_cell itself uses.
 
 
 def test_loads_bracket_cell(bracket_cell_path):
@@ -36,7 +41,7 @@ def test_module_instance_consumables_are_parsed(tmp_path, bracket_cell_path):
     # either -- inject one into a copy so this structural parse path
     # stays covered, same pattern test_duplicate_instance_name_is_rejected
     # already uses below.
-    data = yaml.safe_load(bracket_cell_path.read_text(encoding="utf-8"))
+    data = _read_yaml(bracket_cell_path)
     feed1 = next(m for m in data["modules"] if m["instance"] == "feed1")
     feed1["consumables"] = {"screw": {"part": "M3x8 SHCS", "source": "feed1"}}
     path = tmp_path / "cell_with_consumables.yaml"
@@ -65,7 +70,7 @@ def test_robot1_carries_its_folded_home_joint_state(bracket_cell_path):
 
 
 def test_module_instance_joint_state_is_parsed_as_radians(tmp_path, bracket_cell_path):
-    data = yaml.safe_load(bracket_cell_path.read_text(encoding="utf-8"))
+    data = _read_yaml(bracket_cell_path)
     robot1 = next(m for m in data["modules"] if m["instance"] == "robot1")
     robot1["joint_state"] = {"shoulder_lift_joint": -1.5707963267948966, "elbow_joint": 1}
     path = tmp_path / "cell_with_joint_state.yaml"
@@ -94,7 +99,7 @@ def test_part_and_plan_are_passed_through_untyped(tmp_path, bracket_cell_path):
     # hasn't been redesigned since robot1's end effector was swapped from
     # a screwdriver to a gripper) -- inject a representative plan into a
     # copy so the passthrough itself stays covered.
-    data = yaml.safe_load(bracket_cell_path.read_text(encoding="utf-8"))
+    data = _read_yaml(bracket_cell_path)
     assert data["part"]["id"] == "BRK-4471"
     data["plan"] = [
         {"step": "clamp", "module": "nest1", "op": "clamp"},
@@ -124,13 +129,13 @@ def test_module_ref_referenced_by_a_cell_can_load_the_real_manifest(bracket_cell
 def test_cell_yaml_is_not_a_valid_module_manifest(bracket_cell_path, schema_path):
     # cell.yaml is a different shape entirely (composition, not a module).
     # ocm-core doesn't validate it against the module schema -- pin that.
-    data = yaml.safe_load(bracket_cell_path.read_text(encoding="utf-8"))
+    data = _read_yaml(bracket_cell_path)
     errors = validate_module_dict(data, load_schema(schema_path))
     assert errors
 
 
 def test_duplicate_instance_name_is_rejected(tmp_path, bracket_cell_path):
-    data = yaml.safe_load(bracket_cell_path.read_text(encoding="utf-8"))
+    data = _read_yaml(bracket_cell_path)
     dup = dict(data["modules"][0])
     dup["instance"] = data["modules"][1]["instance"]
     data["modules"].append(dup)
@@ -142,7 +147,7 @@ def test_duplicate_instance_name_is_rejected(tmp_path, bracket_cell_path):
 
 
 def test_missing_base_is_rejected(tmp_path, bracket_cell_path):
-    data = yaml.safe_load(bracket_cell_path.read_text(encoding="utf-8"))
+    data = _read_yaml(bracket_cell_path)
     del data["base"]
     bad_path = tmp_path / "bad_no_base.yaml"
     bad_path.write_text(yaml.safe_dump(data), encoding="utf-8")
@@ -153,7 +158,7 @@ def test_missing_base_is_rejected(tmp_path, bracket_cell_path):
 
 
 def test_malformed_module_ref_is_rejected(tmp_path, bracket_cell_path):
-    data = yaml.safe_load(bracket_cell_path.read_text(encoding="utf-8"))
+    data = _read_yaml(bracket_cell_path)
     data["modules"][0]["module"] = "not-a-valid-ref-missing-revision"
     bad_path = tmp_path / "bad_ref.yaml"
     bad_path.write_text(yaml.safe_dump(data), encoding="utf-8")

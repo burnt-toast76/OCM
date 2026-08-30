@@ -23,7 +23,38 @@ class PreconditionError(CoordinatorError):
     """A capability declares a precondition this coordinator doesn't know
     how to evaluate (spec/00's control vocabulary is fixed and small, but
     v0's expression grammar is smaller still: `signal == literal`).
+
+    ADR-0023 Decision 5: this is now a *backstop*. The same defect --
+    a condition naming a signal the module doesn't declare -- is refused at
+    resolve time (OCM_CONDITION_UNKNOWN_SIGNAL), so a validated manifest should
+    never reach this raise. It stays as a guard against an unvalidated
+    manifest driven straight into the coordinator.
     """
+
+
+class PostconditionError(CoordinatorError):
+    """ADR-0023 Decision 2: a module reported PackML Complete while one of
+    its own declared postconditions reads false against the live bus. The
+    coordinator does not believe Complete on its own -- the step is faulted,
+    naming the capability and the condition that read false.
+    """
+
+
+class OpTimeoutError(CoordinatorError):
+    """ADR-0023 Decision 6: a capability's `timeout_s` elapsed while the
+    coordinator was still waiting -- for its preconditions to hold, or for it
+    to report Complete. Carries `on_timeout` (`hold` | `abort`) so the caller
+    can dispose the part per the module's own declaration.
+    """
+
+    def __init__(self, capability_name: str, phase: str, on_timeout: str | None, timeout_s: float | None):
+        self.capability_name = capability_name
+        self.phase = phase  # "preconditions" | "completion"
+        self.on_timeout = on_timeout
+        self.timeout_s = timeout_s
+        super().__init__(
+            f"{capability_name} timed out after {timeout_s}s waiting for {phase} (on_timeout: {on_timeout})"
+        )
 
 
 class HeartbeatStaleError(CoordinatorError):

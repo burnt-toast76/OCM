@@ -14,6 +14,12 @@ name: test
 # installed. So a suite lacking one of these extras SKIPS the tests that
 # need it, with a clear reason (`-ra` surfaces the reason in the log), it
 # doesn't fail or error at collection.
+#
+# Every `pip install` passes `-c ci/requirements.txt` -- the CI dependency lock.
+# The editable ocm-* packages still install from the working tree; their
+# third-party dependencies resolve to the pinned versions in that file, so an
+# upstream release can't silently break a build no commit here touched (mcp
+# 2.0.0 did exactly that). See ci/requirements.txt and .github/dependabot.yml.
 
 on:
   push:
@@ -24,31 +30,31 @@ jobs:
   ocm-core:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: pip install -e "software/ocm-core[test]"
+      - run: pip install -c ci/requirements.txt -e "software/ocm-core[test]"
       - run: pytest -ra software/ocm-core/tests
 
   ocm-resolve:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install ocm-core (sibling), ocm-resolve[test]
         run: |
-          pip install -e software/ocm-core
-          pip install -e "software/ocm-resolve[test]"
+          pip install -c ci/requirements.txt -e software/ocm-core
+          pip install -c ci/requirements.txt -e "software/ocm-resolve[test]"
       - run: pytest -ra software/ocm-resolve/tests
 
   ocm-generator:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       # No `tesseract` extra: every --collision/plan-dependent test file
@@ -60,16 +66,16 @@ jobs:
       # skipping.
       - name: Install ocm-core, ocm-resolve (siblings), ocm-generator[test]
         run: |
-          pip install -e software/ocm-core
-          pip install -e software/ocm-resolve
-          pip install -e "software/ocm-generator[test]"
+          pip install -c ci/requirements.txt -e software/ocm-core
+          pip install -c ci/requirements.txt -e software/ocm-resolve
+          pip install -c ci/requirements.txt -e "software/ocm-generator[test]"
       - run: pytest -ra software/ocm-generator/tests
 
   ocm-api:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       # ocm-generator is a structural dependency here (ocm_api/composition.py,
@@ -82,8 +88,8 @@ jobs:
       # regardless of what's actually installed.
       - name: Install ocm-core, ocm-resolve, ocm-generator (siblings), ocm-api[test]
         run: |
-          pip install -e software/ocm-core
-          pip install -e software/ocm-resolve
-          pip install -e software/ocm-generator
-          pip install -e "software/ocm-api[test]"
+          pip install -c ci/requirements.txt -e software/ocm-core
+          pip install -c ci/requirements.txt -e software/ocm-resolve
+          pip install -c ci/requirements.txt -e software/ocm-generator
+          pip install -c ci/requirements.txt -e "software/ocm-api[test]"
       - run: pytest -ra software/ocm-api/tests

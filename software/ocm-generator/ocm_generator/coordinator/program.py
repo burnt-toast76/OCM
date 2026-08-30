@@ -65,8 +65,14 @@ from ocm_core import Capability, Module
 from ocm_resolve import ResolvedCell
 
 from .drivers import DriverRegistry, check_drivers_registered
-from .errors import CoordinatorError, HeartbeatStaleError
-from .packml import PackMLCommand, PackMLState, preconditions_met, read_signals
+from .errors import CoordinatorError, HeartbeatStaleError, OpTimeoutError, PostconditionError
+from .packml import (
+    PackMLCommand,
+    PackMLState,
+    failing_postconditions,
+    preconditions_met,
+    read_signals,
+)
 from .robot_link import RobotLink
 from .signals import SignalBus
 
@@ -112,6 +118,12 @@ class CoordinatorResult:
     trace: tuple[TraceEntry, ...] = ()
     aborted: bool = False
     abort_reason: str | None = None
+    # ADR-0023 Decision 6: a capability whose `on_timeout` is `hold` lands
+    # the cell in PackML Held, not Aborted -- the part stays put and waits
+    # for a human. That's a distinct outcome from an abort (which routes to
+    # on_fail), so it gets its own field rather than overloading `aborted`.
+    held: bool = False
+    hold_reason: str | None = None
 
 
 def write_trace_log(path: str | Path, result: CoordinatorResult) -> None:
@@ -123,6 +135,8 @@ def write_trace_log(path: str | Path, result: CoordinatorResult) -> None:
             {
                 "aborted": result.aborted,
                 "abort_reason": result.abort_reason,
+                "held": result.held,
+                "hold_reason": result.hold_reason,
                 "trace": [entry.to_dict() for entry in result.trace],
             },
             indent=2,
@@ -175,6 +189,16 @@ class Coordinator:
 
         self.drive_screw: Capability = self.tool_module.capability("drive_screw")
 
+        # ADR-0023: resolve the tool instance's `requires` bindings to
+        # concrete `(instance, signal)` pairs ONCE, up front -- a
+        # capability that gates on a peer's signal (e.g. drive_screw's
+        # `workpiece_secured` bound to `nest1.clamped`) reads that peer
+        # through this map. Resolve time already checked every binding
+        # names a real instance/signal, so this is a pure parse.
+        self.bindings: dict[str, tuple[str, str]] = self._resolve_bindings(
+            resolved.cell.module(self.tool_instance)
+        )
+
         result_names = _process_result_signal_names(self.tool_module)
         missing = {_RESULT_OK_SIGNAL, _TORQUE_SIGNAL, _ANGLE_SIGNAL} - result_names
         if missing:
@@ -215,14 +239,24 @@ class Coordinator:
 
             standoff_step = standoff_step_number(index)
             await self._wait_for_at_step(standoff_step)
-            # Interlocks become motion gates (spec/08): the robot is
-            # physically unable to proceed to contact until this holds.
-            await self._wait_for_preconditions(self.tool_instance, self.drive_screw)
+            # Interlocks become motion gates (ADR-0023): the robot is
+            # physically unable to proceed to contact until every one of
+            # drive_screw's declared preconditions holds -- including any
+            # bound to a peer instance's signal. Bounded by the
+            # capability's own `timeout_s`; on expiry the part is disposed
+            # per its own `on_timeout` (hold -> Held, abort -> Aborted).
+            try:
+                await self._wait_for_preconditions(self.tool_instance, self.drive_screw)
+            except OpTimeoutError as err:
+                return await self._dispose_timeout(err, trace)
             await self.robot_link.write_done_step(standoff_step)
 
             contact_step = contact_step_number(index)
             await self._wait_for_at_step(contact_step)
-            entry = await self._run_drive_screw(step, contact_step)
+            try:
+                entry = await self._run_drive_screw(step, contact_step)
+            except OpTimeoutError as err:
+                return await self._dispose_timeout(err, trace)
             trace.append(entry)
 
             if not entry.result_ok:
@@ -240,9 +274,55 @@ class Coordinator:
                     abort_reason=f"drive_screw result_ok=false @ {step.hole_id}",
                 )
 
+            # ADR-0023 Decision 2: PackML Complete alone no longer advances
+            # the walk. Verify drive_screw's own declared postconditions
+            # against the live bus; if one reads false, the module reported
+            # Complete without actually reaching it -- fault the cell,
+            # naming the capability and the condition it lied about.
+            failing = await failing_postconditions(
+                self.bus, self.tool_instance, self.drive_screw, self.bindings
+            )
+            if failing:
+                # Fault the cell (this raise surfaces out of .run(), like a
+                # stale heartbeat) -- but drop hs_abort first so the robot,
+                # still parked at the contact sync waiting for done_step,
+                # halts instead of hanging on a coordinator that just died.
+                await self.robot_link.write_abort(1)
+                raise PostconditionError(
+                    f"drive_screw reported PackML Complete @ {step.hole_id} but "
+                    f"postcondition(s) {failing} read false against the live bus"
+                )
+
             await self.robot_link.write_done_step(contact_step)
 
         return CoordinatorResult(trace=tuple(trace))
+
+    @staticmethod
+    def _resolve_bindings(instance) -> dict[str, tuple[str, str]]:
+        """`{requirement name: (target instance, target signal)}` from a
+        cell instance's `requires:` map (`"nest1.clamped"` ->
+        `("nest1", "clamped")`). Resolve time already validated the target
+        exists and is well-formed, so this only has to split on the first
+        dot.
+        """
+        bindings: dict[str, tuple[str, str]] = {}
+        for req_name, target in instance.requires.items():
+            target_instance, _, signal = target.partition(".")
+            bindings[req_name] = (target_instance, signal)
+        return bindings
+
+    async def _dispose_timeout(self, err: OpTimeoutError, trace: list[TraceEntry]) -> CoordinatorResult:
+        """Dispose a timed-out op per the capability's own `on_timeout`
+        (ADR-0023 Decision 6). `hold` commands PackML Hold and returns a
+        Held result -- the part stays put for a human. `abort` raises the
+        real `hs_abort` and returns an Aborted result so on_fail's routing
+        (PLC logic this v0 doesn't implement) has its trigger.
+        """
+        if err.on_timeout == "hold":
+            await self.bus.write(self.tool_instance, "packml_cmd", int(PackMLCommand.HOLD))
+            return CoordinatorResult(trace=tuple(trace), held=True, hold_reason=str(err))
+        await self.robot_link.write_abort(1)
+        return CoordinatorResult(trace=tuple(trace), aborted=True, abort_reason=str(err))
 
     async def _start_op(self, instance: str, op: str, hole_id: str) -> None:
         # `_active_op`/`_active_hole` are simulation-only routing signals --
@@ -262,8 +342,11 @@ class Coordinator:
 
     async def _run_drive_screw(self, step, contact_step: int) -> TraceEntry:
         await self._start_op(self.tool_instance, "drive_screw", step.hole_id)
-        await self._wait_for_state(self.tool_instance, PackMLState.COMPLETE)
-        values = await read_signals(self.bus, self.tool_instance, {_RESULT_OK_SIGNAL, _TORQUE_SIGNAL, _ANGLE_SIGNAL})
+        await self._wait_for_state(self.tool_instance, PackMLState.COMPLETE, self.drive_screw)
+        values = await read_signals(
+            self.bus,
+            {name: (self.tool_instance, name) for name in (_RESULT_OK_SIGNAL, _TORQUE_SIGNAL, _ANGLE_SIGNAL)},
+        )
         return TraceEntry(
             hole_id=step.hole_id,
             tool_instance=self.tool_instance,
@@ -279,11 +362,27 @@ class Coordinator:
             await asyncio.sleep(self.poll_interval_s)
 
     async def _wait_for_preconditions(self, instance: str, capability: Capability) -> None:
-        while not await preconditions_met(self.bus, instance, capability):
+        """Poll until every precondition holds, bounded by the capability's
+        own `timeout_s` (ADR-0023 Decision 6). On expiry, raise
+        OpTimeoutError carrying `on_timeout` so `_walk` can dispose the part
+        per the module's declaration.
+        """
+        deadline = time.monotonic() + capability.timeout_s if capability.timeout_s else None
+        while not await preconditions_met(self.bus, instance, capability, self.bindings):
+            if deadline is not None and time.monotonic() >= deadline:
+                raise OpTimeoutError(capability.name, "preconditions", capability.on_timeout, capability.timeout_s)
             await asyncio.sleep(self.poll_interval_s)
 
-    async def _wait_for_state(self, instance: str, state: PackMLState) -> None:
+    async def _wait_for_state(self, instance: str, state: PackMLState, capability: Capability) -> None:
+        """Poll until the module reports `state`, bounded by the
+        capability's `timeout_s` (ADR-0023 Decision 6) -- a module that
+        never reaches Complete is timed out and disposed, not waited on
+        forever.
+        """
+        deadline = time.monotonic() + capability.timeout_s if capability.timeout_s else None
         while (await self.bus.read(instance, "packml_state")) != int(state):
+            if deadline is not None and time.monotonic() >= deadline:
+                raise OpTimeoutError(capability.name, "completion", capability.on_timeout, capability.timeout_s)
             await asyncio.sleep(self.poll_interval_s)
 
     async def _watch_heartbeat(self) -> None:

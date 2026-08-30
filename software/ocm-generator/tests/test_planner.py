@@ -26,8 +26,8 @@ from ocm_generator.planner import (  # noqa: E402
     UR_JOINT_ORDER,
     PathCollisionError,
     PoseUnreachableError,
+    build_timeline,
     contact_step_number,
-    estimate_cycle_time,
     find_fastening_plan,
     plan_fastening_sequence,
     standoff_step_number,
@@ -64,7 +64,16 @@ def _planner_cell_dict(
             "mount": {"station": [400, 300], "pose": {"xyz_mm": [400, 300, 0], "rpy_deg": [0, 0, 0]}},
             "joint_state": dict(_HOME_JOINT_STATE),
         },
-        {"instance": "sd1", "module": "com.accelsolutions.screwdriver.sd50@1.2.0", "mount": {"on": "robot1.flange"}},
+        {
+            "instance": "sd1",
+            "module": "com.accelsolutions.screwdriver.sd50@1.2.0",
+            "mount": {"on": "robot1.flange"},
+            # sd50's drive_screw requires workpiece_secured; the real cell
+            # binds it to nest1.clamped and so does this fixture. (These
+            # tesseract-gated tests predate requirement bindings and were
+            # never runnable where that check landed.)
+            "requires": {"workpiece_secured": "nest1.clamped"},
+        },
         {
             "instance": "nest1",
             "module": "com.accelsolutions.fixture.pneumatic-nest@1.1.0",
@@ -190,13 +199,19 @@ def test_three_hole_cell_emits_three_approach_groups_in_order_with_direct_transi
             code = ln.split("#")[0].rstrip()
             assert code.endswith(")"), f"line has no real closing paren before its comment: {ln!r}"
 
-    # Cycle-time table renders without error and adds up sanely.
-    report = estimate_cycle_time(plan)
-    assert report.naive_serial_total_s >= report.overlapped_total_s >= 0
-    assert report.savings_s == pytest.approx(report.naive_serial_total_s - report.overlapped_total_s)
+    # Cycle-time table renders without error and adds up serially (D4).
+    timeline = build_timeline(resolved, scene, plan)
+    report = timeline.report
+    assert report.total_s == pytest.approx(sum(row.duration_s for row in report.rows))
+    # Stated durations are the manifests' own, summed with no overlap:
+    # nest1 clamp 0.6 + 3 holes * (load_screw 0.9 + drive_screw 1.8) +
+    # nest1 unclamp 0.4 = 9.1 s; every other row is an ESTIMATE motion.
+    stated = sum(row.duration_s for row in report.rows if row.source == "nominal_duration_s")
+    assert stated == pytest.approx(0.6 + 3 * (0.9 + 1.8) + 0.4)
+    assert not any(row.source == "overlapped" for row in report.rows)
     table = render_cycle_time_table(plan, report)
-    assert "naive serial total" in table
-    assert "overlap savings" in table
+    assert "total:" in table
+    assert "overlap" not in table
 
 
 # ---------------------------------------------------------------------------
@@ -367,8 +382,14 @@ def test_a_transit_that_collides_is_refused_naming_the_segment(modules_root_with
     }
     resolved, scene = _planner_scene(modules_root_with_obstacle, features, ["hole_1", "hole_2"], extra_modules=[obstacle])
 
+    # The check pass lives in the timeline walk now (ADR-0029 D5):
+    # plan_fastening_sequence hands back unchecked segments, and
+    # build_timeline is what refuses the colliding transit.
+    plan = plan_fastening_sequence(resolved, scene)
+    assert all(s.frames == () for s in plan.segments)
+
     with pytest.raises(PathCollisionError) as exc:
-        plan_fastening_sequence(resolved, scene)
+        build_timeline(resolved, scene, plan)
 
     assert exc.value.segment == "retract_1 -> standoff_2"
     assert {exc.value.instance_a, exc.value.instance_b} == {"blocker", "robot1"}

@@ -53,6 +53,7 @@ from typing import Optional
 from ocm_core import Module
 from ocm_resolve import ResolvedCell
 
+from .collision_geometry import derived_collision_elements
 from .containment import check_workspace_containment
 from .errors import FragmentError, SceneBuildError
 from .kinematics import JointState
@@ -191,10 +192,214 @@ def _validate_joint_state(
                 f"module {name}: joint_state names {joint_name!r}, which is a fixed joint (no configurable position)"
             )
             continue
+        # ADR-0028 D3 retrofit (Erratum 1): a cell-supplied joint value is the
+        # same class of claim as a capability's actuation target, so it gets
+        # the same limit check -- a joint driven through its own stop is a
+        # fabricated machine state. Continuous joints have no limits and are
+        # exempt; a NON-continuous joint with a missing or incomplete <limit>
+        # is malformed URDF and refuses (mirroring scene/actuation.py) rather
+        # than silently accepting any value. Messages carry no code prefix --
+        # translate.py's scene_error_to_refusal maps them, like every other
+        # scene-build error.
+        if joint_el.get("type") != "continuous":
+            limit_el = joint_el.find("limit")
+            lower_attr = limit_el.get("lower") if limit_el is not None else None
+            upper_attr = limit_el.get("upper") if limit_el is not None else None
+            if lower_attr is None or upper_attr is None:
+                errors.append(
+                    f"instance {name!r}: joint_state drives {joint_name!r} but the "
+                    f"{joint_el.get('type')} joint declares no <limit> -- malformed URDF; a value "
+                    "cannot be checked against a limit that is missing"
+                )
+                continue
+            lower, upper = float(lower_attr), float(upper_attr)
+            if not (lower <= float(value) <= upper):
+                errors.append(
+                    f"instance {name!r}: joint_state drives {joint_name!r} to {value}, "
+                    f"outside its declared limit [{lower}, {upper}]"
+                )
+                continue
         joint_state_out[namespaced] = float(value)
 
 
-def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
+def _inject_derived_collision(
+    module: Module,
+    prefix: str,
+    frag: _LoadedFragment,
+    components_root: Path | None,
+    errors: list[str],
+) -> None:
+    """ADR-0027: for a `collision_source: derived` module, splice per-link
+    <collision> geometry (posed component envelopes + structure primitives)
+    into the already-namespaced fragment links -- the planner collides against
+    what the manifest states, with no second artifact to fall out of sync.
+    Completeness was refused at resolve; here a missing components root is the
+    one thing left to catch (a derived module cannot build its proxy blind).
+    """
+    if module.mechanical.geometry.collision_source != "derived":
+        return
+    if components_root is None:
+        errors.append(
+            f"module {prefix} ({module.id}): collision_source 'derived' but build_scene was "
+            "given no components root -- cannot build the collision proxy"
+        )
+        return
+
+    from ocm_resolve.search import find_component
+
+    components: dict[str, "object"] = {}
+    for mc in module.components:
+        comp, comp_errors = find_component(mc.ref, components_root)
+        if comp is not None:
+            components[mc.refdes] = comp
+        else:
+            errors.extend(f"module {prefix} ({module.id}): {e}" for e in comp_errors)
+
+    links_by_name = {link.get("name"): link for link in frag.links}
+    for local_link, elements in derived_collision_elements(module, components).items():
+        target = frag.root_link if local_link is None else f"{prefix}__{local_link}"
+        link_el = links_by_name.get(target)
+        if link_el is None:
+            errors.append(
+                f"module {prefix} ({module.id}): derived collision targets link "
+                f"{local_link!r}, absent from the urdf_fragment"
+            )
+            continue
+        for el in elements:
+            link_el.append(el)
+
+
+def _compose_carrier(
+    resolved: ResolvedCell,
+    carriers_root: Path,
+    loaded: dict[str, _LoadedFragment],
+    all_links: list[ET.Element],
+    all_joints: list[ET.Element],
+    instances: dict[str, SceneInstance],
+    joint_state: JointState,
+    errors: list[str],
+) -> None:
+    """ADR-0031 D2: the carrier's chain, ROOTED AT THE LOCATED DATUM --
+
+        conveyor_root --[fixed: located frame]--> {inst}__located_datum
+            --[prismatic: {inst}__travel, +X]--> {inst}__travel_link
+            --[prismatic: {inst}__lift,   +Z]--> carrier fragment root
+
+    Both joints at zero IS the located pose; transit is negative offset,
+    so the part datum derives from machined geometry and nothing else.
+    Rooting at the conveyor base and deriving the located pose forward is
+    the rejected direction (it would make a hundredths-precision pose a
+    function of millimetres-precision joint values); here the located
+    frame is a FIXED transform and the coarse mechanisms hang off it.
+
+    Nothing declares a commanded travel: the prismatic joints' limits are
+    [entry, 0] -- 0 is the hard stop the datum is machined at (true by
+    construction), entry is the cell's own declared entry offset (a place,
+    not a target). A cell that declares no entry_mm models no transit at
+    all and the carrier is composed seated (a fixed joint at zero).
+    """
+    rc = resolved.carrier
+    if rc is None:
+        return
+    name = rc.name
+    declaration = rc.declaration
+
+    conveyor = loaded.get(declaration.located_on)
+    conveyor_module = resolved.instances[declaration.located_on].module
+    located = conveyor_module.mechanical.located
+    if conveyor is None or located is None:
+        return  # resolve already refused (located_on missing/undeclared); geometry errors reported above
+
+    # The located frame, resolved through its manifest parent chain down to
+    # the conveyor's origin (= its fragment root link). Single-hop frames
+    # (parent: origin) are the norm.
+    frames = conveyor_module.mechanical.frames
+    xyz_m, rpy_rad = (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)
+    offsets: list[tuple[tuple[float, float, float], tuple[float, float, float]]] = []
+    frame_name = located.frame
+    seen: set[str] = set()
+    while frame_name != "origin":
+        if frame_name in seen:
+            errors.append(f"carrier {name}: located frame {frame_name!r} has a circular parent chain")
+            return
+        seen.add(frame_name)
+        f = frames.get(frame_name)
+        if f is None:
+            return  # resolve already refused OCM_LOCATED_FRAME_UNKNOWN
+        offsets.append((_mm_to_m(f.xyz_mm), _deg_to_rad(f.rpy_deg)))
+        frame_name = f.parent
+    if len(offsets) == 1:
+        xyz_m, rpy_rad = offsets[0]
+    elif offsets:
+        # Nested frames compose only translations in this simple walk; a
+        # rotated parent frame would need full pose composition. Refuse
+        # loudly rather than place a datum wrong.
+        if any(any(r) for _xyz, r in offsets[1:]):
+            errors.append(
+                f"carrier {name}: located frame {located.frame!r} chains through a rotated parent "
+                "frame -- compose the offset into a single frame instead (v0 walks translations only)"
+            )
+            return
+        xyz_m = tuple(sum(o[0][i] for o in offsets) for i in range(3))  # type: ignore[assignment]
+        rpy_rad = offsets[0][1]
+
+    datum_link = f"{name}__located_datum"
+    travel_link = f"{name}__travel_link"
+
+    try:
+        frag = _load_and_namespace(rc.carrier, name, carriers_root)  # type: ignore[arg-type]
+    except FragmentError as e:
+        errors.append(f"carrier {name} ({rc.carrier.id}): {e}")
+        return
+
+    all_links.append(ET.Element("link", {"name": datum_link}))
+    all_joints.append(_fixed_joint(f"{name}__located", conveyor.root_link, datum_link, xyz_m, rpy_rad))
+
+    entry = declaration.entry_mm
+    if entry is None:
+        # No transit modelled: the carrier is seated at the datum. Fixed,
+        # zero -- the located pose by construction.
+        all_joints.append(_fixed_joint(f"{name}__seated", datum_link, frag.root_link, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)))
+        chain_links: list[str] = [datum_link]
+    else:
+        all_links.append(ET.Element("link", {"name": travel_link}))
+        for joint_name, parent, child, axis, entry_mm_value in (
+            (f"{name}__travel", datum_link, travel_link, "1 0 0", entry.travel),
+            (f"{name}__lift", travel_link, frag.root_link, "0 0 1", entry.lift),
+        ):
+            joint = ET.Element("joint", {"name": joint_name, "type": "prismatic"})
+            ET.SubElement(joint, "parent", {"link": parent})
+            ET.SubElement(joint, "child", {"link": child})
+            ET.SubElement(joint, "origin", {"xyz": "0 0 0", "rpy": "0 0 0"})
+            ET.SubElement(joint, "axis", {"xyz": axis})
+            # Limit [entry, 0]: both ends are DECLARED facts -- 0 is the
+            # machined hard stop (the datum), entry is where the cell says
+            # the carrier comes in. No fabricated range, no commanded value.
+            ET.SubElement(joint, "limit", {"lower": f"{entry_mm_value / 1000.0:.9g}", "upper": "0", "effort": "0", "velocity": "0"})
+            all_joints.append(joint)
+        chain_links = [datum_link, travel_link]
+
+        transit = declaration.transit_mm
+        joint_state[f"{name}__travel"] = (transit.travel / 1000.0) if transit else 0.0
+        joint_state[f"{name}__lift"] = (transit.lift / 1000.0) if transit else 0.0
+
+    all_links.extend(frag.links)
+    all_joints.extend(frag.joints)
+    instances[name] = SceneInstance(
+        name=name,
+        root_link=frag.root_link,
+        parent_link=conveyor.root_link,
+        joint_name=f"{name}__located",
+        link_names=frozenset(frag.link_names | set(chain_links)),
+    )
+
+
+def build_scene(
+    resolved: ResolvedCell,
+    modules_root: Path | str,
+    components_root: Path | str | None = None,
+    carriers_root: Path | str | None = None,
+) -> Scene:
     """Compose a resolved cell into a single combined URDF (a Scene).
 
     Raises SceneBuildError (carrying every violation found) if any
@@ -203,20 +408,34 @@ def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
     that doesn't exist on its target, any joint_state entry is invalid, or
     any non-base/non-robot instance's geometry extends past the base
     module's workspace footprint (see .containment).
+
+    `components_root` (ADR-0027): where components/ definitions live, needed
+    only to build the derived collision proxy of a `collision_source: derived`
+    module. Optional so existing callers keep working -- but a derived module
+    with no components root is a collected violation, never a silently
+    mesh-less scene.
+
+    `carriers_root` (ADR-0031): where carriers/ types live, needed only when
+    the cell declares a carrier instance. Defaults to `carriers/` beside
+    `modules_root`, the repo/workspace layout.
     """
     modules_root = Path(modules_root)
+    components_root = Path(components_root) if components_root is not None else None
+    carriers_root = Path(carriers_root) if carriers_root is not None else modules_root.parent / "carriers"
     errors: list[str] = []
 
     loaded: dict[str, _LoadedFragment] = {}
 
     try:
         loaded[_BASE_KEY] = _load_and_namespace(resolved.base, _BASE_KEY, modules_root)
+        _inject_derived_collision(resolved.base, _BASE_KEY, loaded[_BASE_KEY], components_root, errors)
     except FragmentError as e:
         errors.append(f"base ({resolved.base.id}): {e}")
 
     for name, ri in resolved.instances.items():
         try:
             loaded[name] = _load_and_namespace(ri.module, name, modules_root)
+            _inject_derived_collision(ri.module, name, loaded[name], components_root, errors)
         except FragmentError as e:
             errors.append(f"module {name} ({ri.module.id}): {e}")
 
@@ -292,12 +511,16 @@ def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
 
         _validate_joint_state(name, frag, ri.instance.joint_state, joint_state, errors)
 
+    # ADR-0031 D2: the carrier's chain, rooted at the located datum.
+    _compose_carrier(resolved, carriers_root, loaded, all_links, all_joints, instances, joint_state, errors)
+
     if errors:
         raise SceneBuildError(resolved.cell.id, errors)
 
     urdf_xml = _render_urdf(resolved.cell.id, all_links, all_joints)
 
     assert base_instance is not None  # no base errors above => it loaded
+    carrier_name = resolved.carrier.name if resolved.carrier else None
     errors.extend(
         check_workspace_containment(
             cell_id=resolved.cell.id,
@@ -305,7 +528,10 @@ def build_scene(resolved: ResolvedCell, modules_root: Path | str) -> Scene:
             joint_state=joint_state,
             base_link_names=base_instance.link_names,
             instance_link_names={name: si.link_names for name, si in instances.items()},
-            instance_kinds={name: resolved.instances[name].module.kind for name in instances},
+            instance_kinds={
+                name: ("carrier" if name == carrier_name else resolved.instances[name].module.kind)
+                for name in instances
+            },
             world_link=WORLD_LINK,
         )
     )

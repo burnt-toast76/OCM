@@ -2,6 +2,24 @@
 
 See the [root README](../README.md) for the thesis.
 
+## Manifests are YAML 1.2 (core schema). This is normative, not advisory.
+
+Every OCM manifest — component, module, cell — is parsed under **YAML 1.2 core schema**
+resolution. Only `true`/`false` (and their Title/UPPER case forms) are booleans; the YAML 1.1
+legacy tokens `on`, `off`, `yes`, `no`, `y`, `n` are **plain strings**, as keys and as values.
+
+This is load-bearing, not pedantry. A cell manifest writes `mount: {on: robot1.flange}`. A
+parser using YAML 1.1 resolution — which is what stock PyYAML's `safe_load` does — resolves
+that bare `on` key to boolean `True`, and the mount **silently vanishes**: no error, no
+warning, an instance floating unmounted. An implementation that parses OCM manifests with
+1.1-era resolution is non-conformant and will mis-read valid manifests without noticing.
+
+Implementers: use a YAML 1.2 parser, or restrict your 1.1 parser's implicit boolean resolution
+to `true`/`false` (Cellwright's `ocm-core` does exactly this — see
+`ocm_core/loader.py::_Loader`). The repo carries a test asserting its own manifests round-trip
+identically under 1.2 resolution and demonstrably would not under 1.1, so the hazard stays
+visible.
+
 ## Three layers, kept strictly separate
 
 | Layer | File | Authored by | Analogy |

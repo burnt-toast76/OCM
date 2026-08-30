@@ -22,9 +22,9 @@ export interface Envelope<T = unknown> {
 // -- Refusal codes this UI renders specially (envelope.Codes on the server;
 // mirrored here as string literals, not re-implemented -- the server is
 // still the only place that DECIDES when one applies). --------------------
-export const TOOL_SLOT_OCCUPIED = "TOOL_SLOT_OCCUPIED";
-export const WORKSPACE_OVERHANG = "WORKSPACE_OVERHANG";
-export const AGENT_UNAVAILABLE = "AGENT_UNAVAILABLE";
+export const OCM_TOOL_SLOT_OCCUPIED = "OCM_TOOL_SLOT_OCCUPIED";
+export const OCM_WORKSPACE_OVERHANG = "OCM_WORKSPACE_OVERHANG";
+export const OCM_AGENT_UNAVAILABLE = "OCM_AGENT_UNAVAILABLE";
 
 // -- Data shapes for the verbs this app actually calls (M1 + M2 only). ----
 

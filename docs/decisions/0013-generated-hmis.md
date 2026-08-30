@@ -1,6 +1,9 @@
 # ADR-0013 — Operator and engineer HMIs are generated from manifests
 
-**Status:** Accepted (direction locked; build after the cell composer, ADR-0012)
+**Status:** Accepted (direction locked; build after the cell composer, ADR-0012). ADR-0024
+settles the write-authority question that had left engineer-HMI actuation ambiguous: manual
+ops and jog are *commands* (available in MANUAL), distinct from manifest edits — so this ADR's
+engineer HMI is unblocked and its scope stands.
 
 ## Context
 

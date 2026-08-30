@@ -89,7 +89,7 @@ describe("ComponentForm", () => {
   it("maps a refusal on `vendor` to the vendor section, not some other one", () => {
     useComponentsStore.setState({
       fieldErrors: {
-        vendor: [{ code: "SCHEMA_INVALID", path: "$", message: "'vendor' is a required property", allowed: null, hint: "Fill it in." }],
+        vendor: [{ code: "OCM_SCHEMA_INVALID", path: "$", message: "'vendor' is a required property", allowed: null, hint: "Fill it in." }],
       },
     });
 
