@@ -8,12 +8,21 @@
 #
 # Value shapes:
 #   scalar      one number + unit
-#   spread      min/typ/max (any subset the document states) + unit
+#   spread      any subset of min/typ/max the document states, plus `unqualified`
+#               for a single number printed with no qualifier; + unit. At least
+#               one bound present. A bare number is never a valid spread.
 #   dimensions  length/width/height + unit
 #   text        verbatim string
-#   enum        one of a closed set declared in the entry
 #   list        list of text
 #   record      structured object; schema fragment named in the entry
+# Shapes enter this set the way keys do — by demand, never speculatively.
+#
+# Subject: a key marked `subject: required` claims about one element among
+# several (a connector, port, output, interface, process element); the claim's
+# subject is that element's designation, verbatim as printed. When the document
+# designates no element (a sole unlabeled connector), the subject is omitted —
+# the absence is the transcription. Keys without the marker take no subject.
+# A condition says when a value holds; a subject says which thing it is about.
 #
 # Promotion: an x- key enters this file via pull request, with aliases naming
 # the x- key it absorbs. Ingested claim records are never rewritten.
@@ -56,11 +65,12 @@ keys:
   - key: connector_pinout
     shape: record
     record_schema: pinout   # pin, function, wire_color per component schema
+    subject: required
     dimension: none
     definition: >
       Pin-to-function assignment of one named connector, as printed in the
-      wiring section. One claim per connector; connector designation goes in
-      conditions.
+      wiring section. One claim per connector; the connector designation is
+      the claim's subject.
     demand: ["component.electrical.connectors[].pins", eps25 M12 pinout]
 
   # --- environment and construction ----------------------------------------
@@ -138,10 +148,12 @@ keys:
 
   - key: output_configuration
     shape: text
+    subject: required
     dimension: none
     definition: >
       Electrical form of a named output: switching type (PNP/NPN, N.O./N.C.)
-      or analog range. One claim per output; output designation in conditions.
+      or analog range. One claim per output; the output designation is the
+      claim's subject.
     demand: ["eps25 comms.signals[].electrical"]
 
   # --- pneumatic ------------------------------------------------------------
@@ -160,20 +172,24 @@ keys:
 
   - key: port_thread
     shape: text
+    subject: required
     dimension: none
     definition: >
       Thread specification of a named port, verbatim (e.g. 1/4in male NPT).
-      Port designation in conditions.
+      The port designation is the claim's subject.
     demand: ["component.pneumatic.ports[].thread", eps25]
 
   # --- comms ----------------------------------------------------------------
 
   - key: protocol
     shape: text
+    subject: required
     dimension: none
     definition: >
       Communication protocol of a named interface as the document names it
-      (e.g. EtherCAT, IO-Link, discrete-io).
+      (e.g. EtherCAT, IO-Link, discrete-io). One claim per interface; the
+      interface designation, where the document prints one, is the claim's
+      subject.
     demand: [component.comms.protocol]
 
   # --- process behavior (from dispenser demand) -----------------------------
@@ -193,8 +209,9 @@ keys:
 
   - key: process_temp
     shape: spread
+    subject: required
     dimension: temperature
     definition: >
       Temperature range of a named process element (reservoir, needle, platen)
-      required or reached in operation. Element named in conditions.
+      required or reached in operation. The element is the claim's subject.
     demand: [dp8 notes "reservoir 35-45 C", "needle tip reaches 45 C"]
