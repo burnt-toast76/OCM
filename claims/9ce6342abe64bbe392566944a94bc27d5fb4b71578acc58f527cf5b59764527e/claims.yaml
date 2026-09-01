@@ -13,6 +13,8 @@ document:
 attestations:
 - vocab_version: '1.0'
   date: '2026-09-01'
+- vocab_version: '1.1'
+  date: '2026-09-01'
 claims:
 - id: sha256:41341855c70eec5dd95133d733bc01927175b181ebeda11319dfceabfa849530
   key: supply_voltage
@@ -210,6 +212,96 @@ claims:
   citation:
     page: 1
     locator: specifications, row 'Case material'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:305569b0347dd99f0b48f9c0b2af42eb83902643a112f6094bc58e66c5f07424
+  key: output_voltage
+  value:
+    max: 30
+    unit: V
+  conditions: []
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Control output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:2c082c90b21d294d505c1e852f2af57b7b276dd4591a31f35879303f074ccd03
+  key: output_current
+  value:
+    max: 100
+    unit: mA
+  conditions:
+  - per output
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Control output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:aca6465954385e15a046801602f6c158908fb7861d192f22d541fc241b2af7e2
+  key: output_current
+  value:
+    max: 100
+    unit: mA
+  conditions:
+  - total for 2 outputs
+  - when used as a solitary unit
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Control output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:ae6d770b927fc920d68efbe868b160cde426b942d5b7e17d2a9bc6aa75e0f5a6
+  key: output_current
+  value:
+    max: 20
+    unit: mA
+  conditions:
+  - when used as an expansion unit
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Control output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:99fa69fd562087a8aa0080eade5b6aa1157611f45c15567c9ec63671106c76d6
+  key: residual_voltage
+  value:
+    max: 1.4
+    unit: V
+  conditions:
+  - 'output current: 10 mA or less'
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Control output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:c625b9dc63c096a0329927ebf745e50d99f21bd4bfa99c519b2176e837122c10
+  key: residual_voltage
+  value:
+    max: 2
+    unit: V
+  conditions:
+  - 'output current: 10 to 100 mA'
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Control output'
   extraction:
     method: automated
     tool: LLM agent transcription (pdfplumber text layer)
