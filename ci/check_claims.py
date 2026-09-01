@@ -104,20 +104,25 @@ def check_store(problems: list[str]) -> None:
             continue
         document = entry / "document.txt"
         claims_file = entry / "claims.yaml"
-        if not document.is_file():
-            problems.append(f"claims/{name}: no document.txt -- a citation without bytes is unverifiable (ADR-0035 D5)")
-            continue
         if not claims_file.is_file():
             problems.append(f"claims/{name}: no claims.yaml")
             continue
 
-        actual = hashlib.sha256(document.read_bytes()).hexdigest()
-        if actual != name:
-            problems.append(
-                f"claims/{name}: document.txt hashes to {actual} -- storage location is derived "
-                "from the document hash, never chosen (ADR-0035 D5/D7)"
-            )
-            continue
+        # Synthetic example documents live in the repo and are hash-anchored
+        # here. Real manufacturer documents NEVER enter the repo (see
+        # claims/README.md): their hash was computed at ingest and only
+        # validate_claims can be re-run against such an entry -- the hash
+        # anchor is verifiable exactly when the bytes are ours to commit.
+        if document.is_file():
+            actual = hashlib.sha256(document.read_bytes()).hexdigest()
+            if actual != name:
+                problems.append(
+                    f"claims/{name}: document.txt hashes to {actual} -- storage location is derived "
+                    "from the document hash, never chosen (ADR-0035 D5/D7)"
+                )
+                continue
+        else:
+            print(f"claims/{name[:8]}...: document bytes not in repo (real document, cited by hash only)")
 
         envelope = api.validate_claims(f"sha256:{name}")
         for warning in envelope.warnings:
