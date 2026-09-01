@@ -253,7 +253,7 @@
     },
     "value_spread": {
       "type": "object",
-      "description": "shape: spread -- any subset of min/typ/max the document states, plus `unqualified` for a single number printed with no qualifier (filing it under typ would fabricate a qualifier the document does not state). At least one of the four, any combination legal: documents do print '6 bar (max 8 bar)'. No bound is ever inferred from another, and the claims layer offers no single-number accessor -- picking an end of a spread is manifest-layer authorship (ADR-0035 D1).",
+      "description": "shape: spread -- any subset of min/typ/max the document states, plus `unqualified` for a single number printed with no qualifier (filing it under typ would fabricate a qualifier the document does not state). At least one of the four, any combination legal: documents do print '6 bar (max 8 bar)'. No bound is ever inferred from another, and the claims layer offers no single-number accessor -- picking an end of a spread is manifest-layer authorship (ADR-0035 D1). There is deliberately no min <= typ <= max ordering constraint: a datasheet erratum transcribed verbatim is still a true transcription, and the claims layer never corrects the document.",
       "required": [
         "unit"
       ],
