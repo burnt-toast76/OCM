@@ -30,6 +30,12 @@ DEFAULT_CELL_SCHEMA_PATH = (
 DEFAULT_CARRIER_SCHEMA_PATH = (
     Path(__file__).resolve().parents[3] / "spec" / "schema" / "ocm-carrier-1.0.schema.json"
 )
+DEFAULT_CLAIMS_SCHEMA_PATH = (
+    Path(__file__).resolve().parents[3] / "spec" / "schema" / "ocm-claims-1.0.schema.json"
+)
+DEFAULT_CLAIMS_VOCAB_PATH = (
+    Path(__file__).resolve().parents[3] / "spec" / "schema" / "ocm-claims-vocab-1.0.yaml"
+)
 
 
 class _Loader(yaml.SafeLoader):

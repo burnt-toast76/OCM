@@ -16,7 +16,7 @@ import functools
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
-from . import authoring, carriers, components, composition, discovery, generation
+from . import authoring, carriers, claims, components, composition, discovery, generation
 from .envelope import Codes, Envelope, single_refusal
 from .workspace import Workspace
 
@@ -124,6 +124,12 @@ class OcmApi:
     @_never_raise
     def validate_carrier(self, id: str) -> Envelope:
         return carriers.validate_carrier(self.workspace, id)
+
+    # -- Claims (ADR-0035) ----------------------------------------------------------------
+
+    @_never_raise
+    def validate_claims(self, document_hash: str) -> Envelope:
+        return claims.validate_claims(self.workspace, document_hash)
 
     @_never_raise
     def list_components(self) -> Envelope:

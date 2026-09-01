@@ -15,6 +15,9 @@ dependencies = [
     # task; until then an unbounded >= silently breaks CI on upstream release.
     "mcp>=1.2.0,<2",
     "fastapi>=0.110",
+    # The ONE claim_id() implementation (ADR-0035 D7, ADR-0016) canonicalizes
+    # via RFC 8785 -- borrowed rules, not owned ones.
+    "rfc8785>=0.1.4",
     # /agent/chat's Anthropic Messages API tool-use loop. Always a real
     # dependency -- the degraded case is a missing ANTHROPIC_API_KEY
     # (AGENT_UNAVAILABLE), not a missing package.

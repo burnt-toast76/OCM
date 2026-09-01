@@ -246,6 +246,17 @@ def build_server(repo_root: str) -> FastMCP:
         return api.validate_carrier(id).to_dict()
 
     @mcp.tool(description=_doc(
+        "Validate one document's claims file (claims/<hex>/claims.yaml, ADR-0035), addressed by "
+        "its document hash: schema, vocabulary binding (declared shape, subject-taking, x- keys "
+        "marked unbound in warnings), and stored-id verification against the canonical "
+        "serialization -- an edited ingested record fails here by construction.",
+        '  call: validate_claims(document_hash="sha256:c03286e02ea14374f3b7e69ffb4d9616125bc7db49b9f397a1cb716211a290bb")\n'
+        '  response: {"ok": true, "data": {"document": "sha256:c032...", "claims": 12, "valid": true}}',
+    ))
+    def validate_claims(document_hash: str) -> dict[str, Any]:
+        return api.validate_claims(document_hash).to_dict()
+
+    @mcp.tool(description=_doc(
         "Validate, then set revision (must be >= 1.0.0 -- a real SemVer, not another 0.x draft) -- "
         "the component becomes referenceable from a module's components: list only after this "
         "succeeds.",

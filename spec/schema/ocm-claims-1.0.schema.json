@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opencellmodule.org/schema/ocm-claims-1.0.schema.json",
+  "title": "OCM Claims File v1.0",
+  "description": "ADR-0035: one file per ingested document -- the document record (D5) at the top, that document's claims and its completeness attestation (D4) under it. Claim records are append-only; appending the attestation is the sole legal mutation of this file (D7). Every claim stores its id, the sha256 of its canonical serialization per spec/schema/ocm-claims-serialization-1.0.md, and validate_claims recomputes and verifies it. This schema checks structure only; binding a key to its vocabulary entry (shape, subject, x- unbound marking) is validate_claims' other half -- one validator does both (ADR-0016), never a weaker sibling.",
+  "type": "object",
+  "required": [
+    "ocm_version",
+    "document",
+    "claims"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "ocm_version": {
+      "const": "1.0",
+      "description": "Claims-spec version this file is written against."
+    },
+    "document": {
+      "$ref": "#/$defs/document"
+    },
+    "attestation": {
+      "$ref": "#/$defs/attestation"
+    },
+    "claims": {
+      "type": "array",
+      "description": "May be empty: a document just ingested and not yet transcribed carries no claims and no attestation.",
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Content address: 'sha256:' + 64 lowercase hex digits. One self-describing format for document hashes and claim ids alike."
+    },
+    "document": {
+      "type": "object",
+      "description": "ADR-0035 D5: a document is its hash. Revision, date, and URL appear only when the document states or has them -- absence is honest (ADR-0014). Watermarked twins hash differently and are separate document records, accepted knowingly (D5).",
+      "required": [
+        "hash",
+        "manufacturer",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "hash": {
+          "$ref": "#/$defs/hash",
+          "description": "sha256 of the ingested file's bytes. Citations reference this, never the URL or revision string alone."
+        },
+        "manufacturer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "datasheet",
+            "manual",
+            "catalog"
+          ],
+          "description": "Document kind -- the component schema's source.kind minus 'measured' (a measurement is not an ingested document)."
+        },
+        "revision": {
+          "type": "string",
+          "description": "The printed revision string, verbatim. Recorded, never trusted as identity (D5)."
+        },
+        "date": {
+          "type": "string",
+          "description": "Publication date as printed."
+        },
+        "url": {
+          "type": "string",
+          "description": "Source URL. Prefer the manufacturer's own un-gated URL -- distributor downloads may be per-download watermarked (D5)."
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "description": "ADR-0035 D4: the per-document completeness attestation, pinned to a vocabulary version -- 'fully transcribed against this vocab; any vocabulary key without a claim here is a genuine document silence.' Written once, when a transcription pass finishes; a half-transcribed document carries none, and its absences stay untrusted until the pass completes.",
+      "required": [
+        "vocab_version",
+        "date"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "vocab_version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+$",
+          "description": "The ocm-claims-vocab version the pass covered. Keys a later vocabulary adds are honestly uncovered by this attestation."
+        },
+        "date": {
+          "type": "string",
+          "description": "When the pass finished."
+        },
+        "by": {
+          "type": "string",
+          "description": "Who attests."
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "description": "One datasheet-answerable statement (ADR-0035 D1). `subject` and `family` are the only optional members; an omitted member is absent, and null is not a valid value anywhere in a claim record (serialization spec, section 2).",
+      "required": [
+        "id",
+        "key",
+        "value",
+        "conditions",
+        "applies_to",
+        "citation",
+        "extraction"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/hash",
+          "description": "sha256 of the claim's canonical serialization (spec/schema/ocm-claims-serialization-1.0.md). Stored AND verified: validate_claims recomputes it and refuses on mismatch -- any edit to an ingested record, even a well-meant typo fix, changes its true hash and the stored id gives it away. That check is what makes append-only enforceable rather than conventional."
+        },
+        "key": {
+          "type": "string",
+          "pattern": "^(x-)?[a-z][a-z0-9_]*$",
+          "description": "A vocabulary key, or x- prefixed for a true statement the vocabulary hasn't caught up with (D2). An x- claim is well-formed but unbound; nothing downstream may consume it as a manifest source."
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Which element the claim is about -- a connector, port, output, or process element -- designation verbatim as printed. Only on keys the vocabulary marks subject-taking; omitted when the document designates no element (the absence is the transcription, D1). A condition says when a value holds; a subject says which thing it is about."
+        },
+        "value": {
+          "description": "Shaped by the key's vocabulary entry. This schema admits every shape and keeps them structurally disjoint; validate_claims checks the key's declared shape is the one used.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "description": "shape: text -- verbatim string."
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": "shape: list -- list of verbatim strings."
+            },
+            {
+              "$ref": "#/$defs/value_scalar"
+            },
+            {
+              "$ref": "#/$defs/value_spread"
+            },
+            {
+              "$ref": "#/$defs/value_dimensions"
+            },
+            {
+              "$ref": "#/$defs/record_pinout"
+            }
+          ]
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Test or operating conditions under which the value holds, verbatim. REQUIRED on every claim: an empty list is the transcriber's positive attestation that the document states none -- a missing field is a schema error, not an omission (D1)."
+        },
+        "applies_to": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Part numbers this claim covers, enumerated -- at least one. Claims for a document family carry per-variant applicability rather than being flattened to one part (D1)."
+        },
+        "family": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The document's own family or series designation, verbatim, when that is how it states coverage -- keeps the applies_to enumeration auditable as the judgment it is (D1)."
+        },
+        "citation": {
+          "$ref": "#/$defs/citation"
+        },
+        "extraction": {
+          "$ref": "#/$defs/extraction"
+        }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "description": "Where in THIS file's document the statement appears. The document hash is stated once at file level and re-attached in the canonical form (D7). The same statement printed in two places is two claims with two locators, deliberately -- intra-document discrepancies stay visible instead of silently merging.",
+      "required": [
+        "page",
+        "locator"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Table, row, figure, or section -- verbatim enough to find (e.g. \"spec table, row 'Operating Voltage'\")."
+        }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "description": "ADR-0035 D6: how this claim was produced. Deliberately OUTSIDE the id hash -- a human pass and an automated pass over the same statement must converge on one id, or the parity test (and corroboration generally) has no measuring stick.",
+      "required": [
+        "method"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "enum": [
+            "human",
+            "automated"
+          ]
+        },
+        "tool": {
+          "type": "string",
+          "description": "Tool identity and version, for automated extraction."
+        }
+      }
+    },
+    "value_scalar": {
+      "type": "object",
+      "description": "shape: scalar -- one number, unit verbatim as printed, never converted (ADR-0014).",
+      "required": [
+        "number",
+        "unit"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "number": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "value_spread": {
+      "type": "object",
+      "description": "shape: spread -- any subset of min/typ/max the document states, plus `unqualified` for a single number printed with no qualifier (filing it under typ would fabricate a qualifier the document does not state). At least one of the four, any combination legal: documents do print '6 bar (max 8 bar)'. No bound is ever inferred from another, and the claims layer offers no single-number accessor -- picking an end of a spread is manifest-layer authorship (ADR-0035 D1).",
+      "required": [
+        "unit"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "min"
+          ]
+        },
+        {
+          "required": [
+            "typ"
+          ]
+        },
+        {
+          "required": [
+            "max"
+          ]
+        },
+        {
+          "required": [
+            "unqualified"
+          ]
+        }
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "min": {
+          "type": "number"
+        },
+        "typ": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
+        "unqualified": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "value_dimensions": {
+      "type": "object",
+      "description": "shape: dimensions -- bounding dimensions as printed, unit verbatim. Only what the document states: a document giving two of three is transcribed as two of three.",
+      "required": [
+        "unit"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "length"
+          ]
+        },
+        {
+          "required": [
+            "width"
+          ]
+        },
+        {
+          "required": [
+            "height"
+          ]
+        }
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "length": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "record_pinout": {
+      "type": "array",
+      "minItems": 1,
+      "description": "shape: record, record_schema: pinout -- one connector's pin table. The property definitions mirror ocm-component-1.0.schema.json's electrical.connectors[].pins items VERBATIM (drift-guarded by test). `required` deliberately diverges to ['pin'] alone: a claims record transcribes what is printed, and a pin table without a function column is still a true statement -- requiring `function` is the COMPONENT's completeness bar, applied at projection time, not the transcription's.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pin"
+        ],
+        "properties": {
+          "pin": {
+            "type": "string",
+            "description": "Pin identifier as the datasheet labels it (e.g. '1', 'A', 'GND')."
+          },
+          "function": {
+            "type": "string",
+            "description": "What this pin is for, as the source states it (e.g. '24VDC supply', 'output_1 signal')."
+          },
+          "wire_color": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

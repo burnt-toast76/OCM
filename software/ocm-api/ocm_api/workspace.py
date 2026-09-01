@@ -60,6 +60,8 @@ import jsonpatch
 from ocm_core import new_yaml_rt as _new_yaml_rt
 from ocm_core.loader import (  # noqa: F401 -- see module docstring
     DEFAULT_CARRIER_SCHEMA_PATH,
+    DEFAULT_CLAIMS_SCHEMA_PATH,
+    DEFAULT_CLAIMS_VOCAB_PATH,
     DEFAULT_COMPONENT_SCHEMA_PATH,
     DEFAULT_SCHEMA_PATH,
     _read_yaml,
@@ -186,6 +188,20 @@ class Workspace:
         return candidate if candidate.is_file() else Path(DEFAULT_CARRIER_SCHEMA_PATH)
 
     @property
+    def claims_dir(self) -> Path:
+        return self.root / "claims"
+
+    @property
+    def claims_schema_path(self) -> Path:
+        candidate = self.root / "spec" / "schema" / "ocm-claims-1.0.schema.json"
+        return candidate if candidate.is_file() else Path(DEFAULT_CLAIMS_SCHEMA_PATH)
+
+    @property
+    def claims_vocab_path(self) -> Path:
+        candidate = self.root / "spec" / "schema" / "ocm-claims-vocab-1.0.yaml"
+        return candidate if candidate.is_file() else Path(DEFAULT_CLAIMS_VOCAB_PATH)
+
+    @property
     def changelog_path(self) -> Path:
         return self.root / "spec" / "CHANGELOG.md"
 
@@ -232,6 +248,19 @@ class Workspace:
         # carrier's uploads live under carriers/<id>/attachments/.
         return self.carrier_dir(carrier_id) / "attachments"
 
+    def claims_document_dir(self, document_hash: str) -> Path:
+        # Storage location is DERIVED from identity, never chosen (the same
+        # rule module ids follow): the directory is the document hash's 64
+        # hex digits, with or without its "sha256:" prefix on the way in.
+        # The readable metadata lives inside the file's document record.
+        return self.claims_dir / document_hash.removeprefix("sha256:")
+
+    def claims_path(self, document_hash: str) -> Path:
+        return self.claims_document_dir(document_hash) / "claims.yaml"
+
+    def claims_exists(self, document_hash: str) -> bool:
+        return self.claims_path(document_hash).is_file()
+
     def module_exists(self, module_id: str) -> bool:
         return self.module_path(module_id).is_file()
 
@@ -263,3 +292,8 @@ class Workspace:
         if not self.carriers_dir.is_dir():
             return []
         return sorted(p.parent.name for p in self.carriers_dir.glob("*/carrier.yaml"))
+
+    def list_claims_document_hashes(self) -> list[str]:
+        if not self.claims_dir.is_dir():
+            return []
+        return sorted(f"sha256:{p.parent.name}" for p in self.claims_dir.glob("*/claims.yaml"))
