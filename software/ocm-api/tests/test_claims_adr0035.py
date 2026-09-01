@@ -54,14 +54,14 @@ def _spread_claim() -> dict[str, Any]:
     }
 
 
-def _claims_file(claims: list[dict[str, Any]], attestation: dict[str, Any] | None = None, doc_hash: str = DOC_HASH) -> dict[str, Any]:
+def _claims_file(claims: list[dict[str, Any]], attestations: list[dict[str, Any]] | None = None, doc_hash: str = DOC_HASH) -> dict[str, Any]:
     doc: dict[str, Any] = {
         "ocm_version": "1.0",
         "document": {"hash": doc_hash, "manufacturer": "Example Automation", "type": "datasheet"},
         "claims": claims,
     }
-    if attestation is not None:
-        doc["attestation"] = attestation
+    if attestations is not None:
+        doc["attestations"] = attestations
     return doc
 
 
@@ -107,11 +107,41 @@ def test_an_omitted_subject_hashes_differently_from_a_present_one():
 
 
 def test_a_clean_claims_file_validates_with_no_warnings(api: OcmApi, workspace_root: Path):
-    _write_claims(workspace_root, _claims_file([_subject_claim(), _spread_claim()], attestation={"vocab_version": "1.0", "date": "2026-09-01"}))
+    _write_claims(workspace_root, _claims_file([_subject_claim(), _spread_claim()], attestations=[{"vocab_version": "1.0", "date": "2026-09-01"}]))
     e = api.validate_claims(DOC_HASH)
     assert e.ok, e.refusals
     assert e.data == {"document": DOC_HASH, "claims": 2, "valid": True}
     assert e.warnings == ()
+
+
+def test_a_document_accumulates_one_attestation_per_vocab_version(api: OcmApi, workspace_root: Path):
+    # Vocabulary 1.1 adds keys: the already-attested document gets a second
+    # pass and a second, 1.1-pinned attestation (ADR-0035 D4/D7).
+    _write_claims(workspace_root, _claims_file(
+        [_subject_claim()],
+        attestations=[
+            {"vocab_version": "1.0", "date": "2026-09-01"},
+            {"vocab_version": "1.1", "date": "2026-11-15"},
+        ],
+    ))
+    e = api.validate_claims(DOC_HASH)
+    assert e.ok, e.refusals
+
+
+def test_two_attestations_at_the_same_vocab_version_refuse(api: OcmApi, workspace_root: Path):
+    # One pass per vocabulary version, written once when it finishes.
+    _write_claims(workspace_root, _claims_file(
+        [_subject_claim()],
+        attestations=[
+            {"vocab_version": "1.0", "date": "2026-09-01"},
+            {"vocab_version": "1.0", "date": "2026-09-02"},
+        ],
+    ))
+    e = api.validate_claims(DOC_HASH)
+    assert not e.ok
+    (refusal,) = e.refusals
+    assert refusal.path == "attestations[1].vocab_version"
+    assert "one pass per vocabulary version" in refusal.message
 
 
 def test_an_x_claim_is_well_formed_but_unbound(api: OcmApi, workspace_root: Path):

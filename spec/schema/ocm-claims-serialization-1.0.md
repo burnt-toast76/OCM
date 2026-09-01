@@ -79,12 +79,13 @@ refusing on mismatch. That check is what makes the store's append-only property
 enforceable rather than conventional: any edit to an ingested record — including a
 well-meant typo fix — changes its true hash, and the stored id gives it away.
 
-## 5. A claims file changes in exactly one way
+## 5. A claims file changes in exactly two ways
 
-Informative restatement of ADR-0035 D7: claim records are append-only, and the sole
-legal mutation of an existing claims file is appending the document's completeness
-attestation (ADR-0035 D4) when a transcription pass finishes. Claim ids hash record
-content and citation, never file context, so the append moves no identity; the
+Informative restatement of ADR-0035 D7: an existing claims file has exactly two legal
+mutations — appending the claims a later transcription pass produces, and appending
+that pass's vocabulary-pinned completeness attestation (ADR-0035 D4). Existing records
+are never edited or removed; this is append-only in exactly D3's sense. Claim ids hash
+record content and citation, never file context, so the appends move no identity; the
 stored-id verification above catches anything else that moved.
 
 ## 6. Worked examples

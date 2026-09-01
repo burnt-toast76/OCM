@@ -133,11 +133,13 @@ decision's ambiguity reproduced one level down — while a stored per-query reco
 the day a new document is ingested. The stored fact is therefore scoped to what cannot rot:
 a per-document **completeness attestation**, pinned to a vocabulary version — "this document
 is fully transcribed against vocabulary 1.0; any vocabulary key without a claim here is a
-genuine document silence." The attestation is document-level and written once, when a
-transcription pass finishes; a half-transcribed document carries none, and its absences stay
-untrusted until the pass completes. The computed answer names the documents consulted and
-which of them are attested complete at which vocabulary version — a later vocabulary's new
-keys are honestly uncovered by an older attestation.
+genuine document silence." Each attestation is document-level and written once, when its
+transcription pass finishes; a document accumulates one attestation per vocabulary version
+it has been fully transcribed against, and a pass still unfinished leaves none — that
+vocabulary's absences stay untrusted until it completes. The computed answer names the
+documents consulted and which of them are attested complete at which vocabulary version — a
+later vocabulary's new keys are honestly uncovered by an older attestation, until their own
+pass runs and attests.
 
 ## Decision 5 — A document is its hash
 
@@ -193,11 +195,13 @@ The stored artifact is one file per ingested document, in a top-level `claims/` 
 beside `components/`: the Decision 5 document record at the top, the document's claims and
 its completeness attestation (Decision 4) under it. A claim's stored citation carries page
 and locator; the document hash is stated once at file level, and the claim's canonical,
-served form re-attaches it. Re-ingesting a revised document is one new file, never an edit —
-with one named exception: appending the completeness attestation when a transcription pass
-finishes is the sole legal mutation of an existing claims file. The claim records themselves
-stay append-only, and because a claim id hashes record content and citation — never file
-context — the append moves no identity; the stored-id verification catches anything else
+served form re-attaches it. Re-ingesting a revised document is one new file, never an edit.
+An existing claims file has exactly two legal mutations: appending the claims a later
+transcription pass produces — vocabulary 1.1 adds keys, so an already-attested document gets
+another pass — and appending that pass's vocabulary-pinned attestation (Decision 4).
+Existing records are never edited or removed: this is still append-only in exactly
+Decision 3's sense. Because a claim id hashes record content and citation — never file
+context — the appends move no identity; the stored-id verification catches anything else
 that moved.
 
 ## Out of scope

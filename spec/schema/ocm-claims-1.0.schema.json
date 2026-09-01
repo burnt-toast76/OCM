@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://opencellmodule.org/schema/ocm-claims-1.0.schema.json",
   "title": "OCM Claims File v1.0",
-  "description": "ADR-0035: one file per ingested document -- the document record (D5) at the top, that document's claims and its completeness attestation (D4) under it. Claim records are append-only; appending the attestation is the sole legal mutation of this file (D7). Every claim stores its id, the sha256 of its canonical serialization per spec/schema/ocm-claims-serialization-1.0.md, and validate_claims recomputes and verifies it. This schema checks structure only; binding a key to its vocabulary entry (shape, subject, x- unbound marking) is validate_claims' other half -- one validator does both (ADR-0016), never a weaker sibling.",
+  "description": "ADR-0035: one file per ingested document -- the document record (D5) at the top, that document's claims and its completeness attestations (D4) under it. The file has exactly two legal mutations (D7): appending the claims a later transcription pass produces, and appending that pass's vocabulary-pinned attestation; existing records are never edited or removed. Every claim stores its id, the sha256 of its canonical serialization per spec/schema/ocm-claims-serialization-1.0.md, and validate_claims recomputes and verifies it. This schema checks structure only; binding a key to its vocabulary entry (shape, subject, x- unbound marking) is validate_claims' other half -- one validator does both (ADR-0016), never a weaker sibling.",
   "type": "object",
   "required": [
     "ocm_version",
@@ -18,12 +18,17 @@
     "document": {
       "$ref": "#/$defs/document"
     },
-    "attestation": {
-      "$ref": "#/$defs/attestation"
+    "attestations": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One attestation per vocabulary version this document has been fully transcribed against -- vocabulary 1.1 adds keys, so an already-attested document gets a second pass and a second, 1.1-pinned attestation (D4). Optional: an untranscribed document has none. One pass per vocabulary version; validate_claims refuses duplicates.",
+      "items": {
+        "$ref": "#/$defs/attestation"
+      }
     },
     "claims": {
       "type": "array",
-      "description": "May be empty: a document just ingested and not yet transcribed carries no claims and no attestation.",
+      "description": "May be empty: a document just ingested and not yet transcribed carries no claims and no attestations.",
       "items": {
         "$ref": "#/$defs/claim"
       }
@@ -77,7 +82,7 @@
     },
     "attestation": {
       "type": "object",
-      "description": "ADR-0035 D4: the per-document completeness attestation, pinned to a vocabulary version -- 'fully transcribed against this vocab; any vocabulary key without a claim here is a genuine document silence.' Written once, when a transcription pass finishes; a half-transcribed document carries none, and its absences stay untrusted until the pass completes.",
+      "description": "ADR-0035 D4: one completeness attestation, pinned to a vocabulary version -- 'fully transcribed against this vocab; any vocabulary key without a claim here is a genuine document silence.' Each attestation is written once, when its transcription pass finishes; an unfinished pass leaves none, and that vocabulary's absences stay untrusted until it completes.",
       "required": [
         "vocab_version",
         "date"

@@ -185,6 +185,26 @@ def validate_claims(ws: Workspace, document_hash: str) -> Envelope:
             )
         )
 
+    # One pass per vocabulary version (ADR-0035 D4): the attestations array
+    # accumulates across vocabulary versions, and a duplicate version would
+    # be two "written once" statements about one pass -- the schema cannot
+    # express the uniqueness, so it is checked here.
+    attestations = doc.get("attestations") if isinstance(doc.get("attestations"), list) else []
+    seen_versions: set[str] = set()
+    for index, attestation in enumerate(attestations):
+        version = attestation.get("vocab_version") if isinstance(attestation, dict) else None
+        if isinstance(version, str) and version in seen_versions:
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_INVALID_ARGUMENT,
+                    path=f"attestations[{index}].vocab_version",
+                    message=f"a second attestation at vocabulary version {version!r} -- one pass per vocabulary version, written once when it finishes",
+                    hint="A later vocabulary gets its own pass and its own attestation; the same version attested twice says nothing new and breaks the written-once rule (ADR-0035 D4).",
+                )
+            )
+        elif isinstance(version, str):
+            seen_versions.add(version)
+
     vocab = _load_vocab(ws)
     claims = doc.get("claims") if isinstance(doc.get("claims"), list) else []
     for index, claim in enumerate(claims):
