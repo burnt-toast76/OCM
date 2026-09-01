@@ -1,0 +1,175 @@
+# Golden claims fixture (ADR-0035 D6): hand-transcribed from the
+# document.txt beside this file. Claim ids are computed by
+# ocm_api.claims.claim_id per spec/schema/ocm-claims-serialization-1.0.md
+# -- never by hand. Records are append-only (D3/D7).
+ocm_version: '1.0'
+document:
+  hash: sha256:c704b86ff07863a38fc69681f8e6a993cd2067ca220c7966a8d151877c97b94d
+  manufacturer: Example Dispensing (synthetic)
+  type: datasheet
+  date: '2026-09-01'
+  url: repository file claims/c704b86ff07863a38fc69681f8e6a993cd2067ca220c7966a8d151877c97b94d/document.txt
+attestations:
+- vocab_version: '1.0'
+  date: '2026-09-01'
+claims:
+- id: sha256:c3280a42dff70b3b9e4a4462a26bb9de48f2e9684d794c30651b48962e91d42d
+  key: mass
+  value:
+    number: 4.2
+    unit: kg
+  conditions: []
+  applies_to:
+  - DP-8
+  citation:
+    page: 1
+    locator: specifications, row 'Mass'
+  extraction:
+    method: human
+- id: sha256:2b4be9ad715ceab7b7eaa7bdf62f457dfb7f3bf10d6d0ea64d861a90aeeb7a7c
+  key: envelope
+  value:
+    length: 120
+    width: 160
+    height: 210
+    unit: mm
+  conditions: []
+  applies_to:
+  - DP-8
+  citation:
+    page: 1
+    locator: specifications, row 'Dimensions'
+  extraction:
+    method: human
+- id: sha256:3c83499b2f87b378b23ef4da3b40108ae8bd793e4e4bd1dbcd1c2ee7815e1011
+  key: operating_pressure
+  value:
+    unqualified: 5
+    max: 6
+    unit: bar
+  conditions:
+  - filtered dry air
+  applies_to:
+  - DP-8
+  citation:
+    page: 1
+    locator: specifications, row 'Operating pressure'
+  extraction:
+    method: human
+- id: sha256:f4b7b16ffc7343d29c5ee398fdc1e45fcd0d9c4500018a4056b6c87d029ec3d7
+  key: dispense_volume
+  value:
+    min: 0.3
+    max: 2.5
+    unit: uL
+  conditions:
+  - per shot
+  applies_to:
+  - DP-8
+  citation:
+    page: 1
+    locator: specifications, row 'Dispense volume'
+  extraction:
+    method: human
+- id: sha256:e9a67365a32f58cb99bf2f7ebce8cf1621129e2897969df364b53264e98efbbf
+  key: warmup_time
+  value:
+    number: 4
+    unit: min
+  conditions:
+  - at 20-25 C ambient
+  applies_to:
+  - DP-8
+  citation:
+    page: 1
+    locator: specifications, row 'Warm-up time'
+  extraction:
+    method: human
+- id: sha256:b273ca472a6091995758037e8bfa0b5add4d4649f2d51e59d1f83e669c521785
+  key: current_peak
+  value:
+    number: 3.5
+    unit: A
+  conditions:
+  - heater inrush, cold start
+  applies_to:
+  - DP-8
+  citation:
+    page: 1
+    locator: specifications, row 'Peak supply current'
+  extraction:
+    method: human
+- id: sha256:42c08d4bd38513ea824138f63138071b6cf7a9b1ff71bbff43fa4024da75ec73
+  key: process_temp
+  subject: reservoir
+  value:
+    min: 35
+    max: 45
+    unit: C
+  conditions:
+  - in operation
+  applies_to:
+  - DP-8
+  citation:
+    page: 1
+    locator: specifications, row 'Reservoir temperature'
+  extraction:
+    method: human
+- id: sha256:81f9407253e2e72dbfff7bba4aaca94e63c864af837fe0aa75582f350b88e98d
+  key: process_temp
+  subject: needle tip
+  value:
+    unqualified: 45
+    unit: C
+  conditions:
+  - in operation
+  applies_to:
+  - DP-8
+  citation:
+    page: 1
+    locator: specifications, row 'Needle tip temperature'
+  extraction:
+    method: human
+- id: sha256:6bbe4427dc43de4d6325a2078438583c159e7b94d0459cb2b4f2bf0787a2923d
+  key: protocol
+  value: EtherCAT
+  conditions: []
+  applies_to:
+  - DP-8
+  citation:
+    page: 1
+    locator: specifications, row 'Fieldbus'
+  extraction:
+    method: human
+- id: sha256:3e32bcbc778f976f6e96def6b2b067d9960faf380eb833415291d4d098ed02ed
+  key: port_thread
+  subject: A
+  value: G1/8
+  conditions: []
+  applies_to:
+  - DP-8
+  citation:
+    page: 2
+    locator: connections, row 'Air supply port A'
+  extraction:
+    method: human
+- id: sha256:dc2be98682154b22a5b10318e54c65c422012c261475b0b540ddeb85b6ab2abf
+  key: connector_pinout
+  subject: X1
+  value:
+  - pin: '1'
+    wire_color: BN (brown)
+  - pin: '2'
+    wire_color: BU (blue)
+  - pin: '3'
+    wire_color: BK (black)
+  - pin: '4'
+    wire_color: GY (gray)
+  conditions: []
+  applies_to:
+  - DP-8
+  citation:
+    page: 2
+    locator: connections, pin table 'Connector X1'
+  extraction:
+    method: human

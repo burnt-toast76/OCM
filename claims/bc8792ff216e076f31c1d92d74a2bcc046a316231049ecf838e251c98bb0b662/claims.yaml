@@ -1,0 +1,260 @@
+# Golden claims fixture (ADR-0035 D6): hand-transcribed from the
+# document.txt beside this file. Claim ids are computed by
+# ocm_api.claims.claim_id per spec/schema/ocm-claims-serialization-1.0.md
+# -- never by hand. Records are append-only (D3/D7).
+ocm_version: '1.0'
+document:
+  hash: sha256:bc8792ff216e076f31c1d92d74a2bcc046a316231049ecf838e251c98bb0b662
+  manufacturer: Example Automation (synthetic)
+  type: datasheet
+  date: '2026-09-01'
+  url: repository file claims/bc8792ff216e076f31c1d92d74a2bcc046a316231049ecf838e251c98bb0b662/document.txt
+attestations:
+- vocab_version: '1.0'
+  date: '2026-09-01'
+claims:
+- id: sha256:4b1e5cfd7bb4996059688f365f449b2ef7a215170683fa920bc04b6e0715e403
+  key: supply_voltage
+  value:
+    min: 18
+    max: 30
+    unit: VDC
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 1
+    locator: overview, row 'Supply voltage'
+  extraction:
+    method: human
+- id: sha256:def8ccbfaeecdabb00bfcc276d7d45659e66f49a45a40228b210ed946eb4185b
+  key: supply_voltage
+  value:
+    min: 18
+    max: 30
+    unit: VDC
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Supply voltage'
+  extraction:
+    method: human
+- id: sha256:8d63dafd7d0573a0f5d6aec5c84f0acf3e0015c366613e9814cb1d7f4a38b47b
+  key: ip_rating
+  value: IP67
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 1
+    locator: overview, row 'Protection rating'
+  extraction:
+    method: human
+- id: sha256:040c4083c4d259b7f65c7d0376dee1ac2fefe2b49c170015f9a29755b6962541
+  key: x-display_type
+  value: 4-digit, two-color LED
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 1
+    locator: overview, row 'Display'
+  extraction:
+    method: human
+- id: sha256:fbe74d6c556478575d3a745a67b78518d1635bd433763548eade0dbe94a75703
+  key: power_consumption
+  value:
+    unqualified: 1.2
+    unit: W
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Power consumption'
+  extraction:
+    method: human
+- id: sha256:3af15a04d6baf56041db3065d59f9a09a5deb7fe19c73b032fbc9277cc5209f8
+  key: measuring_range
+  value:
+    min: -5
+    max: 100.4
+    unit: inches of water column
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Measuring range', variant EPS25-100WC-1001
+  extraction:
+    method: human
+- id: sha256:bbb40afc400ce9feada37516fa7b824d2d672042c64dbc1a90a6843e30138cce
+  key: measuring_range
+  value:
+    min: -5
+    max: 250
+    unit: inches of water column
+  conditions: []
+  applies_to:
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Measuring range', variant EPS25-250WC-1001
+  extraction:
+    method: human
+- id: sha256:bed9ddf838733b5f7455c9cd88606e60747c2808847c7d9355695d92e464b9b3
+  key: accuracy
+  value:
+    number: 0.5
+    unit: '% of full range'
+  conditions:
+  - at 23 C reference temperature
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Accuracy'
+  extraction:
+    method: human
+- id: sha256:0089a18d96a88f19fed867fc97bcef09620f9167d321f8a20a19fce362d1fe0d
+  key: output_configuration
+  subject: OUT1
+  value: Switch (N.O./N.C.), PNP/NPN selectable
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Output 1 (OUT1)'
+  extraction:
+    method: human
+- id: sha256:c6fb7f7f950244afd20d080dbe2315339aba72b990dacb6892d7e01bf3e2b836
+  key: output_configuration
+  subject: OUT2
+  value: Switch (N.O./N.C.), PNP/NPN selectable, or 4-20 mA / 0-10 VDC analog
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Output 2 (OUT2)'
+  extraction:
+    method: human
+- id: sha256:0dd81b7af77bbb74a0c9a9c8a8dd88dc3a7010fb6edd6553c37345d5bd0ae626
+  key: seal_material
+  value: FKM
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Seal material'
+  extraction:
+    method: human
+- id: sha256:bb3b41635b8e885f201d42415066715b04ed804d78c38e2558d36ec4f365f7bc
+  key: wetted_materials
+  value:
+  - Ceramic
+  - FKM
+  - 316 stainless steel
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Wetted parts'
+  extraction:
+    method: human
+- id: sha256:709f3ad731e70351f3f5d583f12c39b6f76764d1cab6cca3362f13a3e5f28bbd
+  key: envelope
+  value:
+    length: 108
+    height: 34
+    unit: mm
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Body dimensions'
+  extraction:
+    method: human
+- id: sha256:5957391e5009d178eb943ae2d594190dc3cda2b71cd41c51b8eaae57cfd4bb4f
+  key: port_thread
+  value: 1/4in male NPT
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Process connection'
+  extraction:
+    method: human
+- id: sha256:77fc614be4b2fe4891742360b0f45a66a7ccb2f84b2fcfbf3cda5039bc237a5c
+  key: agency_approvals
+  value:
+  - UL Listed file E000000
+  - CE
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Agency approvals'
+  extraction:
+    method: human
+- id: sha256:6ac51ab69e081c20f0bac79dad2361aba6890a756f64d9a17c24f83cfc506077
+  key: connector_pinout
+  value:
+  - pin: '1'
+    function: L+ (supply)
+    wire_color: BN (brown)
+  - pin: '2'
+    function: OUT2
+    wire_color: WH (white)
+  - pin: '3'
+    function: L- (supply)
+    wire_color: BU (blue)
+  - pin: '4'
+    function: OUT1
+    wire_color: BK (black)
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 3
+    locator: wiring, M12 pin table
+  extraction:
+    method: human
