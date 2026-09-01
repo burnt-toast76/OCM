@@ -30,7 +30,8 @@ claims:
     page: 1
     locator: specifications, row 'Power voltage'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:64d368feae2f69a7702005ea0b30632a4656358bb848596d380b31d26ca81243
   key: power_consumption
   value:
@@ -45,7 +46,8 @@ claims:
     page: 1
     locator: specifications, row 'Power consumption'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:352b4b63078e332aacd0f252f154763cb539a7539a2f35e4e0761878b2fe96d1
   key: power_consumption
   value:
@@ -60,7 +62,8 @@ claims:
     page: 1
     locator: specifications, row 'Power consumption'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:91111496c81de7328b2927471cbb862e6a59526776258f7031add47577185392
   key: power_consumption
   value:
@@ -75,7 +78,8 @@ claims:
     page: 1
     locator: specifications, row 'Power consumption'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:a72679025d9fb783317b0a5ae2e49c84bf6f1092a8350552413a395644a89035
   key: operating_temp
   value:
@@ -91,7 +95,8 @@ claims:
     page: 1
     locator: specifications, row 'Ambient temperature'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:73fe163c188cb911db8466678b9072822a29aacf85196172cc568a525109c846
   key: operating_temp
   value:
@@ -109,7 +114,8 @@ claims:
     page: 2
     locator: footnote *6
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:07a12f42ff4cb0dcd02a82900e9b7e51299a74464b3612a9637f5c8c6a001f2f
   key: operating_temp
   value:
@@ -127,7 +133,8 @@ claims:
     page: 2
     locator: footnote *6
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:0191e09dc13160690107ee62ef9d47540a54aaa99e2be50d7f8d7e396a914617
   key: mass
   value:
@@ -141,7 +148,8 @@ claims:
     page: 1
     locator: specifications, row 'Weight'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:a9e055110cb4e89552840ace593407e1aa89863d3bc4924f326cfff398a53681
   key: output_configuration
   value: NPN
@@ -152,7 +160,8 @@ claims:
     page: 1
     locator: specifications, row 'Output'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:a55d8b6ec5c5027fba1db8fc1a6ad4f2d33b07492a9bf739fc9af4d4ba596e3b
   key: output_configuration
   value: 'Open-collector, 30 V or less 100 mA or less per output, 100 mA or less total for 2 outputs (when
@@ -165,7 +174,8 @@ claims:
     page: 1
     locator: specifications, row 'Control output'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:dff3383776aece821ab678710774aef43305f411360632d27615945313e9a955
   key: x-response_time
   value: 23 µs (S-HSPD*1) /50 µs (HSPD*2) /250 µs (FINE) /500 µs (TURBO) /1 ms (SUPER) /4 ms (ULTRA) /16
@@ -177,7 +187,8 @@ claims:
     page: 1
     locator: specifications, row 'Response time'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:d5ea211bae458d140126338ee64718cbe209e21e8af2b1369bda91853603808d
   key: x-light_source
   value: 'Transmitter side: Red, four-element LED (wavelength: 660 nm)'
@@ -188,7 +199,8 @@ claims:
     page: 1
     locator: specifications, row 'Light source LED'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:5d5b0f1d23e0f7410554933c643857c709bff6942de4725b89d4e3c565a4c5ba
   key: x-case_material
   value: 'Main unit and cover: polycarbonate'
@@ -199,4 +211,5 @@ claims:
     page: 1
     locator: specifications, row 'Case material'
   extraction:
-    method: human
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
