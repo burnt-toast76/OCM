@@ -26,8 +26,14 @@
 #
 # Promotion: an x- key enters this file via pull request, with aliases naming
 # the x- key it absorbs. Ingested claim records are never rewritten.
+#
+# Versioning: the filename carries the FORMAT major (like the schema files);
+# `ocm_version` below is the KEY-SET version that attestations pin (ADR-0035
+# D4). Adding a key bumps it -- an older attestation honestly does not cover
+# the new keys, and a document gains coverage through a new pass and a new
+# attestation, never by editing the old one.
 
-ocm_version: '1.0'
+ocm_version: '1.1'
 keys:
 
   # --- electrical -----------------------------------------------------------
@@ -72,6 +78,37 @@ keys:
       wiring section. One claim per connector; the connector designation is
       the claim's subject.
     demand: ["component.electrical.connectors[].pins", eps25 M12 pinout]
+
+  - key: output_voltage
+    shape: spread
+    subject: takes
+    dimension: voltage
+    definition: >
+      Voltage rating of a named electrical output (e.g. an open-collector
+      maximum). One claim per output; the output designation, where the
+      document prints one, is the claim's subject. Load or configuration
+      goes in conditions.
+    demand: ['fs-n41n "Control output: Open-collector, 30 V or less"']
+
+  - key: output_current
+    shape: spread
+    subject: takes
+    dimension: current
+    definition: >
+      Current rating of a named electrical output. One claim per stated
+      configuration (per output, total across outputs, as an expansion
+      unit) -- the configuration goes in conditions; the output
+      designation, where printed, is the claim's subject.
+    demand: ['fs-n41n "100 mA or less per output / 20 mA or less (expansion unit)"']
+
+  - key: residual_voltage
+    shape: spread
+    subject: takes
+    dimension: voltage
+    definition: >
+      Residual (saturation) voltage across a named output in the ON state.
+      The output current at which it holds goes in conditions.
+    demand: ['fs-n41n "Residual voltage: 1.4 V or less (output current: 10 mA or less)"']
 
   # --- environment and construction ----------------------------------------
 
@@ -152,8 +189,10 @@ keys:
     dimension: none
     definition: >
       Electrical form of a named output: switching type (PNP/NPN, N.O./N.C.)
-      or analog range. One claim per output; the output designation is the
-      claim's subject.
+      or analog range -- ONLY. Voltage and current ratings belong to
+      output_voltage, output_current, and residual_voltage, one statement
+      per claim (ADR-0035 D1), never packed into this key's text. One claim
+      per output; the output designation is the claim's subject.
     demand: ["eps25 comms.signals[].electrical"]
 
   # --- pneumatic ------------------------------------------------------------
