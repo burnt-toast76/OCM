@@ -17,7 +17,7 @@
 #   record      structured object; schema fragment named in the entry
 # Shapes enter this set the way keys do — by demand, never speculatively.
 #
-# Subject: a key marked `subject: required` claims about one element among
+# Subject: a key marked `subject: takes` claims about one element among
 # several (a connector, port, output, interface, process element); the claim's
 # subject is that element's designation, verbatim as printed. When the document
 # designates no element (a sole unlabeled connector), the subject is omitted —
@@ -65,7 +65,7 @@ keys:
   - key: connector_pinout
     shape: record
     record_schema: pinout   # pin, function, wire_color per component schema
-    subject: required
+    subject: takes
     dimension: none
     definition: >
       Pin-to-function assignment of one named connector, as printed in the
@@ -148,7 +148,7 @@ keys:
 
   - key: output_configuration
     shape: text
-    subject: required
+    subject: takes
     dimension: none
     definition: >
       Electrical form of a named output: switching type (PNP/NPN, N.O./N.C.)
@@ -172,7 +172,7 @@ keys:
 
   - key: port_thread
     shape: text
-    subject: required
+    subject: takes
     dimension: none
     definition: >
       Thread specification of a named port, verbatim (e.g. 1/4in male NPT).
@@ -183,7 +183,7 @@ keys:
 
   - key: protocol
     shape: text
-    subject: required
+    subject: takes
     dimension: none
     definition: >
       Communication protocol of a named interface as the document names it
@@ -209,7 +209,7 @@ keys:
 
   - key: process_temp
     shape: spread
-    subject: required
+    subject: takes
     dimension: temperature
     definition: >
       Temperature range of a named process element (reservoir, needle, platen)

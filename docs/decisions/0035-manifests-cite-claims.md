@@ -193,7 +193,12 @@ The stored artifact is one file per ingested document, in a top-level `claims/` 
 beside `components/`: the Decision 5 document record at the top, the document's claims and
 its completeness attestation (Decision 4) under it. A claim's stored citation carries page
 and locator; the document hash is stated once at file level, and the claim's canonical,
-served form re-attaches it. Re-ingesting a revised document is one new file, never an edit.
+served form re-attaches it. Re-ingesting a revised document is one new file, never an edit —
+with one named exception: appending the completeness attestation when a transcription pass
+finishes is the sole legal mutation of an existing claims file. The claim records themselves
+stay append-only, and because a claim id hashes record content and citation — never file
+context — the append moves no identity; the stored-id verification catches anything else
+that moved.
 
 ## Out of scope
 
