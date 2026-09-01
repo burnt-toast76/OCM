@@ -36,7 +36,7 @@ from ocm_core.loader import load_schema, validate_module_dict
 
 from .envelope import Codes, Envelope, Refusal, single_refusal
 from .translate import schema_violation_to_refusal
-from .workspace import Workspace, read_yaml
+from .workspace import Workspace, read_yaml, write_yaml
 
 # Hash-scope members copied from the claim when present; everything else
 # in scope (key, value, conditions, applies_to, citation) is mandatory.
@@ -176,14 +176,28 @@ def validate_claims(ws: Workspace, document_hash: str) -> Envelope:
         )
 
     doc = read_yaml(ws.claims_path(document_hash)) or {}
+    addressed = document_hash if document_hash.startswith("sha256:") else f"sha256:{document_hash}"
+    refusals, warnings = _validate_doc(ws, doc, addressed)
 
+    if refusals:
+        return Envelope.refuse(refusals, warnings=warnings)
+    claims = doc.get("claims") if isinstance(doc.get("claims"), list) else []
+    return Envelope.succeed({"document": addressed, "claims": len(claims), "valid": True}, warnings=warnings)
+
+
+def _validate_doc(ws: Workspace, doc: dict[str, Any], addressed: str) -> tuple[list[Refusal], list[str]]:
+    """The whole check, on an in-memory document: schema, storage-location
+    agreement, attestation uniqueness, vocabulary binding, the stuffed-text
+    advisory, and stored-id verification. validate_claims wraps it for the
+    on-disk file; append_claims runs it on the candidate document BEFORE
+    writing -- one validation surface, no weaker sibling (ADR-0016).
+    """
     schema = load_schema(ws.claims_schema_path)
     errors = validate_module_dict(doc, schema)  # schema-agnostic; reused, not duplicated
     refusals: list[Refusal] = [schema_violation_to_refusal(e) for e in errors]
     warnings: list[str] = []
 
     stated = doc.get("document", {}).get("hash") if isinstance(doc.get("document"), dict) else None
-    addressed = document_hash if document_hash.startswith("sha256:") else f"sha256:{document_hash}"
     if isinstance(stated, str) and stated != addressed:
         refusals.append(
             Refusal(
@@ -231,7 +245,7 @@ def validate_claims(ws: Workspace, document_hash: str) -> Envelope:
                 warnings.append(
                     f"claims[{index}].value: text value carries {len(quantities)} unit-bearing quantities -- "
                     "a claim is a single datasheet-answerable statement (ADR-0035 D1); split it, or nominate "
-                    "vocabulary keys for the quantities"
+                    "vocabulary keys for the quantities (propose_claim_split drafts candidates)"
                 )
 
         # Stored-id verification -- only computable once the members the
@@ -252,6 +266,133 @@ def validate_claims(ws: Workspace, document_hash: str) -> Envelope:
                 )
             )
 
+    return refusals, warnings
+
+
+def propose_claim_split(ws: Workspace, document_hash: str, claim_id_ref: str) -> Envelope:
+    """Draft a split of one stuffed text value into candidate claims --
+    read-only. Candidates from a uniform grammar inherit the source key;
+    heterogeneous statements come back with key: None, because choosing a
+    vocabulary key is design judgment (the control-output split created
+    three NEW keys). Leftover text the grammars cannot place is returned,
+    never dropped. Nothing is written; review, assign keys, then
+    append_claims.
+    """
+    from .claims_split import INHERITING_GRAMMARS, split_text_value
+
+    if not ws.claims_exists(document_hash):
+        return single_refusal(
+            Codes.OCM_NOT_FOUND,
+            path=f"claims['{document_hash}']",
+            message=f"no claims file for document {document_hash!r} in this workspace",
+        )
+    doc = read_yaml(ws.claims_path(document_hash)) or {}
+    claims = doc.get("claims") if isinstance(doc.get("claims"), list) else []
+    source = next((c for c in claims if isinstance(c, dict) and c.get("id") == claim_id_ref), None)
+    if source is None:
+        return single_refusal(Codes.OCM_NOT_FOUND, path="claim", message=f"no claim {claim_id_ref!r} in this document's file")
+    value = source.get("value")
+    if not isinstance(value, str):
+        return single_refusal(
+            Codes.OCM_INVALID_ARGUMENT,
+            path="claim.value",
+            message="only text values can be split; this value is already structured",
+        )
+
+    proposal = split_text_value(value)
+    source_key = source.get("key")
+    inherit = proposal.grammar in INHERITING_GRAMMARS
+    candidates = [dict(c, key=source_key if inherit else None) for c in proposal.candidates]
+    return Envelope.succeed(
+        {
+            "source": claim_id_ref,
+            "source_key": source_key,
+            "grammar": proposal.grammar,
+            "candidates": candidates,
+            "leftovers": proposal.leftovers,
+            "note": (
+                "Nothing was written. Candidates with key: null need a human key assignment "
+                "(a vocabulary decision); complete each candidate (applies_to, citation, "
+                "extraction) and append via append_claims. The source claim stays as the "
+                "verbatim record either way (ADR-0035 D3/D7)."
+            ),
+        }
+    )
+
+
+def append_claims(
+    ws: Workspace,
+    document_hash: str,
+    new_claims: list[dict[str, Any]],
+    attestation: dict[str, Any] | None = None,
+) -> Envelope:
+    """The one write path into an existing claims file (ADR-0035 D7's two
+    legal mutations): append reviewed claims, and optionally the pass's
+    attestation. Ids are computed here, never supplied. The updated
+    document is built from the on-disk records plus the appends --
+    structurally incapable of editing or removing an existing record --
+    and the WHOLE result must pass the full validation before a byte is
+    written.
+    """
+    if not ws.claims_exists(document_hash):
+        return single_refusal(
+            Codes.OCM_NOT_FOUND,
+            path=f"claims['{document_hash}']",
+            message=f"no claims file for document {document_hash!r} in this workspace",
+        )
+    if not new_claims and attestation is None:
+        return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="$", message="nothing to append")
+    addressed = document_hash if document_hash.startswith("sha256:") else f"sha256:{document_hash}"
+
+    refusals: list[Refusal] = []
+    appended: list[dict[str, Any]] = []
+    for index, claim in enumerate(new_claims):
+        path = f"append[{index}]"
+        if not isinstance(claim, dict):
+            refusals.append(Refusal(code=Codes.OCM_INVALID_ARGUMENT, path=path, message="a claim must be a mapping"))
+            continue
+        if "id" in claim:
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_INVALID_ARGUMENT,
+                    path=f"{path}.id",
+                    message="ids are computed from the canonical serialization, never supplied",
+                )
+            )
+            continue
+        try:
+            record = {"id": claim_id(claim, addressed)}
+        except (KeyError, TypeError) as e:
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_INVALID_ARGUMENT,
+                    path=path,
+                    message=f"claim is missing a member the id hashes over: {e}",
+                )
+            )
+            continue
+        record.update(claim)
+        appended.append(record)
+    if refusals:
+        return Envelope.refuse(refusals)
+
+    doc = read_yaml(ws.claims_path(document_hash)) or {}
+    updated = dict(doc)
+    updated["claims"] = list(doc.get("claims") or []) + appended
+    if attestation is not None:
+        updated["attestations"] = list(doc.get("attestations") or []) + [attestation]
+
+    refusals, warnings = _validate_doc(ws, updated, addressed)
     if refusals:
         return Envelope.refuse(refusals, warnings=warnings)
-    return Envelope.succeed({"document": addressed, "claims": len(claims), "valid": True}, warnings=warnings)
+
+    write_yaml(ws.claims_path(document_hash), updated)
+    return Envelope.succeed(
+        {
+            "document": addressed,
+            "appended": len(appended),
+            "ids": [record["id"] for record in appended],
+            "claims": len(updated["claims"]),
+        },
+        warnings=warnings,
+    )

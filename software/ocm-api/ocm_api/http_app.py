@@ -147,6 +147,18 @@ def build_app(repo_root: str) -> FastAPI:
     def validate_claims(document_hash: str = Body(..., embed=True)) -> dict[str, Any]:
         return envelope_response(api.validate_claims(document_hash))
 
+    @app.post("/propose_claim_split")
+    def propose_claim_split(document_hash: str = Body(...), claim_id: str = Body(...)) -> dict[str, Any]:
+        return envelope_response(api.propose_claim_split(document_hash, claim_id))
+
+    @app.post("/append_claims")
+    def append_claims(
+        document_hash: str = Body(...),
+        claims: list[dict[str, Any]] = Body(...),
+        attestation: dict[str, Any] | None = Body(default=None),
+    ) -> dict[str, Any]:
+        return envelope_response(api.append_claims(document_hash, claims, attestation=attestation))
+
     @app.post("/publish_component")
     def publish_component(id: str = Body(...), revision: str = Body(...)) -> dict[str, Any]:
         return envelope_response(api.publish_component(id, revision))

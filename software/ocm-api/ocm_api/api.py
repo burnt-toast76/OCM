@@ -132,6 +132,14 @@ class OcmApi:
         return claims.validate_claims(self.workspace, document_hash)
 
     @_never_raise
+    def propose_claim_split(self, document_hash: str, claim_id: str) -> Envelope:
+        return claims.propose_claim_split(self.workspace, document_hash, claim_id)
+
+    @_never_raise
+    def append_claims(self, document_hash: str, claims_to_add: list[dict[str, Any]], attestation: dict[str, Any] | None = None) -> Envelope:
+        return claims.append_claims(self.workspace, document_hash, claims_to_add, attestation=attestation)
+
+    @_never_raise
     def list_components(self) -> Envelope:
         return components.list_components(self.workspace)
 

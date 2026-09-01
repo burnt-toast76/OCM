@@ -257,6 +257,28 @@ def build_server(repo_root: str) -> FastMCP:
         return api.validate_claims(document_hash).to_dict()
 
     @mcp.tool(description=_doc(
+        "Draft a split of one stuffed text claim into candidate claims (ADR-0035 D1) -- READ-ONLY. "
+        "Candidates from a uniform grammar inherit the source key; heterogeneous statements come "
+        "back with key: null because choosing a vocabulary key is design judgment. Leftover text "
+        "is returned, never dropped. Review, assign keys, then call append_claims.",
+        '  call: propose_claim_split(document_hash="sha256:9ce6...", claim_id="sha256:dff3...")\n'
+        '  response: {"ok": true, "data": {"grammar": "alternates", "candidates": [...], "leftovers": []}}',
+    ))
+    def propose_claim_split(document_hash: str, claim_id: str) -> dict[str, Any]:
+        return api.propose_claim_split(document_hash, claim_id).to_dict()
+
+    @mcp.tool(description=_doc(
+        "Append reviewed claims (and optionally a transcription pass's vocabulary-pinned "
+        "attestation) to an existing claims file -- ADR-0035 D7's two legal mutations, and the ONE "
+        "write path. Ids are computed server-side, never supplied; the whole updated file must "
+        "pass full validation before anything is written; existing records are never touched.",
+        '  call: append_claims(document_hash="sha256:9ce6...", claims=[{...}], attestation={"vocab_version": "1.1", "date": "2026-09-01"})\n'
+        '  response: {"ok": true, "data": {"appended": 6, "ids": ["sha256:..."], "claims": 19}}',
+    ))
+    def append_claims(document_hash: str, claims: list[dict[str, Any]], attestation: dict[str, Any] | None = None) -> dict[str, Any]:
+        return api.append_claims(document_hash, claims, attestation=attestation).to_dict()
+
+    @mcp.tool(description=_doc(
         "Validate, then set revision (must be >= 1.0.0 -- a real SemVer, not another 0.x draft) -- "
         "the component becomes referenceable from a module's components: list only after this "
         "succeeds.",
