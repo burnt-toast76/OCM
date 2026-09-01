@@ -1,0 +1,200 @@
+# OCM claims vocabulary 1.0 (seed draft)
+#
+# Governed by ADR-0035. Every entry defines a claim key: its value shape, unit
+# dimension, and a definition precise enough to judge whether two manufacturers'
+# datasheets answer the same question. Keys are seeded by demand — fields the
+# component schema and existing component manifests already consume — not by
+# what datasheets happen to print.
+#
+# Value shapes:
+#   scalar      one number + unit
+#   spread      min/typ/max (any subset the document states) + unit
+#   dimensions  length/width/height + unit
+#   text        verbatim string
+#   enum        one of a closed set declared in the entry
+#   list        list of text
+#   record      structured object; schema fragment named in the entry
+#
+# Promotion: an x- key enters this file via pull request, with aliases naming
+# the x- key it absorbs. Ingested claim records are never rewritten.
+
+ocm_version: '1.0'
+keys:
+
+  # --- electrical -----------------------------------------------------------
+
+  - key: supply_voltage
+    shape: spread
+    dimension: voltage
+    definition: >
+      DC or AC supply voltage range at the device's power input under which the
+      manufacturer specifies normal operation. Not the absolute-maximum rating.
+    demand: [component.electrical.supplies, eps25 notes "Operating Voltage 18-30 VDC"]
+
+  - key: current_nominal
+    shape: scalar
+    dimension: current
+    definition: >
+      Steady-state supply current draw at rated supply voltage, excluding
+      switched loads the device powers.
+    demand: ["component.electrical.supplies[].current_nominal_a"]
+
+  - key: current_peak
+    shape: scalar
+    dimension: current
+    definition: >
+      Maximum transient supply current the manufacturer states (inrush,
+      actuation peak). Duration goes in conditions.
+    demand: ["component.electrical.supplies[].current_peak_a"]
+
+  - key: power_consumption
+    shape: spread
+    dimension: power
+    definition: Input power at rated supply voltage.
+    demand: [component.electrical]
+
+  - key: connector_pinout
+    shape: record
+    record_schema: pinout   # pin, function, wire_color per component schema
+    dimension: none
+    definition: >
+      Pin-to-function assignment of one named connector, as printed in the
+      wiring section. One claim per connector; connector designation goes in
+      conditions.
+    demand: ["component.electrical.connectors[].pins", eps25 M12 pinout]
+
+  # --- environment and construction ----------------------------------------
+
+  - key: operating_temp
+    shape: spread
+    dimension: temperature
+    definition: Ambient temperature range for specified operation.
+    demand: [component manifests generally]
+
+  - key: ip_rating
+    shape: text
+    dimension: none
+    definition: Ingress protection rating per IEC 60529, verbatim (e.g. IP67).
+    demand: [component manifests generally]
+
+  - key: mass
+    shape: scalar
+    dimension: mass
+    definition: Mass of the device as shipped, excluding cables and accessories.
+    demand: [component.geometry.mass]
+
+  - key: envelope
+    shape: dimensions
+    dimension: length
+    definition: >
+      Overall bounding dimensions of the device body, excluding connectors and
+      moving-element travel unless the document includes them (state which in
+      conditions).
+    demand: [component.geometry.envelope]
+
+  - key: wetted_materials
+    shape: list
+    dimension: none
+    definition: Materials in contact with the process medium.
+    demand: [eps25 notes "Wetted Parts"]
+
+  - key: seal_material
+    shape: text
+    dimension: none
+    definition: Primary seal material designation as printed (e.g. FKM).
+    demand: [eps25 notes "Seal Material"]
+
+  - key: agency_approvals
+    shape: list
+    dimension: none
+    definition: >
+      Certifications and listings as printed, one list item per agency mark,
+      including file numbers where given.
+    demand: [eps25 notes "Agency Approvals"]
+
+  # --- measurement (sensor-kind components) ---------------------------------
+
+  - key: measuring_range
+    shape: spread
+    dimension: declared   # unit as printed; never converted at the claims layer
+    definition: >
+      Span of the measured quantity over which the device meets its accuracy
+      specification. Unit is recorded exactly as printed.
+    demand: [eps25 notes "Pressure Range ... verbatim; NOT converted"]
+
+  - key: accuracy
+    shape: scalar
+    dimension: declared
+    definition: >
+      Measurement accuracy as stated, in the document's own terms (e.g. percent
+      of full range). Reference conditions go in conditions.
+    demand: [eps25 notes "Accuracy"]
+
+  - key: repeatability
+    shape: scalar
+    dimension: declared
+    definition: Repeatability as stated, in the document's own terms.
+    demand: [sensor components generally]
+
+  - key: output_configuration
+    shape: text
+    dimension: none
+    definition: >
+      Electrical form of a named output: switching type (PNP/NPN, N.O./N.C.)
+      or analog range. One claim per output; output designation in conditions.
+    demand: ["eps25 comms.signals[].electrical"]
+
+  # --- pneumatic ------------------------------------------------------------
+
+  - key: operating_pressure
+    shape: spread
+    dimension: pressure
+    definition: Supply or working pressure range for specified operation.
+    demand: [component.pneumatic.pressure_min/max]
+
+  - key: flow_rate
+    shape: scalar
+    dimension: flow
+    definition: Rated flow at stated conditions (pressure, medium in conditions).
+    demand: [component.pneumatic.flow]
+
+  - key: port_thread
+    shape: text
+    dimension: none
+    definition: >
+      Thread specification of a named port, verbatim (e.g. 1/4in male NPT).
+      Port designation in conditions.
+    demand: ["component.pneumatic.ports[].thread", eps25]
+
+  # --- comms ----------------------------------------------------------------
+
+  - key: protocol
+    shape: text
+    dimension: none
+    definition: >
+      Communication protocol of a named interface as the document names it
+      (e.g. EtherCAT, IO-Link, discrete-io).
+    demand: [component.comms.protocol]
+
+  # --- process behavior (from dispenser demand) -----------------------------
+
+  - key: warmup_time
+    shape: scalar
+    dimension: time
+    definition: >
+      Time from power-on to ready state under stated ambient conditions.
+    demand: [dp8 notes "ready ~4 min after power-on"]
+
+  - key: dispense_volume
+    shape: spread
+    dimension: volume
+    definition: Deliverable volume range per actuation.
+    demand: [dp8 notes "0.3-2.5 uL"]
+
+  - key: process_temp
+    shape: spread
+    dimension: temperature
+    definition: >
+      Temperature range of a named process element (reservoir, needle, platen)
+      required or reached in operation. Element named in conditions.
+    demand: [dp8 notes "reservoir 35-45 C", "needle tip reaches 45 C"]
