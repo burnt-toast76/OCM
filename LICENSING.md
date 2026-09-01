@@ -8,6 +8,7 @@ directory and its license becomes ambiguous.
 | `software/` | **AGPL-3.0** | Strongly reciprocal. Closes the SaaS loophole — a competitor can't run our generator as a hosted service without contributing back. |
 | `hardware/` | **CERN-OHL-S v2** | GPL doesn't work for hardware: it's a software copyright license, it covers CAD *files* but says nothing coherent about the manufactured object, and it grants no patent rights. CERN-OHL-S is the strongly-reciprocal hardware license, purpose-built. |
 | `spec/`, `modules/`, `cells/`, `reference/`, `docs/` | **CC BY-SA 4.0** | The standard must be freely implementable by anyone, including commercially, as long as derivatives stay open. |
+| `claims/` | **CC BY-SA 4.0** | The registry's compilation stays open and share-alike; the facts inside it are facts — see `claims/README.md` for the scope. |
 
 ---
 

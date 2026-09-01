@@ -3,7 +3,7 @@ OCM is multi-licensed by directory. There is no single project license.
   software/                          AGPL-3.0-only
   hardware/                          CERN-OHL-S-2.0
   spec/ modules/ cells/ docs/
-  reference/                         CC-BY-SA-4.0
+  reference/ claims/                 CC-BY-SA-4.0
 
 Each directory contains its own LICENSE file with the full text.
 See LICENSING.md for the rationale, and for the dependency compatibility table.
