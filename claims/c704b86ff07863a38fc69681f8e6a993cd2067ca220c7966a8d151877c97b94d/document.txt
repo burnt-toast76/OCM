@@ -1,0 +1,36 @@
+SYNTHETIC DATASHEET -- written for this repository as OCM golden claims
+fixture source material (ADR-0035 D6). Not a manufacturer document; the
+values are synthetic and carry no authority about any real product
+(ADR-0014).
+
+Nordson-Kline-style DP-8 precision dot dispenser
+Part number: DP-8
+
+Page 1 -- Specifications
+
+  Mass ...................... 4.2 kg
+  Dimensions ................ length 120 mm, width 160 mm, height 210 mm
+  Operating pressure ........ 5 bar (max 6 bar), filtered dry air
+  Dispense volume ........... 0.3-2.5 uL per shot
+  Warm-up time .............. 4 min (at 20-25 C ambient)
+  Peak supply current ....... 3.5 A (heater inrush, cold start)
+  Reservoir temperature ..... 35-45 C in operation
+  Needle tip temperature .... reaches 45 C in operation
+  Fieldbus .................. EtherCAT
+
+Page 2 -- Connections
+
+  Air supply port A ......... G1/8
+  Connector X1 (4-pin M12):
+    Pin   Wire color
+    1     BN (brown)
+    2     BU (blue)
+    3     BK (black)
+    4     GY (gray)
+
+----------------------------------------------------------------------
+Repo note (not part of the described product): this document
+deliberately does NOT answer the vocabulary keys supply_voltage,
+operating_temp, flow_rate, and ip_rating, so the claims file's
+attestation makes those absences genuine document silences and
+ADR-0035 D4's not_found path has reference content to compute against.

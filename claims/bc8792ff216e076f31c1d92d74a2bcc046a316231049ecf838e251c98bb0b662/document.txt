@@ -1,0 +1,47 @@
+SYNTHETIC DATASHEET -- written for this repository as OCM golden claims
+fixture source material (ADR-0035 D6). Not a manufacturer document; the
+values are synthetic and carry no authority about any real product
+(ADR-0014).
+
+ProSense-style digital pressure sensor
+EPS25 series: EPS25-100WC-1001, EPS25-250WC-1001
+
+Page 1 -- Overview
+
+  Supply voltage ............ 18-30 VDC
+  Display ................... 4-digit, two-color LED
+  Protection rating ......... IP67
+
+Page 2 -- Specifications
+
+  Spec table
+    Supply voltage ............ 18-30 VDC
+    Power consumption ......... 1.2 W
+    Measuring range
+      EPS25-100WC-1001 ........ -5 to +100.4 inches of water column
+      EPS25-250WC-1001 ........ -5 to +250 inches of water column
+    Accuracy .................. +/-0.5 % of full range
+                                (at 23 C reference temperature)
+    Output 1 (OUT1) ........... Switch (N.O./N.C.), PNP/NPN selectable
+    Output 2 (OUT2) ........... Switch (N.O./N.C.), PNP/NPN selectable,
+                                or 4-20 mA / 0-10 VDC analog
+    Seal material ............. FKM
+    Wetted parts .............. Ceramic, FKM, 316 stainless steel
+    Body dimensions ........... length 108 mm, height 34 mm
+    Process connection ........ 1/4in male NPT
+    Agency approvals .......... UL Listed file E000000; CE
+
+Page 3 -- Wiring
+
+  Electrical connection: one M12 quick-disconnect, 4-pin
+    Pin 1   L+ (supply)   BN (brown)
+    Pin 2   OUT2          WH (white)
+    Pin 3   L- (supply)   BU (blue)
+    Pin 4   OUT1          BK (black)
+
+----------------------------------------------------------------------
+Repo note (not part of the described product): this document
+deliberately does NOT answer the vocabulary keys mass, operating_temp,
+current_nominal, and repeatability, so the claims file's attestation
+makes those absences genuine document silences and ADR-0035 D4's
+not_found path has reference content to compute against.
