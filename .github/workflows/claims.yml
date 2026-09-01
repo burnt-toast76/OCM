@@ -1,0 +1,39 @@
+name: claims
+
+# `ci/check_claims.py` guards the claims store and its vocabulary (ADR-0035):
+#   1. the vocab file lints structurally (parseable, unique keys, complete
+#      entries, known shapes, `subject: takes` spelling, record_schema
+#      resolvable) -- it once merged as invalid YAML with nothing to catch it;
+#   2. every claims/<hex>/ entry is hash-anchored (the directory name IS the
+#      sha256 of its document.txt) and passes the REAL `validate_claims`.
+#
+# Unlike refusal-catalogue this job installs the ocm-* chain: ADR-0016 forbids
+# a second, weaker validation surface, so the check calls the one validator
+# rather than shadowing its schema + vocab-binding + stored-id logic in
+# stdlib. Install mirrors the ocm-api test job (structural siblings, no
+# `test`/`tesseract`/`cad` extras), constrained by the CI dependency lock --
+# see ci/requirements.txt and .github/dependabot.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  claims:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install ocm-core, ocm-resolve, ocm-generator (siblings), ocm-api
+        run: |
+          pip install -c ci/requirements.txt -e software/ocm-core
+          pip install -c ci/requirements.txt -e software/ocm-resolve
+          pip install -c ci/requirements.txt -e software/ocm-generator
+          pip install -c ci/requirements.txt -e software/ocm-api
+
+      - run: python ci/check_claims.py
