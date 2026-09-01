@@ -42,6 +42,12 @@ With it, the same statement printed in two places in one document yields two ids
 accepted as two distinct claims, each citing exactly where it appears, so
 intra-document discrepancies stay visible instead of silently merging.
 
+`page` is the printed page number, as the document labels it; PDF position is used
+only when the document's pages are unlabeled, and the locator should then say so.
+Without this convention, two correct transcriptions of the same statement disagree on
+`page` and mint two different ids — a fabricated discrepancy where the documents have
+none.
+
 ## 2. Canonical bytes
 
 The hash-scope object is serialized by **RFC 8785 (JSON Canonicalization Scheme)**:
