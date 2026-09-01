@@ -304,6 +304,29 @@ def test_a_pinout_claim_needs_only_pin_per_row(api: OcmApi, workspace_root: Path
     assert e.ok, e.refusals
 
 
+def test_a_stuffed_text_value_gets_the_single_statement_advisory(api: OcmApi, workspace_root: Path):
+    # Several statements wearing one claim (D1: a claim is a SINGLE
+    # datasheet-answerable statement) -- advised, never refused.
+    claim = dict(_subject_claim(), value="Open-collector, 30 V or less, 100 mA per output, residual 1.4 V")
+    claim["id"] = claim_id(claim, DOC_HASH)
+    _write_claims(workspace_root, _claims_file([claim]))
+
+    e = api.validate_claims(DOC_HASH)
+    assert e.ok, e.refusals
+    assert any("single datasheet-answerable statement" in w for w in e.warnings)
+
+
+def test_a_short_analog_range_text_stays_below_the_advisory(api: OcmApi, workspace_root: Path):
+    # Two quantities is an ordinary analog-range statement, not stuffing.
+    claim = dict(_subject_claim(), value="4-20 mA / 0-10 VDC analog")
+    claim["id"] = claim_id(claim, DOC_HASH)
+    _write_claims(workspace_root, _claims_file([claim]))
+
+    e = api.validate_claims(DOC_HASH)
+    assert e.ok, e.refusals
+    assert not any("single datasheet-answerable statement" in w for w in e.warnings)
+
+
 # -- the pinout fragment drift guard ------------------------------------------
 
 

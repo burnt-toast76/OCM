@@ -27,6 +27,7 @@ per the house rule.
 from __future__ import annotations
 
 import hashlib
+import re
 from typing import Any
 
 import rfc8785
@@ -42,6 +43,14 @@ from .workspace import Workspace, read_yaml
 # Serialization spec section 2: an omitted optional member is ABSENT from
 # the canonical form, never null.
 _HASH_SCOPE_OPTIONAL = ("subject", "family")
+
+# A number followed by a short unit token ("30 V", "1.4 mA", "660 nm").
+# Deliberately a heuristic: it feeds an ADVISORY, never a refusal -- some
+# composite cells (a per-mode response-time table) are legitimately one
+# statement, and D2 promises ingestion never refuses a true statement.
+_QUANTITY = re.compile(r"\d[\d.,]*\s*([a-zA-Zµ°%]{1,3})(?![a-zA-Z])")
+_QUANTITY_STOPWORDS = frozenset({"to", "or", "of", "and", "the", "per", "for", "at", "in", "on", "as", "by"})
+_QUANTITY_ADVISORY_THRESHOLD = 3
 
 
 def claim_id(claim: dict[str, Any], document_hash: str) -> str:
@@ -211,6 +220,19 @@ def validate_claims(ws: Workspace, document_hash: str) -> Envelope:
         if not isinstance(claim, dict):
             continue  # the schema pass already refused it
         _check_claim_binding(index, claim, vocab, refusals, warnings)
+
+        # Advisory: a text value stuffed with quantities is usually several
+        # statements wearing one claim -- D1 defines a claim as a SINGLE
+        # datasheet-answerable statement. Applies to x- claims too.
+        value = claim.get("value")
+        if isinstance(value, str):
+            quantities = [unit for unit in _QUANTITY.findall(value) if unit.lower() not in _QUANTITY_STOPWORDS]
+            if len(quantities) >= _QUANTITY_ADVISORY_THRESHOLD:
+                warnings.append(
+                    f"claims[{index}].value: text value carries {len(quantities)} unit-bearing quantities -- "
+                    "a claim is a single datasheet-answerable statement (ADR-0035 D1); split it, or nominate "
+                    "vocabulary keys for the quantities"
+                )
 
         # Stored-id verification -- only computable once the members the
         # hash scope needs are structurally present; anything missing was
