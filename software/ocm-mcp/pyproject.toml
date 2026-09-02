@@ -1,0 +1,29 @@
+[project]
+name = "ocm-mcp"
+version = "0.1.0"
+description = "The read-only claims serving surface (ADR-0036): an MCP server presenting as ocm-claims, reading through ocm-api."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "AGPL-3.0-or-later" }
+dependencies = [
+    # ocm-api is a monorepo sibling, not published to an index -- install
+    # editable from the same venv:
+    # `pip install -e ../ocm-core -e ../ocm-resolve -e ../ocm-generator -e ../ocm-api -e ".[test]"`
+    "PyYAML>=6.0",
+    # Same load-bearing upper bound as ocm-api: mcp 2.0.0 removed
+    # mcp.server.fastmcp; migrate both packages together or not at all.
+    "mcp>=1.2.0,<2",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+ocm-claims = "ocm_mcp.server:main"
+
+[tool.setuptools.packages.find]
+include = ["ocm_mcp*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

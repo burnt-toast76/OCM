@@ -31,7 +31,10 @@
 # `ocm_version` below is the KEY-SET version that attestations pin (ADR-0035
 # D4). Adding a key bumps it -- an older attestation honestly does not cover
 # the new keys, and a document gains coverage through a new pass and a new
-# attestation, never by editing the old one.
+# attestation, never by editing the old one. Each entry's `since:` records
+# the version that introduced its key (absent means '1.0'); that is what
+# lets a served absence distinguish "attested silence" from "key newer than
+# the attestation" (ADR-0036 D3).
 
 ocm_version: '1.1'
 keys:
@@ -80,6 +83,7 @@ keys:
     demand: ["component.electrical.connectors[].pins", eps25 M12 pinout]
 
   - key: output_voltage
+    since: '1.1'
     shape: spread
     subject: takes
     dimension: voltage
@@ -91,6 +95,7 @@ keys:
     demand: ['fs-n41n "Control output: Open-collector, 30 V or less"']
 
   - key: output_current
+    since: '1.1'
     shape: spread
     subject: takes
     dimension: current
@@ -102,6 +107,7 @@ keys:
     demand: ['fs-n41n "100 mA or less per output / 20 mA or less (expansion unit)"']
 
   - key: residual_voltage
+    since: '1.1'
     shape: spread
     subject: takes
     dimension: voltage

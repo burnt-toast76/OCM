@@ -93,3 +93,23 @@ jobs:
           pip install -c ci/requirements.txt -e software/ocm-generator
           pip install -c ci/requirements.txt -e "software/ocm-api[test]"
       - run: pytest -ra software/ocm-api/tests
+
+  ocm-mcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      # ocm-api is the structural dependency (ADR-0016: the serving layer
+      # reads through it), which pulls the same sibling chain as the
+      # ocm-api job. The golden evals run against the committed claims/
+      # registry in this checkout -- that is the point of them.
+      - name: Install ocm-core, ocm-resolve, ocm-generator, ocm-api (siblings), ocm-mcp[test]
+        run: |
+          pip install -c ci/requirements.txt -e software/ocm-core
+          pip install -c ci/requirements.txt -e software/ocm-resolve
+          pip install -c ci/requirements.txt -e software/ocm-generator
+          pip install -c ci/requirements.txt -e software/ocm-api
+          pip install -c ci/requirements.txt -e "software/ocm-mcp[test]"
+      - run: pytest -ra software/ocm-mcp/tests
