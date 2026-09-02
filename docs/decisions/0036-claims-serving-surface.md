@@ -151,7 +151,9 @@ lossy.
 Every envelope carries the git commit hash of the registry checkout being served. Two
 servers at different commits may answer the same question differently; the commit hash is
 how a consumer tells, and the append-only store (ADR-0035 D3/D7) means a newer commit
-only ever knows more. No synthetic store version — git already provides the identity —
+only ever knows more. A checkout whose `claims/` tree carries uncommitted changes serves
+the hash suffixed `-dirty` — an identity that admits it names no committed state, rather
+than one that borrows the last commit's authority. No synthetic store version — git already provides the identity —
 and no `get_store_info` tool: every response already answers the question, and the
 contract starts minimal (Decision 1).
 
