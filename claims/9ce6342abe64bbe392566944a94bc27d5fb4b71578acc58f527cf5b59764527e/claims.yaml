@@ -166,9 +166,7 @@ claims:
     tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:a55d8b6ec5c5027fba1db8fc1a6ad4f2d33b07492a9bf739fc9af4d4ba596e3b
   key: output_configuration
-  value: 'Open-collector, 30 V or less 100 mA or less per output, 100 mA or less total for 2 outputs (when
-    used as a solitary unit) /20 mA or less (when used as an expansion unit). Residual voltage: 1.4 V
-    or less (output current: 10 mA or less) /2 V or less (output current: 10 to 100 mA)'
+  value: 'Open-collector, 30 V or less 100 mA or less per output, 100 mA or less total for 2 outputs (when used as a solitary unit) /20 mA or less (when used as an expansion unit). Residual voltage: 1.4 V or less (output current: 10 mA or less) /2 V or less (output current: 10 to 100 mA)'
   conditions: []
   applies_to:
   - FS-N41N
@@ -180,8 +178,7 @@ claims:
     tool: LLM agent transcription (pdfplumber text layer)
 - id: sha256:dff3383776aece821ab678710774aef43305f411360632d27615945313e9a955
   key: x-response_time
-  value: 23 µs (S-HSPD*1) /50 µs (HSPD*2) /250 µs (FINE) /500 µs (TURBO) /1 ms (SUPER) /4 ms (ULTRA) /16
-    ms (MEGA) /64 ms (TERA)
+  value: 23 µs (S-HSPD*1) /50 µs (HSPD*2) /250 µs (FINE) /500 µs (TURBO) /1 ms (SUPER) /4 ms (ULTRA) /16 ms (MEGA) /64 ms (TERA)
   conditions: []
   applies_to:
   - FS-N41N
@@ -305,3 +302,123 @@ claims:
   extraction:
     method: automated
     tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:d3bce4f4221aebb19ab9c596c28d2f5bacca912094a351837bbb83eb609d5f71
+  key: x-response_time
+  value:
+    unqualified: 23
+    unit: µs
+  conditions:
+  - S-HSPD*1
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Response time'
+  extraction:
+    method: automated
+    tool: propose_claim_split (alternates grammar)
+- id: sha256:a8f5b18b76b80ec4c8af77ca9098c0649aecce5f633936222a7ef8dad6667988
+  key: x-response_time
+  value:
+    unqualified: 50
+    unit: µs
+  conditions:
+  - HSPD*2
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Response time'
+  extraction:
+    method: automated
+    tool: propose_claim_split (alternates grammar)
+- id: sha256:6ce26ac810ca01b069c68236b6ab6ca88a19f4f774799cada230f4f6c7b8f464
+  key: x-response_time
+  value:
+    unqualified: 250
+    unit: µs
+  conditions:
+  - FINE
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Response time'
+  extraction:
+    method: automated
+    tool: propose_claim_split (alternates grammar)
+- id: sha256:249c195cb072ffbbd43b85497637ee4ffdfe4e4056c25ada65cd24255017c170
+  key: x-response_time
+  value:
+    unqualified: 500
+    unit: µs
+  conditions:
+  - TURBO
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Response time'
+  extraction:
+    method: automated
+    tool: propose_claim_split (alternates grammar)
+- id: sha256:059e77b316c8ba7f7d4c6bcb0e2aba7853faedf53507a30666d2fc903a36aae5
+  key: x-response_time
+  value:
+    unqualified: 1
+    unit: ms
+  conditions:
+  - SUPER
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Response time'
+  extraction:
+    method: automated
+    tool: propose_claim_split (alternates grammar)
+- id: sha256:c0f24afdcf45882c9739e732fdd163ad0bdc5fd78c9359efa67f2ac17463922d
+  key: x-response_time
+  value:
+    unqualified: 4
+    unit: ms
+  conditions:
+  - ULTRA
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Response time'
+  extraction:
+    method: automated
+    tool: propose_claim_split (alternates grammar)
+- id: sha256:6bff6933e827182b8e45ef59b48730a4696d406adf6b1e802c91cc485a00104a
+  key: x-response_time
+  value:
+    unqualified: 16
+    unit: ms
+  conditions:
+  - MEGA
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Response time'
+  extraction:
+    method: automated
+    tool: propose_claim_split (alternates grammar)
+- id: sha256:38ba33a1efaea9451df62618b6c45d764685ce5fb52817fd93e5c44453f86323
+  key: x-response_time
+  value:
+    unqualified: 64
+    unit: ms
+  conditions:
+  - TERA
+  applies_to:
+  - FS-N41N
+  citation:
+    page: 1
+    locator: specifications, row 'Response time'
+  extraction:
+    method: automated
+    tool: propose_claim_split (alternates grammar)
