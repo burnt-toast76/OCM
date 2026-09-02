@@ -42,8 +42,9 @@ context was.
 | [0033](0033-manifest-authority-is-enforced-in-copper.md) | Manifest authority is enforced in copper | **Proposed** |
 | [0034](0034-safety-internal-to-cell.md) | The safety domain does not cross a cell boundary | **Proposed** |
 | [0035](0035-manifests-cite-claims.md) | A manifest cites claims; a claim cites a document | **Proposed** |
+| [0036](0036-claims-serving-surface.md) | Claims are served read-only, with provenance on every value | **Proposed** |
 
 Numbers are allocated by claim, not by write order: a number is claimed the moment an accepted
 or proposed ADR forward-references it, and a later ADR takes the next free one instead.
 Currently reserved: **0030** (`ocm-viewer`, claimed by ADR-0029) and **0032** (pick and place,
-claimed by ADR-0031). The next free number is **0036**.
+claimed by ADR-0031). The next free number is **0037**.
