@@ -1,0 +1,835 @@
+# Real-document claims entry (ADR-0035): transcribed from the KEYENCE
+# FS-N40 Series catalog's Amplifier Units specification table (page 36).
+# The document's bytes are NOT in this repository (see claims/README.md);
+# the hash was computed at ingest from the PDF itself. PARTIAL PASS: no
+# attestation -- only the amplifier spec table is transcribed, so an
+# absent vocabulary key here means "not yet checked", not "the catalog
+# is silent" (ADR-0035 D4). The FS-N41C's weight is deliberately NOT
+# transcribed: the printed table is ambiguous for that column (25 g vs
+# 23 g across two header slots) and a guess would be fabrication
+# (ADR-0014). Claim ids are computed by ocm_api.claims.claim_id -- never
+# by hand. Records are append-only (D3/D7).
+ocm_version: '1.0'
+document:
+  hash: sha256:cfdb33d35f7c8152121d4be026337da47bbceba4c216e503eff4c815b4bc05e9
+  manufacturer: KEYENCE CORPORATION
+  type: catalog
+  revision: FSN40-KA-C-US 2056-8 611G30
+  date: '2018'
+claims:
+- id: sha256:73f74899f8e95f04340786a24ed2a9e92cfe083a7d4c98d3ac725395b04220f0
+  key: supply_voltage
+  value:
+    min: 10
+    max: 30
+    unit: VDC
+  conditions:
+  - including 10% ripple (P-P) or less
+  - class 2 or LPS
+  - use a power supply voltage of 12 V or higher when expanding to 9 or more units (*8)
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Power supply voltage'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:015c9a799176a00fc1e59f5561c869e947ad555c56bd9db7e6a95003b2dc3159
+  key: power_consumption
+  value:
+    max: 870
+    unit: mW
+  conditions:
+  - during normal operation
+  - load current excluded (*9)
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Power consumption'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:cfd83c947dcfab69b1452220e58f1b1b2789203a16b08cbd1c009c1a7eaf7229
+  key: power_consumption
+  value:
+    max: 800
+    unit: mW
+  conditions:
+  - ECO ON
+  - load current excluded (*9)
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Power consumption'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:ad076f37efcf4612883a94d083b821819f0cd144db99064442d8f0a4c107c9c6
+  key: power_consumption
+  value:
+    max: 710
+    unit: mW
+  conditions:
+  - ECO FULL
+  - load current excluded (*9)
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Power consumption'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:127111af81a36bd7b41466e3da3043c4ee1cfcc2d736b1e1b87409ef884bd86d
+  key: power_consumption
+  value:
+    max: 910
+    unit: mW
+  conditions:
+  - during normal operation
+  - load current excluded (*9)
+  applies_to:
+  - FS-N41P
+  - FS-N42P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Power consumption'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:9933e8a0ac12a0dcd353d0133f998d4558e68c85e523b8de76dd9943f37c4beb
+  key: power_consumption
+  value:
+    max: 840
+    unit: mW
+  conditions:
+  - ECO ON
+  - load current excluded (*9)
+  applies_to:
+  - FS-N41P
+  - FS-N42P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Power consumption'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:eecd20a3f314b63ecc675920440cbe6391dc22b4831fb81e63f9793e64a51733
+  key: power_consumption
+  value:
+    max: 750
+    unit: mW
+  conditions:
+  - ECO FULL
+  - load current excluded (*9)
+  applies_to:
+  - FS-N41P
+  - FS-N42P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Power consumption'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:3b0caf32128c8b3b05b7779905e9b720e82c51184b2cf2b072945ab65505722e
+  key: power_consumption
+  value:
+    max: 990
+    unit: mW
+  conditions:
+  - during normal operation
+  - load current excluded (*9)
+  applies_to:
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Power consumption'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:97bdb29aeaa7fbb1b32c9eb341441c44f720c4003a96b081901a72c8dd8e9482
+  key: power_consumption
+  value:
+    max: 920
+    unit: mW
+  conditions:
+  - ECO ON
+  - load current excluded (*9)
+  applies_to:
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Power consumption'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:54bf52d80423344f522e0ae5b78ce2048ca8752386eb1e9726b308c1f5758873
+  key: power_consumption
+  value:
+    max: 830
+    unit: mW
+  conditions:
+  - ECO FULL
+  - load current excluded (*9)
+  applies_to:
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Power consumption'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:9de855caeb978210d28df9f8f7de5376f9b549a39d5c1c3a73f09fdcaba867b9
+  key: operating_temp
+  value:
+    min: -20
+    max: 55
+    unit: °C
+  conditions:
+  - no freezing
+  - assumes the sensor amplifier is mounted on a DIN rail installed on a metal surface (*10)
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:f6d9112a181ceb6cda767c802e19d8c92069d7e311c51d8ec5001c6152768a9d
+  key: operating_temp
+  value:
+    min: -20
+    max: 50
+    unit: °C
+  conditions:
+  - when expanded by 3 to 10 units
+  - no freezing
+  - assumes the sensor amplifier is mounted on a DIN rail installed on a metal surface (*10)
+  - when using 2 outputs, 1 unit is counted as 2 units (*10)
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: footnote *10
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:f304e02ed40fcd82aebf3c042a7e232eb43a71b79af5adb69ffd95e4b923acea
+  key: operating_temp
+  value:
+    min: -20
+    max: 45
+    unit: °C
+  conditions:
+  - when expanded by 11 to 16 units
+  - no freezing
+  - assumes the sensor amplifier is mounted on a DIN rail installed on a metal surface (*10)
+  - when using 2 outputs, 1 unit is counted as 2 units (*10)
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: footnote *10
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:9d2c7ff9d1d270ce3ef56ea8b8c07dc80c236bb9284da46e5705529470a48968
+  key: output_voltage
+  value:
+    max: 30
+    unit: V
+  conditions: []
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Control output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:823b0474a841185482196f6bbaede258fca629b96850c46ca248697045d8666a
+  key: output_current
+  value:
+    max: 100
+    unit: mA
+  conditions:
+  - per output
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Control output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:e73466dcd310d45988638a03825d7ab99630a9c896186c872ecbb78f85282a15
+  key: output_current
+  value:
+    max: 100
+    unit: mA
+  conditions:
+  - total for 2 outputs
+  - when used as a solitary unit
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Control output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:55cdf004186b0152c265a8c86bc709b0ea643ef2623c463da60373bd1049f475
+  key: output_current
+  value:
+    max: 20
+    unit: mA
+  conditions:
+  - when used as an expansion unit
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Control output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:16cdecbd609671ae7270b9fc1e201d3d19a176cf78356e8f28619a611be3b1c9
+  key: residual_voltage
+  value:
+    max: 1.4
+    unit: V
+  conditions:
+  - 'output current: 10 mA or less'
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Residual voltage, NPN'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:014de539528eb9bf3642aae4bcb9bbe9f1ec36b2e2cb86dd5f22eaad037b3f50
+  key: residual_voltage
+  value:
+    max: 2
+    unit: V
+  conditions:
+  - 'output current: 10 to 100 mA'
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Residual voltage, NPN'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:c1fb47b6ab7fc56b9098f3fd27d725fa16e35b48ddcbbb032c547320e04b10c9
+  key: residual_voltage
+  value:
+    max: 1.6
+    unit: V
+  conditions:
+  - 'output current: 10 mA or less'
+  applies_to:
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Residual voltage, PNP'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:1d354b93d91f80c2e8c839ecd424831202e860f0d4bdb13acec707a9af62dfe4
+  key: residual_voltage
+  value:
+    max: 2.2
+    unit: V
+  conditions:
+  - 'output current: 10 to 100 mA'
+  applies_to:
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Residual voltage, PNP'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:9671bbf1102b9f4d1d29d1f53fc4494a0425633a9ad8c5466482d595416e8770
+  key: output_configuration
+  value: NPN
+  conditions: []
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Model, NPN output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:979f686b1cc6306c1607d3780ff9674132f35762b187e59d8991517d2d8f0686
+  key: output_configuration
+  value: PNP
+  conditions: []
+  applies_to:
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Model, PNP output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:33b936aee6b42b6615441f255ba879a0313763df5801648431cfed1e209f62d2
+  key: output_configuration
+  value: Open-collector
+  conditions: []
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Control output'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:141a6052fe2ab8b0e145d063f757afd1fee7d29bb1ac81ef7530f91152234092
+  key: protocol
+  value: IO-Link
+  conditions:
+  - Specification V.1.1/COM2 (38.4 kbps)
+  applies_to:
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: footnote *1
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:5afab65083dfea911b2ee5763b7bd6d3ff2981a22b763810b9dee3af9b0ad8bb
+  key: x-response_time
+  value:
+    unqualified: 23
+    unit: μs
+  conditions:
+  - S-HSPD*5
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Response time'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:e8429309acb1f9b9a36d785c625b654f2cee23969070467dac6078f107053f9a
+  key: x-response_time
+  value:
+    unqualified: 50
+    unit: μs
+  conditions:
+  - HSPD*6
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Response time'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:f52d37807c2dcfc7b085ae34477a9f5bf491f873d644425c67582a4b76041dbc
+  key: x-response_time
+  value:
+    unqualified: 250
+    unit: μs
+  conditions:
+  - FINE
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Response time'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:70c34a8fe6660383f244d9618d8f0f849728e41f905419ab98abe411618004ca
+  key: x-response_time
+  value:
+    unqualified: 500
+    unit: μs
+  conditions:
+  - TURBO
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Response time'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:1b0019408d4f5d95ac89cc6ec49f2be3af67a7c18f6de1131f6e5ebf95c5f6b9
+  key: x-response_time
+  value:
+    unqualified: 1
+    unit: ms
+  conditions:
+  - SUPER
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Response time'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:fd59a9e628d08c92409fda84028bdf25565b3c749f65b9f15300680d22e0516e
+  key: x-response_time
+  value:
+    unqualified: 4
+    unit: ms
+  conditions:
+  - ULTRA
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Response time'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:62e998d398cd240656c635eb8a1e457fe0b6de6162e6777ae43fb275ebb0c9c3
+  key: x-response_time
+  value:
+    unqualified: 16
+    unit: ms
+  conditions:
+  - MEGA
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Response time'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:35cd481c46b33da858cc877958fcf85f114847fa18fcae7ebbc089f4915117dd
+  key: x-response_time
+  value:
+    unqualified: 64
+    unit: ms
+  conditions:
+  - TERA
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Response time'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:02cbc49795837ec262ef6bde107bfb9d9f0312a8874ecea769d7435113980927
+  key: x-light_source
+  value: 'Transmitter side: Red, four-element LED (wavelength: 660 nm)'
+  conditions: []
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Light source LED'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:047b634c744829bc505b13cf1a1aca08db3b3036ea7a6fddc42e002025f412ab
+  key: x-case_material
+  value: 'Main unit and cover: polycarbonate'
+  conditions: []
+  applies_to:
+  - FS-N41N
+  - FS-N42N
+  - FS-N43N
+  - FS-N44N
+  - FS-N41P
+  - FS-N42P
+  - FS-N43P
+  - FS-N44P
+  - FS-N41C
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Case material'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:9084247ab333b83ff34b2f5bc5dc2e3a2d1b912d0becdc4a95d935e8f6d04f39
+  key: mass
+  value:
+    number: 78
+    unit: g
+  conditions:
+  - printed as 'Approx. 78 g'
+  applies_to:
+  - FS-N41N
+  - FS-N41P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:a2e96f1c8b4f8d815b17823c64fd5a853d1c87279dcbedab06151489d70acf19
+  key: mass
+  value:
+    number: 48
+    unit: g
+  conditions:
+  - printed as 'Approx. 48 g'
+  applies_to:
+  - FS-N42N
+  - FS-N42P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:22fea36196b6a83c1f5268946293c1d0c6020de2fb5c893022a43cb976ddb5b1
+  key: mass
+  value:
+    number: 83
+    unit: g
+  conditions:
+  - printed as 'Approx. 83 g'
+  applies_to:
+  - FS-N43N
+  - FS-N43P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:fe9ec07c2a27cedf3803178438b6fa42451a70a077dca815399b4f7d676ca333
+  key: mass
+  value:
+    number: 73
+    unit: g
+  conditions:
+  - printed as 'Approx. 73 g'
+  applies_to:
+  - FS-N44N
+  - FS-N44P
+  family: FS-N40
+  citation:
+    page: 36
+    locator: Specifications, Amplifier Units table, row 'Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
