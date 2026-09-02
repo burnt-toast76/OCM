@@ -89,7 +89,11 @@ strip the separator characters space, hyphen, underscore, and dot. `FS-N41N`,
 
 A part covered only through a `family` claim still resolves, and the envelope labels it
 (`matched_via: family`) — family coverage is served as family coverage, never passed off
-as part-exact.
+as part-exact. Family resolution triggers when the query itself, normalized, exactly
+matches a family string: `get_claims("EPS25 series")` resolves. An *unlisted* member
+(EPS25-50WC-1001) does not — inferring membership from a prefix is fuzzy matching wearing
+a different hat, and `search_parts` surfaces the family for the agent to query
+explicitly.
 
 There is no fuzzy matching in `get_claims`. A near-miss that quietly resolves FS-N41N to
 FS-N41P would serve the wrong part's electrical ratings with full provenance attached —

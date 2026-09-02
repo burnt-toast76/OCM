@@ -1,0 +1,211 @@
+# Golden queries for the ocm-claims serving surface (ADR-0036).
+#
+# ADR-0035 D6's move applied to serving: known-correct answers over the
+# committed registry, written BEFORE the server exists. The future
+# ocm-mcp test suite executes every eval against the real implementation
+# and fails on any deviation; until then ci/check_serving_evals.py keeps
+# the expectations referentially honest against the registry (every id,
+# part, key, and document hash below must exist -- expectations may not
+# rot as the store grows).
+#
+# Expected claim ids are copied from the registry, whose ids are
+# content-hashes (serialization spec): they are stable under append-only
+# growth, so these goldens never go stale -- new claims ADD to counts
+# flagged `minimum: true`, and never change an id asserted here.
+#
+# Envelope invariants asserted by EVERY eval, stated once:
+#   - vocab_version present (the vocabulary the answer was served under)
+#   - serving_state present, equal to the registry checkout's git commit
+#   - every served claim record carries id + citation (document hash,
+#     page, locator) inline -- no bare values anywhere (ADR-0036 D2)
+#
+# Registry snapshot these goldens were authored against: 4 documents,
+# 229 claims (fixtures bc8792ff/c704b86f, datasheet 9ce6342a, catalog
+# cfdb33d3 -- the catalog deliberately unattested).
+
+version: 1
+contract: ADR-0036
+evals:
+
+  # --- get_claims: resolution and full-record mode --------------------------
+
+  - name: small_part_returns_full_records
+    tool: get_claims
+    args: {part_number: DP-8}
+    expect:
+      matched_via: exact
+      mode: full
+      attestation_status: all_attested
+      claim_count: 11
+      claim_ids:
+        - sha256:c3280a42dff70b3b9e4a4462a26bb9de48f2e9684d794c30651b48962e91d42d
+        - sha256:2b4be9ad715ceab7b7eaa7bdf62f457dfb7f3bf10d6d0ea64d861a90aeeb7a7c
+        - sha256:3c83499b2f87b378b23ef4da3b40108ae8bd793e4e4bd1dbcd1c2ee7815e1011
+        - sha256:f4b7b16ffc7343d29c5ee398fdc1e45fcd0d9c4500018a4056b6c87d029ec3d7
+        - sha256:e9a67365a32f58cb99bf2f7ebce8cf1621129e2897969df364b53264e98efbbf
+        - sha256:b273ca472a6091995758037e8bfa0b5add4d4649f2d51e59d1f83e669c521785
+        - sha256:42c08d4bd38513ea824138f63138071b6cf7a9b1ff71bbff43fa4024da75ec73
+        - sha256:81f9407253e2e72dbfff7bba4aaca94e63c864af837fe0aa75582f350b88e98d
+        - sha256:6bbe4427dc43de4d6325a2078438583c159e7b94d0459cb2b4f2bf0787a2923d
+        - sha256:3e32bcbc778f976f6e96def6b2b067d9960faf380eb833415291d4d098ed02ed
+        - sha256:dc2be98682154b22a5b10318e54c65c422012c261475b0b540ddeb85b6ab2abf
+    note: >
+      11 claims < the 25-claim threshold (D7): full records, each with
+      citation into document c704b86f... The part's only document is
+      attested at 1.0, so attestation_status is all_attested.
+
+  - name: normalization_resolves_spaced_lowercase
+    tool: get_claims
+    args: {part_number: "fs n41n", keys: [supply_voltage]}
+    expect:
+      matched_via: exact
+      resolved_part: FS-N41N
+    note: >
+      D4 normalization is normative: case-fold + strip space/hyphen/
+      underscore/dot. "fs n41n" and "FS-N41N" are the same part.
+
+  # --- get_claims: summary mode and keyed retrieval --------------------------
+
+  - name: catalog_part_summarizes_above_threshold
+    tool: get_claims
+    args: {part_number: FS-N41N}
+    expect:
+      matched_via: exact
+      mode: summary
+      attestation_status: mixed   # datasheet attested 1.0+1.1; catalog unattested
+      claim_count: {value: 53, minimum: true}
+      summary_keys_include:
+        supply_voltage: 2
+        power_consumption: 6
+        operating_temp: 6
+        output_configuration: 4
+        x-response_time: 17
+    note: >
+      53 claims across two documents > 25 (D7): per-key summary, never a
+      truncated record list. Counts are minimums -- append-only growth
+      may raise them, never lower them.
+
+  - name: keyed_retrieval_crosses_documents
+    tool: get_claims
+    args: {part_number: FS-N41N, keys: [supply_voltage]}
+    expect:
+      mode: full
+      claim_count: {value: 2, minimum: true}
+      claim_ids:
+        - sha256:41341855c70eec5dd95133d733bc01927175b181ebeda11319dfceabfa849530  # datasheet 9ce6342a
+        - sha256:5c6ac093a479ae2e7198a2ca4eaf57737eeea55e9b2b4d5e531feaec889ffd8b  # catalog cfdb33d3
+    note: >
+      The same statement in two documents is two claims with two ids
+      citing two hashes -- corroboration served as data, never merged.
+
+  - name: keyed_retrieval_includes_the_packed_blob
+    tool: get_claims
+    args: {part_number: FS-N41N, keys: [output_configuration]}
+    expect:
+      mode: full
+      claim_count: {value: 4, minimum: true}
+      claim_ids_include:
+        - sha256:a55d8b6ec5c5027fba1db8fc1a6ad4f2d33b07492a9bf739fc9af4d4ba596e3b  # the verbatim packed record
+    note: >
+      Append-only means the packed control-output record is still served,
+      verbatim, alongside everything else -- the serving layer neither
+      hides nor repairs a record.
+
+  # --- absence: the three states (D3) ----------------------------------------
+
+  - name: attested_silence_lists_the_consulted_set
+    tool: get_claims
+    args: {part_number: DP-8, keys: [ip_rating]}
+    expect:
+      absence_state: attested_silence
+      documents_consulted:
+        - sha256:c704b86ff07863a38fc69681f8e6a993cd2067ca220c7966a8d151877c97b94d
+    note: >
+      The dp8 document names ip_rating a deliberate silence and is
+      attested at 1.0: the absence is information (ADR-0035 D4), served
+      with the consulted set.
+
+  - name: unattested_document_makes_absence_meaningless
+    tool: get_claims
+    args: {part_number: FS-N41N, keys: [measuring_range]}
+    expect:
+      absence_state: absence_not_yet_meaningful
+    note: >
+      FS-N41N's datasheet is attested but the catalog on file is not:
+      nobody has established the catalog is silent on this key, and the
+      envelope must say so rather than fabricate certainty.
+
+  - name: unknown_part_is_no_documents
+    tool: get_claims
+    args: {part_number: XYZ-999}
+    expect:
+      absence_state: no_documents
+    note: Third state -- nothing consulted at all.
+
+  # --- family resolution (D4) -------------------------------------------------
+
+  - name: family_name_resolves_labeled
+    tool: get_claims
+    args: {part_number: EPS25 series}
+    expect:
+      matched_via: family
+      mode: full
+      attestation_status: all_attested
+      claim_count: {value: 16, minimum: true}
+    note: >
+      The query, normalized, exactly matches the family string: the
+      family-scoped claims return, labeled matched_via: family -- never
+      passed off as part-exact.
+
+  - name: unlisted_family_member_does_not_resolve
+    tool: get_claims
+    args: {part_number: EPS25-50WC-1001}
+    expect:
+      absence_state: no_documents
+    note: >
+      Membership-by-prefix is fuzzy matching wearing a different hat and
+      is refused in v1: an unlisted variant does not inherit the family's
+      claims. search_parts surfaces the family for the agent to query
+      explicitly.
+
+  # --- search_parts (D1/D4) ---------------------------------------------------
+
+  - name: search_finds_the_fu67_family_of_parts
+    tool: search_parts
+    args: {query: fu-67}
+    expect:
+      results_include: [FU-67TG, FU-67MTG, FU-67MG, FU-67G]
+      results_exclude: [FU-2303]
+
+  - name: search_surfaces_family_strings
+    tool: search_parts
+    args: {query: eps25}
+    expect:
+      results_include: [EPS25-100WC-1001, EPS25-250WC-1001, EPS25 series]
+    note: Family strings are searchable alongside part numbers (D4).
+
+  # --- get_document (D1) ------------------------------------------------------
+
+  - name: document_metadata_never_bytes
+    tool: get_document
+    args: {hash: sha256:c704b86ff07863a38fc69681f8e6a993cd2067ca220c7966a8d151877c97b94d}
+    expect:
+      manufacturer: Example Dispensing (synthetic)
+      type: datasheet
+      attestations: ["1.0"]
+      claim_count: {value: 11, minimum: true}
+      bytes_served: false
+
+  - name: unattested_catalog_reports_no_attestations
+    tool: get_document
+    args: {hash: sha256:cfdb33d35f7c8152121d4be026337da47bbceba4c216e503eff4c815b4bc05e9}
+    expect:
+      manufacturer: KEYENCE CORPORATION
+      type: catalog
+      attestations: []
+      claim_count: {value: 175, minimum: true}
+      bytes_served: false
+    note: >
+      A partial pass serves as a partial pass: no attestation, and every
+      absence involving this document is state
+      absence_not_yet_meaningful.
