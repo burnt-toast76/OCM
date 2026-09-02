@@ -157,6 +157,21 @@ evals:
       family-scoped claims return, labeled matched_via: family -- never
       passed off as part-exact.
 
+  - name: family_absence_consults_the_familys_documents
+    tool: get_claims
+    args: {part_number: EPS25 series, keys: [mass]}
+    expect:
+      matched_via: family
+      absence_state: attested_silence
+      documents_consulted:
+        - sha256:bc8792ff216e076f31c1d92d74a2bcc046a316231049ecf838e251c98bb0b662
+    note: >
+      A family-resolved absence is computed from the family's documents,
+      never answered no_documents while they sit on file. The registry
+      yields attested_silence here because the family's one document is
+      attested at 1.0, mass is a 1.0 key, and the eps25 synthetic
+      datasheet deliberately does not answer it (a named omission).
+
   - name: unlisted_family_member_does_not_resolve
     tool: get_claims
     args: {part_number: EPS25-50WC-1001}

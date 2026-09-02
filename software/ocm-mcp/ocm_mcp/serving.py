@@ -49,8 +49,11 @@ def _attestation_status(index: ServingIndex, document_hashes: set[str]) -> str:
     return "mixed" if any(attested) else "unattested"
 
 
-def _absence(index: ServingIndex, part_token: str, key: str) -> dict[str, Any]:
-    documents = index.part_documents.get(part_token, set())
+def _absence(index: ServingIndex, documents: set[str], key: str) -> dict[str, Any]:
+    # The caller resolved the document set (part- or family-scoped, D4);
+    # absence is computed from THAT set, never re-derived from a token --
+    # a family-resolved query's absence must consult the family's
+    # documents, not answer no_documents while they sit on file.
     if not documents:
         return {"absence_state": "no_documents"}
     if all(index.covered(h, key) for h in documents):
@@ -83,7 +86,7 @@ def get_claims(index: ServingIndex, part_number: str, keys: list[str] | None = N
         if not served:
             # One absence state for the whole query: meaningful only when
             # every consulted document covers every asked key (D3).
-            worst = [_absence(index, token, key) for key in keys]
+            worst = [_absence(index, documents, key) for key in keys]
             state = next(
                 (a for a in worst if a["absence_state"] == "absence_not_yet_meaningful"),
                 worst[0],
