@@ -2,13 +2,15 @@
 # FS-N40 Series catalog's Amplifier Units specification table (page 36).
 # The document's bytes are NOT in this repository (see claims/README.md);
 # the hash was computed at ingest from the PDF itself. PARTIAL PASS: no
-# attestation -- only the amplifier spec table is transcribed, so an
-# absent vocabulary key here means "not yet checked", not "the catalog
-# is silent" (ADR-0035 D4). The FS-N41C's weight is deliberately NOT
-# transcribed: the printed table is ambiguous for that column (25 g vs
-# 23 g across two header slots) and a guess would be fabrication
-# (ADR-0014). Claim ids are computed by ocm_api.claims.claim_id -- never
-# by hand. Records are append-only (D3/D7).
+# attestation -- transcribed so far: the Amplifier Units spec table
+# (p36) and the ARMOR GUARDED Reflective fiber table (p19). An absent
+# vocabulary key here means "not yet checked", not "the catalog is
+# silent" (ADR-0035 D4); fiber pages 18 and 20-35 remain untranscribed.
+# Deliberately NOT transcribed, ambiguity over guessing (ADR-0014): the
+# FS-N41C's weight (25 g vs 23 g across two header slots) and the
+# FU-67TG's minimum bend radius (a merged cell shared with FU-67MTG).
+# Claim ids are computed by ocm_api.claims.claim_id -- never by hand.
+# Records are append-only (D3/D7).
 ocm_version: '1.0'
 document:
   hash: sha256:cfdb33d35f7c8152121d4be026337da47bbceba4c216e503eff4c815b4bc05e9
@@ -830,6 +832,1324 @@ claims:
   citation:
     page: 36
     locator: Specifications, Amplifier Units table, row 'Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:928ca21fc4537399d88de5a06e8ab2c27b22e4d3b2d7a86b68d1325e98a2b8dc
+  key: x-detecting_distance
+  value:
+    unqualified: 590
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:7833976690936848ecffafd434f5a766ab4d5051919e43bc5bc321ffd5742ff8
+  key: x-detecting_distance
+  value:
+    unqualified: 130
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:5fa9d9ec7eff234c97f0737f541d076000b1be1e72f00aeebec4889c1ae61e14
+  key: x-detecting_distance
+  value:
+    unqualified: 540
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:ab924809b99789df490cf6dc3e3c623f752122ec50f678606c6d205f6fe98e54
+  key: x-detecting_distance
+  value:
+    unqualified: 420
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:5da51c67f43dd6d508e0dab8544a789787ae81938d166df0cec2769087f3ba4e
+  key: x-detecting_distance
+  value:
+    unqualified: 320
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:c288ceadf7232c728350f5d3d9022513b41983d3142f9796b38540ee0ec06194
+  key: x-detecting_distance
+  value:
+    unqualified: 190
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:e425a0823a80b27f78293151454578ec17f129f7685ffdb89461e8546759fe1f
+  key: x-detecting_distance
+  value:
+    unqualified: 47
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:677e5bb47087c06c91561cfbd15c3dad1943e0206802e57200dd21512e7da6fc
+  key: x-detecting_distance
+  value:
+    unqualified: 28
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:e808ee0883d13061b8d9a3f6251204eb3c09e055b952bc8fc646d250b681ab09
+  key: mass
+  value:
+    number: 20
+    unit: g
+  conditions:
+  - printed as 'Approx. 20g'
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:84d226b5bbd578e70a367d88df2db97bc64511211a44d7bb9c86ab53288f5b44
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:00d8e994c9911fe39f30f8baed69dbe6b1ed597a58f5abc6e57f9a282d4bce62
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Cut not allowed
+  conditions: []
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:bb338acefe9bba582d3e629a11c8c6a4c9292387c2a4b0a0b895b798d952d46f
+  key: x-minimum_bend_radius
+  value: R10 R0.39"
+  conditions: []
+  applies_to:
+  - FU-2303
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-2303, 'Minimum bend radius'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:eaf20acb31b4dcdeedeee9dbbf6524f6d85047ba7ebcc53cc4be5e5059581f1a
+  key: x-detecting_distance
+  value:
+    unqualified: 590
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:6bcdaf67cd06b57e60f69266fb734d2828d5bb7989e8b0441bbb57f015a1eb8d
+  key: x-detecting_distance
+  value:
+    unqualified: 130
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:50d8497403cb033e990d8ccc7dd277560c59eae5640977f6d186ddd1c9d1aeb2
+  key: x-detecting_distance
+  value:
+    unqualified: 540
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:91618a8bcc02e48aafb7dfe6c721da8aa7497075d1902178e9116fe0756730a7
+  key: x-detecting_distance
+  value:
+    unqualified: 420
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:26866df8d48c2f21f69e8f9499d45af852b4215aa0b19e043ab5eed0076dffb2
+  key: x-detecting_distance
+  value:
+    unqualified: 320
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:7bfc3dbba3dbbb0fc242c89464ad858225383a13427f10ef84be2eea5acca816
+  key: x-detecting_distance
+  value:
+    unqualified: 190
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:bef730a47dd91fb7d10edf6b76f3ecb79caefc2d02600ee98767aeee73ef3d88
+  key: x-detecting_distance
+  value:
+    unqualified: 47
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:37a610e16908d2fb1a5362a486a9a334c8b12e251f3eed6a3831814194672412
+  key: x-detecting_distance
+  value:
+    unqualified: 28
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:527f789dd0529dabd1c8209eee6906523f86ad1bdcc7523f7e3683391d5ba17e
+  key: mass
+  value:
+    number: 15
+    unit: g
+  conditions:
+  - printed as 'Approx. 15g'
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:ee7d35123669ef305259410cfbd14f4f18bf77d9e24562b7489fb1cbc9c9108a
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:04d0d3d56b0dea8b0080dfd077e43a4b682183f12710663bcc680d40e4cf4577
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Free-cut (ø1.3 ±0.05" × 2) spiral 30 cm 11.81"
+  conditions: []
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:b51034b63f2cb5fd141dfa2170981df301c103a54d19b83b1c9a2eb93efad14f
+  key: x-minimum_bend_radius
+  value: R10 R0.39" Stainless Steel
+  conditions: []
+  applies_to:
+  - FU-35FG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35FG, 'Minimum bend radius'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:0ce993a923297db828ce109d746ba4ae91e47d3b2d4ecc40a94c66713bb0bcc8
+  key: x-detecting_distance
+  value:
+    unqualified: 900
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:11639e670c7b1fbe151af3134fae6b4447cbe0533dfe128716ceac11ce520e1d
+  key: x-detecting_distance
+  value:
+    unqualified: 380
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:36b78b7e4f934bfb81eeb749fce85391b08cba0336c6acdd9423d26ba3f309e3
+  key: x-detecting_distance
+  value:
+    unqualified: 830
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:b378d0ec3253035f46bb5e07f45b5ee1b81bc96478e59ad935610d2654f79b55
+  key: x-detecting_distance
+  value:
+    unqualified: 730
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:ce9762933efd84bb5285e8ac046bb4eac52c09874cdff363aef3e6623f878784
+  key: x-detecting_distance
+  value:
+    unqualified: 670
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:c961f68ffd2cb306656738f58abf146a43c2af4b93060e40393fd04c991b4551
+  key: x-detecting_distance
+  value:
+    unqualified: 520
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:449ce90ec0cec828c892619410f19def3a9c225bf88479a9f35e5dcc0b82c608
+  key: x-detecting_distance
+  value:
+    unqualified: 150
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:4010b1ea21e7405a9ac90729f8de21c7b004d89d1b65986157dd3327e4b6d221
+  key: x-detecting_distance
+  value:
+    unqualified: 89
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:370ca72ff1ccbaf8e01587e3c64c675180afdc939fc9f079ee111e9616052218
+  key: mass
+  value:
+    number: 32
+    unit: g
+  conditions:
+  - printed as 'Approx. 32g'
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:79c39fe09ab5396c53d4ec261bb23a6daf3fe5a08fc4b7027dbc4dfa0ea61e5a
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:438bbb369c0617e45314e22cb9949747c4f8a2f0b79d3962c39a2ce40cde8d1c
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Cut not allowed
+  conditions: []
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:a35fbb849e3d7d5582ebb5762add83d3fb75950f53f5a29bd9d3605f85629b28
+  key: x-detecting_distance
+  value:
+    unqualified: 900
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:f3f0791a6e33c28cd7e97ba312e8a90471b322b782208c982eac47e6df54bae5
+  key: x-detecting_distance
+  value:
+    unqualified: 380
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:06cada6f341e31bd136f4a90c8e7d69dd7e414c5664f2e1adcc0b0a47133fdb5
+  key: x-detecting_distance
+  value:
+    unqualified: 830
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:a97a1ee9c81e10ccb2ff5c78f786d018390ea2498277ac77a57f28cc7cd5c4ed
+  key: x-detecting_distance
+  value:
+    unqualified: 730
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:5982546d9ba7b16310f42a97f965d6f97ff3c342ed807ec520cf27f88c524732
+  key: x-detecting_distance
+  value:
+    unqualified: 670
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:7ad6d8f28a895d266ecb92767995a60373299b5f52da9a9fb8d35f579bf83fb8
+  key: x-detecting_distance
+  value:
+    unqualified: 520
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:af24088622de2570773118bfb88ecbf7bf4eecba2e8cb94935cdc52c90aa0065
+  key: x-detecting_distance
+  value:
+    unqualified: 150
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:f5e0256a724fc9bccb60fab79d6a2552a9650b41128a6091d64521490cc14036
+  key: x-detecting_distance
+  value:
+    unqualified: 89
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:881f72aa5ba4ffe145ec08f1bd805033b35cdb365efcb89f1c4298c36ee7f732
+  key: mass
+  value:
+    number: 80
+    unit: g
+  conditions:
+  - printed as 'Approx. 80g'
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:5e72e92eb470301b29cf53551b4ffa7eaad65d57fc4ff97f6b5fe3880009cb54
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:2f95605776179114173cf0d3ba981aa6a9fa35223a59242b97588dda64d6d000
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Cut not allowed
+  conditions: []
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:bc967fadf4d9fa0007bfd66889536be489f4a8331b946f26c22e168af2a6e55c
+  key: x-minimum_bend_radius
+  value: R25 R0.98" Stainless Steel
+  conditions: []
+  applies_to:
+  - FU-67MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MTG, 'Minimum bend radius'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:907f4a7cda8ad36618e5832ee727a66552b07a0d86dac77db0c09e6ca1a437c0
+  key: x-detecting_distance
+  value:
+    unqualified: 580
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:a276f13b95f71557156cd993f59a6f71d0d4ee286198e677f65d12e0f51304d8
+  key: x-detecting_distance
+  value:
+    unqualified: 120
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:52bbccf918f6f978fd818cc0b08c20dd1d55d7fcc9ee034a1ec9afa9d65bd8db
+  key: x-detecting_distance
+  value:
+    unqualified: 530
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:4aebd4ff0ed7946db662c2a75316a65c03e12fd0f60e7a1a73d0b371cd992efc
+  key: x-detecting_distance
+  value:
+    unqualified: 390
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:a7d84fed295726be4f04edaec0b33fbcd65f02a3745c740e18869a8aa7198394
+  key: x-detecting_distance
+  value:
+    unqualified: 250
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:a1c457b93eb6fd459b07fb777c189af5a15eba51246b571135733026164737b9
+  key: x-detecting_distance
+  value:
+    unqualified: 170
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:f93da9cd6c53917d85cc70b9256930c50be4e4db9385dcbce7cbdf1e3aa8806c
+  key: x-detecting_distance
+  value:
+    unqualified: 45
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:1b03f2f8b87d1807f1f2bf3109ba2845949d9c03e993b9501ea453a7e5144d01
+  key: x-detecting_distance
+  value:
+    unqualified: 27
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:773adc405a6ea31bb1cb515e9e5a9f134d89593d73c5506b4ee520a9cba36f1a
+  key: mass
+  value:
+    number: 32
+    unit: g
+  conditions:
+  - printed as 'Approx. 32g'
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:d150303e57ae8857b8f19e08403622643bd13940c1d79be4e4da67e6cf686428
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:483186f390fab4dd2dc91e8454b6c6ca69de57d15a174797b96748e971a690c8
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Cut not allowed
+  conditions: []
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:40fc5ddfcf9d02165dfb743b6fe50ca4e7a984bf0f05e01521d4559d7c069a31
+  key: x-minimum_bend_radius
+  value: R10 R0.39" Stainless Steel
+  conditions: []
+  applies_to:
+  - FU-35TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-35TG, 'Minimum bend radius'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:872fad735b67b9668db3100c3774195be1bdd302772938f24090f8be31d25071
+  key: x-detecting_distance
+  value:
+    unqualified: 1100
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:07680a391750695decc3a71544660d027e9f8ac38b775052240f6267cc3ffaca
+  key: x-detecting_distance
+  value:
+    unqualified: 380
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:2e97052b300b7c4c1e6a39a0e11ca82fcf233da484389a2db4eaef4410efeaa0
+  key: x-detecting_distance
+  value:
+    unqualified: 1000
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:2c4bf861ea1329b6b4e324b8ab8d4aca98e0f9ebeddb3a4dfeb60b001ed81506
+  key: x-detecting_distance
+  value:
+    unqualified: 830
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:f0623afaf31bd44250e23f694f63b4781833c2d49ec3045f30d67f8364e6af0c
+  key: x-detecting_distance
+  value:
+    unqualified: 610
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:e77b9532095d98b30e092e3b6f7c953f5e040cb003386c60624adbb5708f1065
+  key: x-detecting_distance
+  value:
+    unqualified: 500
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:682f0b18d9a5a6cd35932305c94494b0e18cbc6da53c0714f9424702aac6a7a3
+  key: x-detecting_distance
+  value:
+    unqualified: 150
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:163c94f571f083e6fba576b5d6c55ca7a926ae2c1b05b6343307814469234634
+  key: x-detecting_distance
+  value:
+    unqualified: 88
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:5434b9084b7858d6725b6dc7c8989e46df9bf29441b4ba669671a9c4f5cea698
+  key: mass
+  value:
+    number: 70
+    unit: g
+  conditions:
+  - printed as 'Approx. 70g'
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:9c24d91929d8ad839ac75ac579e49434955744d8700b8a522db86f86341147cf
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:003b62f55c9ba18dbbba67810a4ebd07867e93f00182f534711b26d3b40b2ed4
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Cut not allowed
+  conditions: []
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:ecfc96846ff11cd8cbc0c6f4bfe95337e76c19b7b56039af80caca5b9520cf44
+  key: x-minimum_bend_radius
+  value: R25 R0.98" Stainless Steel
+  conditions: []
+  applies_to:
+  - FU-67MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67MG, 'Minimum bend radius'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:4117fc9eab68564c3d84a1f61f16aa80c108ed8a4e988f1af28ec356fa6c0643
+  key: x-detecting_distance
+  value:
+    unqualified: 1100
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:1a1ee9ba3bed106a55f89fe39920de3e0e2e2e055f952d57fc3cf655f98048cf
+  key: x-detecting_distance
+  value:
+    unqualified: 380
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:9ba4664cfe6f0ea410c549e366d8701e5ed71b3893c6b022fe73fdccd9f3d19d
+  key: x-detecting_distance
+  value:
+    unqualified: 1000
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:67947b4e12670aa29e42e93b4e51a3426adc82dbb8d49c5638a47d1c4e8d9242
+  key: x-detecting_distance
+  value:
+    unqualified: 830
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:9dea9172e18452e907063bc25273b6775c871153f67feefd0d9ddaa81a1d6658
+  key: x-detecting_distance
+  value:
+    unqualified: 610
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:fd8ea5185e797dc6b426b605928a444928e3004c9381d5d7d26465e5c348d62d
+  key: x-detecting_distance
+  value:
+    unqualified: 500
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:44a3c15de8aa219e7e8d35f2b4a30d0746d0ad59c2cd09970d86bcfc93f8b342
+  key: x-detecting_distance
+  value:
+    unqualified: 150
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:59093ab49d93a21f866c5e559c573fca3c8311414fe0e0bce2a06a7b32f2d353
+  key: x-detecting_distance
+  value:
+    unqualified: 88
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - 'standard target: White matte paper (*1)'
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:70629d34098bddb28b5b20b809012142ef05bc817ab3e79400001533d372f8ba
+  key: mass
+  value:
+    number: 29
+    unit: g
+  conditions:
+  - printed as 'Approx. 29g'
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:9348047d8fbde065c8307c47f8aaa075afca58cb920d06dd0c044072f2675bbd
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:bd2b61e26332dca5586fae842f4f6502de155f9020bde9df7539f0b96c5a99f5
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Cut not allowed
+  conditions: []
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:72576cabd66498629e567232edbd5fa2c6d315d8a47a7a41b644506f4da3aa81
+  key: x-minimum_bend_radius
+  value: R10 R0.39" Stainless Steel
+  conditions: []
+  applies_to:
+  - FU-67G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67G, 'Minimum bend radius'
   extraction:
     method: automated
     tool: LLM agent transcription (pdfplumber text layer)
