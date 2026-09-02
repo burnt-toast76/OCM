@@ -3,12 +3,12 @@
 # The document's bytes are NOT in this repository (see claims/README.md);
 # the hash was computed at ingest from the PDF itself. PARTIAL PASS: no
 # attestation -- transcribed so far: the Amplifier Units spec table
-# (p36) and the ARMOR GUARDED Reflective fiber table (p19). An absent
+# (p36) and both ARMOR GUARDED fiber tables (p19, Thrubeam and
+# Reflective, resolved against the rendered page image). An absent
 # vocabulary key here means "not yet checked", not "the catalog is
 # silent" (ADR-0035 D4); fiber pages 18 and 20-35 remain untranscribed.
 # Deliberately NOT transcribed, ambiguity over guessing (ADR-0014): the
-# FS-N41C's weight (25 g vs 23 g across two header slots) and the
-# FU-67TG's minimum bend radius (a merged cell shared with FU-67MTG).
+# FS-N41C's weight (25 g vs 23 g across two header slots).
 # Claim ids are computed by ocm_api.claims.claim_id -- never by hand.
 # Records are append-only (D3/D7).
 ocm_version: '1.0'
@@ -2153,3 +2153,790 @@ claims:
   extraction:
     method: automated
     tool: LLM agent transcription (pdfplumber text layer)
+- id: sha256:77c1ddacb9b654f15f5e2bee33a5a6a34d3ab260f4e688bbdfebb831071404d4
+  key: x-minimum_bend_radius
+  value: R10 R0.39" Stainless Steel
+  conditions: []
+  applies_to:
+  - FU-67TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Reflective table, row FU-67TG, 'Minimum bend radius' (cell merged with FU-35FG)
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:1866b973109e260741038de6b4c1a21bc6713c3c69335e495e8e7924760f1607
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:82ceb7646bb83bc73b3cb5cea0c3eef1be2a79007f5acaba8e2ba3c9060ffc86
+  key: x-detecting_distance
+  value:
+    unqualified: 1100
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:52b1263de637c35038917d844d176d796f62a4eedd73b7cb95a59beea53487b3
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:a78c6ba7bc5940ec3a4d8bf7453e8b50c0f7f202afc4ad0e663a1915c9b3a7a2
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:454a58b81420fe8412df64f9e7fa81814099def6e0ea8bee4bd31b9417e964e8
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:b26cf24d9c2137baf1e7676b5fbe20395ee3da9f7c6e29f9ff00800dbfb5eb6a
+  key: x-detecting_distance
+  value:
+    unqualified: 1400
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:c88b1cedee16d1b077ed4301a176e3c8591a1751cf16c1b8535cc0cc3ae52127
+  key: x-detecting_distance
+  value:
+    unqualified: 430
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:0bf1f2976bddb9f615707ed49ffb02902ffe1a6d62ee011c657c4d686b555c9d
+  key: x-detecting_distance
+  value:
+    unqualified: 280
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:b4fb6a61378bf57f4f9ccaef78debe6c10715849c25d8361440bcb26bad5c152
+  key: mass
+  value:
+    number: 43
+    unit: g
+  conditions:
+  - printed as 'Approx. 43g'
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:c0bfa36d172b1ca555fe2448101c978bfd20670cdb4e48a154f3cd33f5db4de9
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:dcbd058559d40b46378e7d0e035f114ddafd343986f3b253e4866f5300a3a246
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Cut not allowed
+  conditions: []
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:f3ce40a96a8d572485860a532f07cb9ce877b7e5eda4d5338244273fa3e787a3
+  key: x-minimum_bend_radius
+  value: R10 R0.39" Stainless Steel
+  conditions: []
+  applies_to:
+  - FU-77TG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77TG, 'Minimum bend radius'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:a2977cfee397dc649969df275673b97b3a0424662fa9925ddad79dccb3dac07b
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:b2f8cd6c8f4f388dc64280ec5bc918b949b16ecd1200c429992831dde6c2631b
+  key: x-detecting_distance
+  value:
+    unqualified: 1100
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:59024a0c4979b9be1fc0b824487f24b6e34564ab84042a2150c2b7edea6c4cce
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:ecf1575d5fc6e12c69dd6a2197f8577510213e7cca7b7c189abc7976695d8000
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:68e2391ad43b0c13d3826fdfc10d7a9c30b473be21ec8d35d3eb5c86772bfd4a
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:7b574a35b86fd438b4f322dcb5cc7680af410effedaaad7926a26107a0d604a5
+  key: x-detecting_distance
+  value:
+    unqualified: 1400
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:fa14267439c338d4707000a6223e30de8054ecb575e2af0668849ddecf6a48f5
+  key: x-detecting_distance
+  value:
+    unqualified: 430
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:d8b82cd9b49631fb148e0765d656b39b0d9d814521d067640abbd27331131293
+  key: x-detecting_distance
+  value:
+    unqualified: 280
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:44727f3c2d5f6ac20e8a8281e28d68f89757d63f7df27cf3665d9c560ef15f01
+  key: mass
+  value:
+    number: 100
+    unit: g
+  conditions:
+  - printed as 'Approx. 100g'
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:12bc7f706da9d4193f21b214911b8f29d9716bb3ef570e8e11acf11611b174e3
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:cf2d491525d2e4c00f4d1b4fe8f330c452aceb046924d4f860cf1d3eaf4b61c2
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Cut not allowed
+  conditions: []
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:4da2bdbe9108afbe4a0ff52b14dbea8a1dacfa14b2c96795406921fdf828b32a
+  key: x-minimum_bend_radius
+  value: R20 R0.79" Stainless Steel
+  conditions: []
+  applies_to:
+  - FU-77MTG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MTG, 'Minimum bend radius'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:0f4980d441a6f6ba0e43dbe3e91e6acd7f27074f45d7bce8b8244126af803782
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:5ebc913c6c6f84a0b553223f980f85354739f8b0a437d2c14ca20102379f2eaf
+  key: x-detecting_distance
+  value:
+    unqualified: 1100
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:26cd98fcadb097a4428311433579eb63da22e9f0c78339f7d0cc91986343de6e
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:2cb3208b9c6fdf93cbf07ade8c1ad15e3ab8e203c59e2d59217d569888c481cb
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:bb2c86a7f620a74120ae8ec18e92b57e551816e50febfdcf76d55034fb917b84
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:86ea5a337337a06e97d979891a11d4fc31f96161fbcd04b488fa7a89e0e706fa
+  key: x-detecting_distance
+  value:
+    unqualified: 1400
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:79c8ca24438dde28be5b40b42a3946ce3332477f7b9e6ccb0c74340a2d988270
+  key: x-detecting_distance
+  value:
+    unqualified: 430
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:1cce3e4ac30b6fddae0ec58bcbf969fad5f9c34e2061fd060fa576353f960c64
+  key: x-detecting_distance
+  value:
+    unqualified: 280
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:b8a2bbd614fcb74f96594a400ad8e4596ad5264671fc0140405db037edba0e70
+  key: mass
+  value:
+    number: 39
+    unit: g
+  conditions:
+  - printed as 'Approx. 39g'
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:f46358456f324432f3324ad19c218436c106d4faafd0837b5c935635ea646d45
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:df3934c053d1f2bf5905d383b55738b4c7a1b1ddcb6c36c15948b8ed407169da
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Cut not allowed
+  conditions: []
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:83b8f97475d94801f0e67892448e330d8e1ca24a339de7eefa70e38a6e5ea68b
+  key: x-minimum_bend_radius
+  value: R10 R0.39" Stainless Steel
+  conditions: []
+  applies_to:
+  - FU-77G
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77G, 'Minimum bend radius'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:a2f52add8f0909fe01334cab972c04f27ca6a27ddf5a07d5bc7fdd1778945342
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - TERA (Longest)
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:fd9f222911d4059812f355ee7862326ec25721d1651ca6ebc8face79df069e21
+  key: x-detecting_distance
+  value:
+    unqualified: 1100
+    unit: mm
+  conditions:
+  - FINE (Initial)
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:5581e99311f25497ace062c9705cef41687e9e94e01942e4594f4a18803e4dda
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - MEGA
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:d36c907f77ccd242358dfc6278995b938e1dd4469f2ff802a1bb5643b8c31c16
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - ULTRA
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:40aed154c3c62a864cb88fefb2f74dfb6a0c9c4d8a8cf63b70ac1666a64c778d
+  key: x-detecting_distance
+  value:
+    unqualified: 1800
+    unit: mm
+  conditions:
+  - SUPER
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:c361380ff260aac386983bf9c6b89971bd51457d599abbd76a9c460c0e4d73fa
+  key: x-detecting_distance
+  value:
+    unqualified: 1400
+    unit: mm
+  conditions:
+  - TURBO
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:3125ce4feab3148406ecdd5adf85200911a71fdb17e239b41738fa9c1dbe5b89
+  key: x-detecting_distance
+  value:
+    unqualified: 430
+    unit: mm
+  conditions:
+  - HSPD
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:3f23345ed7de0839b8b6adc239ceb2266459a20b7e1631d0ae79c8a7c58ed9f3
+  key: x-detecting_distance
+  value:
+    unqualified: 280
+    unit: mm
+  conditions:
+  - S-HSPD
+  - when using the FS-N40 Series (*1)
+  - "\"3600 mm 141.73\" (1800 mm 70.87\")\" is assumed as the maximum because the fiber cable length is 2 m 6.6' (1 m 3.3') (*1)"
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Detecting distance'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:a41bb240ce35bcdde5a41f97301283695675a2038c6dcfd301573a595ce2bdbb
+  key: mass
+  value:
+    number: 100
+    unit: g
+  conditions:
+  - printed as 'Approx. 100g'
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Model Weight'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:e8808d13630309a3a35a42cc0d538ba70c8b10a1938f033b92d7d43bad1a9d80
+  key: operating_temp
+  value:
+    min: -40
+    max: 50
+    unit: °C
+  conditions: []
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Ambient temperature'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:db8786455c545fd4ab7a2cbff7a5c7c0e4f823db79fb09e75ddf692309f77e7c
+  key: x-fiber_unit_length
+  value: 1 m 3.3' Cut not allowed
+  conditions: []
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Fiber unit length (Diameter)'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:75e7ecb525b2f71703a0d7d7d322d56e29ae64b5424db19aa5fc23ae7949b1a3
+  key: x-minimum_bend_radius
+  value: R20 R0.79" Stainless Steel
+  conditions: []
+  applies_to:
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, row FU-77MG, 'Minimum bend radius'
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
+- id: sha256:5d6aa1a8d89a5bdf8c35f19dcd2cc301468aec80186cdd014bc4d81b505475ae
+  key: x-optical_axis_diameter
+  value: ø1.13 ø0.04"
+  conditions: []
+  applies_to:
+  - FU-77TG
+  - FU-77MTG
+  - FU-77G
+  - FU-77MG
+  citation:
+    page: 19
+    locator: ARMOR GUARDED FIBER UNITS, Thrubeam table, 'Optical axis diameter' (cell merged across all four rows)
+  extraction:
+    method: automated
+    tool: LLM agent transcription (pypdfium2 page render)
