@@ -64,7 +64,7 @@ that poisons every consumer at once.
 
 ## Decision 3 — Absence has three answers
 
-A query for a key with no claim is answered with one of three distinct states, never a
+A query for a key with no claim is answered with one of four distinct states, never a
 bare empty list:
 
 1. **Attested silence** — every document on file for the part is attested complete at the
@@ -76,8 +76,14 @@ bare empty list:
    attestation at the current vocabulary. Nobody has established the document is silent;
    the envelope says so.
 3. **No documents on file** for the part at all.
+4. **Unbound key, never attested** — the queried key is outside the vocabulary (an `x-`
+   key, or no vocabulary key at all) and documents are on file. An attestation's promise
+   is full transcription against a vocabulary (ADR-0035 D4), and a statement outside the
+   vocabulary is outside that promise — so silence on an unbound key is never attested
+   silence, whatever the part's attestation status. State 3 still wins when nothing is
+   on file.
 
-The registry already exhibits all three, and flattening any pair fabricates certainty —
+The registry already exhibits all four, and flattening any pair fabricates certainty —
 the exact ambiguity the attestation machinery exists to kill.
 
 ## Decision 4 — Exact resolution after stated normalization

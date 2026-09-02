@@ -65,8 +65,12 @@ class ServingIndex:
         """A document's absence for `key` is meaningful iff some attestation
         on it pins a vocabulary version that already contained the key
         (ADR-0035 D4: a later vocabulary's new keys are honestly uncovered
-        by an older attestation)."""
-        since = _version_tuple(self.key_since.get(key, "1.0"))
+        by an older attestation). Only vocabulary keys can be covered at
+        all -- an attestation's promise is scoped to the vocabulary, so
+        callers check membership first; an unknown key here is a
+        programming error, never silently treated as a 1.0 key.
+        """
+        since = _version_tuple(self.key_since[key])
         return any(_version_tuple(v) >= since for v in self.documents[document_hash].attestations)
 
 

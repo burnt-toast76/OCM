@@ -11,8 +11,9 @@ Contract invariants enforced here, not in the transport:
   path that strips them (D2);
 - spreads are served verbatim; nothing here computes, converts, or
   summarizes a value (D2);
-- absence is answered in one of three distinct states, never a bare
-  empty list (D3);
+- absence is answered in one of four distinct states, never a bare
+  empty list (D3) -- and silence on a key outside the vocabulary is
+  never attested silence;
 - resolution is exact after normalization; family resolution triggers
   only on the family NAME as the query, labeled matched_via: family
   (D4);
@@ -56,6 +57,12 @@ def _absence(index: ServingIndex, documents: set[str], key: str) -> dict[str, An
     # documents, not answer no_documents while they sit on file.
     if not documents:
         return {"absence_state": "no_documents"}
+    if key not in index.key_since:
+        # An attestation promises full transcription against a VOCABULARY
+        # (ADR-0035 D4); a statement outside the vocabulary is outside
+        # that promise, so an absent x-/unknown key never earns attested
+        # silence -- that would be fabricated certainty (ADR-0036 D3).
+        return {"absence_state": "unbound_key_never_attested", "documents_on_file": sorted(documents)}
     if all(index.covered(h, key) for h in documents):
         return {"absence_state": "attested_silence", "documents_consulted": sorted(documents)}
     return {"absence_state": "absence_not_yet_meaningful", "documents_on_file": sorted(documents)}

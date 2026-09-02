@@ -135,6 +135,17 @@ evals:
       nobody has established the catalog is silent on this key, and the
       envelope must say so rather than fabricate certainty.
 
+  - name: absent_unbound_key_is_never_attested_silence
+    tool: get_claims
+    args: {part_number: DP-8, keys: [x-never_stated_anywhere]}
+    expect:
+      absence_state: unbound_key_never_attested
+    note: >
+      DP-8's document is fully attested, but an attestation's promise is
+      scoped to the vocabulary (ADR-0035 D4): silence on an x- key is
+      never attested silence -- serving it as such would be fabricated
+      certainty (D3 state 4).
+
   - name: unknown_part_is_no_documents
     tool: get_claims
     args: {part_number: XYZ-999}
