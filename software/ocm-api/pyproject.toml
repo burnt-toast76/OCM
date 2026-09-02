@@ -42,6 +42,12 @@ tesseract = ["ocm-generator[tesseract]"]
 # written, so this stays a separate extra rather than a hard dependency of
 # the whole package; ocm_api.attachments handles ImportError itself.
 cad = ["cascadio>=0.0.10", "trimesh>=4.0"]
+# Extraction preflight for datasheet/catalog ingestion (ADR-0035 D6):
+# pdfplumber for text/table extraction, pypdfium2 to render the page
+# image every hazard is resolved against. claims_preflight's detectors
+# are pure functions and work without either; only preflight_page and
+# render_page need this extra, and both say so if it is absent.
+ingest = ["pdfplumber>=0.11", "pypdfium2>=4"]
 # numpy is test-only, not a runtime dependency of attachments.py itself --
 # tests/test_attachments.py's fakes construct real numpy arrays for
 # `.bounds` (trimesh's own real return shape: a (2, 3) array supporting
