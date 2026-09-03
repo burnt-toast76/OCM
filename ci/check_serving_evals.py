@@ -69,6 +69,14 @@ def main() -> int:
     evals = doc.get("evals") or []
     registry = load_registry()
 
+    vocab = yaml.safe_load(VOCAB_PATH.read_text(encoding="utf-8"))
+    vocab_keys = {entry["key"] for entry in vocab["keys"]}
+    # Alias spellings credit their promoted key too (ADR-0035 D3) --
+    # SPELLING-level only, no shape gate: gating is serving semantics the
+    # server's own tests execute, so lint counts are upper bounds and
+    # alias goldens use {minimum: true}.
+    aliases = {alias: entry["key"] for entry in vocab["keys"] for alias in entry.get("aliases", [])}
+
     all_ids: set[str] = set()
     part_claims: dict[str, int] = {}
     per_key: dict[tuple[str, str], int] = {}
@@ -81,9 +89,9 @@ def main() -> int:
             for part in claim["applies_to"]:
                 part_claims[norm(part)] = part_claims.get(norm(part), 0) + 1
                 per_key[(norm(part), claim["key"])] = per_key.get((norm(part), claim["key"]), 0) + 1
-
-    vocab = yaml.safe_load(VOCAB_PATH.read_text(encoding="utf-8"))
-    vocab_keys = {entry["key"] for entry in vocab["keys"]}
+                canonical = aliases.get(claim["key"])
+                if canonical is not None:
+                    per_key[(norm(part), canonical)] = per_key.get((norm(part), canonical), 0) + 1
 
     names: set[str] = set()
     for e in evals:

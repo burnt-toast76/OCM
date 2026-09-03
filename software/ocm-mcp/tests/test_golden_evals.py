@@ -61,6 +61,12 @@ def test_golden(eval_case: dict[str, Any], index) -> None:
             assert set(served_ids) == set(expected)
         elif field == "claim_ids_include":
             assert set(expected) <= set(served_ids)
+        elif field == "claim_ids_exclude":
+            assert not set(expected) & set(served_ids)
+        elif field == "served_keys_include":
+            assert set(expected) <= {c["key"] for c in response.get("claims", [])}
+        elif field == "bound_via_all":
+            assert all(c.get("bound_via") == expected for c in response.get("claims", [])), "every served record binds"
         elif field == "summary_keys_include":
             for key, minimum in expected.items():
                 assert response["summary"][key]["count"] >= int(minimum), f"summary[{key}]"

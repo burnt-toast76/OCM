@@ -194,6 +194,51 @@ evals:
       claims. search_parts surfaces the family for the agent to query
       explicitly.
 
+  # --- promoted keys: alias binding, shape-gated (vocab 1.2, ADR-0035 D3) ----
+
+  - name: promoted_key_serves_previously_unbound_claims
+    tool: get_claims
+    args: {part_number: LR-XN11N, keys: [response_time]}
+    expect:
+      mode: full
+      claim_count: {value: 13, minimum: true}
+      served_keys_include: [x-response_time]
+      bound_via_all: response_time
+      claim_ids_include:
+        - sha256:ca67cb10241720d3a213b83bce9785bbaaba38f3fdb629e8be8639f3b20deffc
+    note: >
+      The LR-X catalog's response-time claims were unbound x- records
+      until vocab 1.2; the promoted key now serves them. Records keep
+      their STORED key (provenance is the stored form, never relabeled)
+      and carry bound_via naming the promoted key.
+
+  - name: shape_gate_excludes_the_packed_blob
+    tool: get_claims
+    args: {part_number: FS-N41N, keys: [response_time]}
+    expect:
+      mode: full
+      claim_count: {value: 16, minimum: true}
+      bound_via_all: response_time
+      claim_ids_exclude:
+        - sha256:dff3383776aece821ab678710774aef43305f411360632d27615945313e9a955
+    note: >
+      Alias binding is shape-gated: the FS-N41N datasheet's packed text
+      blob does not fit shape spread, stays unbound, and is NOT served
+      under the promoted key -- every record that is served binds.
+
+  - name: x_spelling_still_serves_everything_stored
+    tool: get_claims
+    args: {part_number: FS-N41N, keys: [x-response_time]}
+    expect:
+      mode: full
+      claim_count: {value: 17, minimum: true}
+      claim_ids_include:
+        - sha256:dff3383776aece821ab678710774aef43305f411360632d27615945313e9a955
+    note: >
+      Both spellings resolve after promotion (the alias is an addition,
+      never a retirement), and the stored spelling serves every record
+      stored under it -- the blob included, carrying no bound_via.
+
   # --- search_parts (D1/D4) ---------------------------------------------------
 
   - name: search_finds_the_fu67_family_of_parts
