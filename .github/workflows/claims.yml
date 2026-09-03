@@ -41,3 +41,8 @@ jobs:
       # ADR-0036: the serving-surface goldens must stay referentially
       # honest against the registry until the server's own tests run them.
       - run: python ci/check_serving_evals.py
+
+      # docs/ingestion.md: new passes never write an alias spelling of a
+      # promoted key -- historical records are grandfathered by frozen
+      # content-hash inventory, so no git history is needed.
+      - run: python ci/check_alias_drift.py
