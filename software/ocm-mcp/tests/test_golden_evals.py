@@ -30,6 +30,10 @@ def index():
 def _assert_envelope_invariants(response: dict[str, Any]) -> None:
     assert response.get("vocab_version"), "every envelope names its vocab version"
     assert response.get("serving_state"), "every envelope names the serving state"
+    # D8 as amended: the corpus state is always PRESENT, null when no
+    # corpus is configured -- a missing field would leave the consumer to
+    # infer which registry answered.
+    assert "corpus_state" in response, "every envelope names the corpus state, null when unconfigured"
     for record in response.get("claims", []):
         assert record.get("id", "").startswith("sha256:"), "no bare values: claim id required"
         citation = record.get("citation", {})

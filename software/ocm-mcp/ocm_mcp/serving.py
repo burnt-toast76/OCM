@@ -32,7 +32,18 @@ SEARCH_CAP = 50  # ADR-0036 D7
 
 
 def _envelope(index: ServingIndex, **payload: Any) -> dict[str, Any]:
-    return {"vocab_version": index.vocab_version, "serving_state": index.serving_state, **payload}
+    # Two states, always both present (ADR-0036 D8 as amended):
+    # serving_state is the public checkout -- code, schema, vocabulary,
+    # fixtures -- and corpus_state the production corpus, null when none
+    # is configured. Null is an answer, not an omission: it says this
+    # server serves the public registry alone, which a missing field
+    # would leave the consumer to guess.
+    return {
+        "vocab_version": index.vocab_version,
+        "serving_state": index.serving_state,
+        "corpus_state": index.corpus_state,
+        **payload,
+    }
 
 
 def _served_record(index: ServingIndex, document_hash: str, claim: dict[str, Any]) -> dict[str, Any]:

@@ -152,9 +152,42 @@ def is_draft_revision(revision: str) -> bool:
     return major == "0"
 
 
+CORPUS_ENV = "OCM_CORPUS"
+
+
+def corpus_roots_from_env() -> tuple[Path, ...]:
+    """The extra claims roots the environment configures, in order.
+
+    A production corpus lives in its own repository (proprietary, served
+    rather than distributed) while the code, schema, vocabulary, and
+    reference fixtures stay in this one. `OCM_CORPUS` names that
+    checkout; unset -- the contributor's case, and CI's -- is public-only
+    and behaves exactly as it always did.
+    """
+    configured = os.environ.get(CORPUS_ENV, "").strip()
+    return (Path(configured),) if configured else ()
+
+
 @dataclass(frozen=True)
 class Workspace:
+    """A repo working tree, plus any claims-only roots appended to it.
+
+    `root` is the PRIMARY root and the only one that carries code, schema,
+    vocabulary, and every non-claims artifact. `extra_claims_roots` are
+    content-only checkouts whose `claims/` trees are read as if they were
+    part of this one, in order -- the corpus split (ADR-0036 D8 as
+    amended). Empty is the default everywhere and changes nothing.
+
+    Registry discovery therefore has three rules, all of them here so no
+    caller re-implements them: a document is looked up across every root
+    in order; a NEW entry's would-be location is always the primary root
+    (`claims_document_dir`); and the same document hash under two roots is
+    ambiguous, so `claims_paths` reports both and the claims layer refuses
+    rather than silently preferring one.
+    """
+
     root: Path
+    extra_claims_roots: tuple[Path, ...] = ()
 
     @property
     def modules_dir(self) -> Path:
@@ -248,18 +281,42 @@ class Workspace:
         # carrier's uploads live under carriers/<id>/attachments/.
         return self.carrier_dir(carrier_id) / "attachments"
 
+    @property
+    def claims_roots(self) -> tuple[Path, ...]:
+        """Every claims tree this workspace reads, primary first."""
+        return (self.claims_dir, *(root / "claims" for root in self.extra_claims_roots))
+
     def claims_document_dir(self, document_hash: str) -> Path:
         # Storage location is DERIVED from identity, never chosen (the same
         # rule module ids follow): the directory is the document hash's 64
         # hex digits, with or without its "sha256:" prefix on the way in.
         # The readable metadata lives inside the file's document record.
+        # This is the PRIMARY root's location -- where an entry that exists
+        # nowhere yet would go; `claims_paths` finds one that already exists.
         return self.claims_dir / document_hash.removeprefix("sha256:")
 
+    def claims_paths(self, document_hash: str) -> list[Path]:
+        """Every configured root that actually holds this document, in root
+        order. Two hits mean one document filed twice -- the claims layer
+        refuses on that rather than picking a winner, because picking one
+        would make the answer depend on root order (ADR-0035 D5: a document
+        is its hash, and a hash names one entry).
+        """
+        found = []
+        for root in self.claims_roots:
+            candidate = root / document_hash.removeprefix("sha256:") / "claims.yaml"
+            if candidate.is_file():
+                found.append(candidate)
+        return found
+
     def claims_path(self, document_hash: str) -> Path:
-        return self.claims_document_dir(document_hash) / "claims.yaml"
+        """The file this document is read from and written to: the first
+        root that holds it, or its would-be primary-root location."""
+        found = self.claims_paths(document_hash)
+        return found[0] if found else self.claims_document_dir(document_hash) / "claims.yaml"
 
     def claims_exists(self, document_hash: str) -> bool:
-        return self.claims_path(document_hash).is_file()
+        return bool(self.claims_paths(document_hash))
 
     def module_exists(self, module_id: str) -> bool:
         return self.module_path(module_id).is_file()
@@ -294,6 +351,16 @@ class Workspace:
         return sorted(p.parent.name for p in self.carriers_dir.glob("*/carrier.yaml"))
 
     def list_claims_document_hashes(self) -> list[str]:
-        if not self.claims_dir.is_dir():
-            return []
-        return sorted(f"sha256:{p.parent.name}" for p in self.claims_dir.glob("*/claims.yaml"))
+        """Every document in the registry, across all roots. A hash filed
+        under two roots appears ONCE here and is refused when read -- the
+        duplicate must surface as a refusal naming both paths, never as a
+        doubled entry a caller might quietly deduplicate.
+        """
+        return sorted(
+            {
+                f"sha256:{path.parent.name}"
+                for root in self.claims_roots
+                if root.is_dir()
+                for path in root.glob("*/claims.yaml")
+            }
+        )

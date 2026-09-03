@@ -15,7 +15,10 @@
 #
 # Envelope invariants asserted by EVERY eval, stated once:
 #   - vocab_version present (the vocabulary the answer was served under)
-#   - serving_state present, equal to the registry checkout's git commit
+#   - serving_state present, equal to the public checkout's git commit, and
+#     corpus_state present -- the production corpus's own commit, or null
+#     when no corpus is configured (ADR-0036 D8 as amended). These evals
+#     run public-only, so corpus_state is null throughout.
 #   - every served claim record carries id + citation (document hash,
 #     page, locator) inline -- no bare values anywhere (ADR-0036 D2)
 #

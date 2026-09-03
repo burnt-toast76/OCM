@@ -53,6 +53,35 @@ _QUANTITY_STOPWORDS = frozenset({"to", "or", "of", "and", "the", "per", "for", "
 _QUANTITY_ADVISORY_THRESHOLD = 3
 
 
+def ambiguous_document(ws: Workspace, document_hash: str) -> Refusal | None:
+    """One document, one entry -- a hash filed under two claims roots is
+    refused, never resolved by root order (ADR-0035 D5).
+
+    The corpus split makes this reachable: a migration that copies an
+    entry into the corpus and forgets to remove the public copy leaves two
+    files claiming the same identity. Preferring the first root would make
+    every answer depend on configuration order, and the two copies can
+    drift; refusing names both paths and stops the registry from being
+    served at all (ADR-0036 D5's "a registry that fails does not get
+    served"), which is the loud failure this case deserves.
+    """
+    paths = ws.claims_paths(document_hash)
+    if len(paths) < 2:
+        return None
+    return Refusal(
+        code=Codes.OCM_INVALID_ARGUMENT,
+        path=f"claims['{document_hash}']",
+        message=(
+            f"document {document_hash!r} is filed under {len(paths)} claims roots: "
+            + ", ".join(str(path) for path in paths)
+        ),
+        hint=(
+            "A document is its hash and a hash names one entry (ADR-0035 D5). Remove the copy that "
+            "should not be there -- do not let root order decide which one answers."
+        ),
+    )
+
+
 def claim_id(claim: dict[str, Any], document_hash: str) -> str:
     """sha256 of the claim's canonical serialization, presented as
     "sha256:<64 lowercase hex>" -- the same content-address format the
@@ -195,6 +224,9 @@ def validate_claims(ws: Workspace, document_hash: str) -> Envelope:
             path=f"claims['{document_hash}']",
             message=f"no claims file for document {document_hash!r} in this workspace",
         )
+    ambiguous = ambiguous_document(ws, document_hash)
+    if ambiguous is not None:
+        return Envelope.refuse([ambiguous])
 
     doc = read_yaml(ws.claims_path(document_hash)) or {}
     addressed = document_hash if document_hash.startswith("sha256:") else f"sha256:{document_hash}"
@@ -308,6 +340,9 @@ def propose_claim_split(ws: Workspace, document_hash: str, claim_id_ref: str) ->
             path=f"claims['{document_hash}']",
             message=f"no claims file for document {document_hash!r} in this workspace",
         )
+    ambiguous = ambiguous_document(ws, document_hash)
+    if ambiguous is not None:
+        return Envelope.refuse([ambiguous])
     doc = read_yaml(ws.claims_path(document_hash)) or {}
     claims = doc.get("claims") if isinstance(doc.get("claims"), list) else []
     source = next((c for c in claims if isinstance(c, dict) and c.get("id") == claim_id_ref), None)
@@ -362,6 +397,9 @@ def append_claims(
             path=f"claims['{document_hash}']",
             message=f"no claims file for document {document_hash!r} in this workspace",
         )
+    ambiguous = ambiguous_document(ws, document_hash)
+    if ambiguous is not None:
+        return Envelope.refuse([ambiguous])
     if not new_claims and attestation is None:
         return single_refusal(Codes.OCM_INVALID_ARGUMENT, path="$", message="nothing to append")
     addressed = document_hash if document_hash.startswith("sha256:") else f"sha256:{document_hash}"

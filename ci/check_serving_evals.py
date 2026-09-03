@@ -28,6 +28,7 @@ evals for real.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -45,14 +46,37 @@ def norm(text: str) -> str:
     return "".join(c for c in text.casefold() if c not in SEPARATORS)
 
 
+def corpus_roots() -> list[Path]:
+    """Extra claims roots from OCM_CORPUS (the production corpus), in
+    order. Unset is public-only and changes nothing."""
+    configured = os.environ.get("OCM_CORPUS", "").strip()
+    return [Path(configured)] if configured else []
+
+
 def load_registry():
     import yaml
 
     entries = {}
-    for entry in sorted(CLAIMS_DIR.iterdir()):
-        if entry.is_dir() and (entry / "claims.yaml").is_file():
-            entries[f"sha256:{entry.name}"] = yaml.safe_load((entry / "claims.yaml").read_text(encoding="utf-8"))
+    for root in [CLAIMS_DIR, *(corpus / "claims" for corpus in corpus_roots())]:
+        if not root.is_dir():
+            continue
+        for entry in sorted(root.iterdir()):
+            if entry.is_dir() and (entry / "claims.yaml").is_file():
+                entries[f"sha256:{entry.name}"] = yaml.safe_load((entry / "claims.yaml").read_text(encoding="utf-8"))
     return entries
+
+
+def eval_files() -> list[Path]:
+    """Every golden file to check: this repo's, plus a corpus's own
+    evals/golden-queries.yaml. The goldens whose expectations name
+    real-document data live with that data (corpus layout: claims/,
+    ci/alias-grandfather.txt, evals/golden-queries.yaml, tests/)."""
+    paths = [EVALS_PATH]
+    for corpus in corpus_roots():
+        candidate = corpus / "evals" / "golden-queries.yaml"
+        if candidate.is_file():
+            paths.append(candidate)
+    return paths
 
 
 def expected_count_ok(expect_count, actual: int) -> bool:
@@ -65,8 +89,10 @@ def main() -> int:
     import yaml
 
     problems: list[str] = []
-    doc = yaml.safe_load(EVALS_PATH.read_text(encoding="utf-8"))
-    evals = doc.get("evals") or []
+    evals = []
+    for path in eval_files():
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+        evals.extend(doc.get("evals") or [])
     registry = load_registry()
 
     vocab = yaml.safe_load(VOCAB_PATH.read_text(encoding="utf-8"))

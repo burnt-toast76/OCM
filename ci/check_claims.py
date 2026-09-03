@@ -93,10 +93,21 @@ def check_vocab(problems: list[str]) -> None:
 
 def check_store(problems: list[str]) -> None:
     from ocm_api import OcmApi
+    from ocm_api.workspace import corpus_roots_from_env
 
-    api = OcmApi(REPO)
-    entries = sorted(p for p in CLAIMS_DIR.iterdir() if p.is_dir()) if CLAIMS_DIR.is_dir() else []
+    # OCM_CORPUS appends the production corpus's claims root. Unset -- the
+    # contributor's case and this repo's own CI -- checks the public store
+    # alone, exactly as before. Set, the union is checked, because the
+    # union is what the server serves.
+    corpus = corpus_roots_from_env()
+    api = OcmApi(REPO, corpus)
+    roots = [CLAIMS_DIR, *(root / "claims" for root in corpus)]
+    entries = sorted(
+        (p for root in roots if root.is_dir() for p in root.iterdir() if p.is_dir()),
+        key=lambda p: p.name,
+    )
 
+    validated: set[str] = set()
     for entry in entries:
         name = entry.name
         if not HEX64.match(name):
@@ -124,6 +135,12 @@ def check_store(problems: list[str]) -> None:
         else:
             print(f"claims/{name[:8]}...: document bytes not in repo (real document, cited by hash only)")
 
+        # The directory checks above are per-root; validation is per
+        # DOCUMENT. A hash under two roots is one refusal naming both
+        # paths, not one per root -- the operator has a single problem.
+        if name in validated:
+            continue
+        validated.add(name)
         envelope = api.validate_claims(f"sha256:{name}")
         for warning in envelope.warnings:
             print(f"claims/{name[:8]}...: warning: {warning}")

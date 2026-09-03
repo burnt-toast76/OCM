@@ -11,11 +11,19 @@ One process lifetime serves exactly one registry state, identified by
 the git commit of the checkout (D8) -- suffixed "-dirty" when the
 claims/ tree carries uncommitted changes, because an honest identity
 beats a clean-looking one.
+
+A registry can span two checkouts: the public repo (code, schema,
+vocabulary, reference fixtures) and a production corpus read from a
+second claims root. Each keeps its own state -- serving_state and
+corpus_state, each with its own -dirty suffix (D8 as amended) -- because
+two registries have two identities and joining them into one string
+would only make consumers split it apart again.
 """
 
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -55,6 +63,15 @@ class ServingIndex:
     vocab_version: str
     serving_state: str
     key_since: dict[str, str]
+    # The corpus checkout's own commit, or None when none is configured
+    # (ADR-0036 D8 as amended). Never folded into serving_state: two
+    # registries have two identities, and joining them would only make
+    # every consumer re-split the string.
+    corpus_state: str | None = None
+    # Every claims root served, primary first -- the public checkout, then
+    # any corpus. `root` stays the primary: it is the only one carrying
+    # code, schema, and vocabulary.
+    roots: tuple[Path, ...] = ()
     # alias spelling -> promoted key (ADR-0035 D3), and every vocab key's
     # declared shape (the gate for alias binding).
     aliases: dict[str, str] = field(default_factory=dict)
@@ -112,10 +129,33 @@ def _serving_state(root: Path) -> str:
         return "untracked"
 
 
-def build_index(root: str | Path) -> ServingIndex:
-    root = Path(root)
-    ws = Workspace(root)
-    api = OcmApi(root)
+def build_index(roots: str | Path | Sequence[str | Path]) -> ServingIndex:
+    """Build the serving index over one or more claims roots, in order.
+
+    One root is the whole story for a contributor and for public CI. A
+    second -- the production corpus, configured by OCM_CORPUS -- is read
+    as if its claims/ tree were part of the primary checkout, while code,
+    schema, and vocabulary always come from the primary.
+
+    Exactly two states are servable, because the envelope names exactly
+    two (ADR-0036 D8 as amended): a third root would be served under an
+    identity that cannot describe it, so it is refused rather than
+    silently misreported.
+    """
+    if isinstance(roots, (str, Path)):
+        roots = [roots]
+    resolved = tuple(Path(root) for root in roots)
+    if not resolved:
+        raise ValueError("build_index needs at least one claims root")
+    if len(resolved) > 2:
+        raise ValueError(
+            f"build_index was given {len(resolved)} roots; the envelope's identity contract names "
+            "exactly two states (serving_state, corpus_state), so a third root could not be "
+            "identified in any answer (ADR-0036 D8 as amended)"
+        )
+    root, extra = resolved[0], resolved[1:]
+    ws = Workspace(root, extra)
+    api = OcmApi(root, extra)
 
     vocab = read_yaml(ws.claims_vocab_path) or {}
     entries = vocab.get("keys", [])
@@ -126,6 +166,8 @@ def build_index(root: str | Path) -> ServingIndex:
         vocab_version=str(vocab.get("ocm_version", "unknown")),
         serving_state=_serving_state(root),
         key_since=key_since,
+        corpus_state=_serving_state(extra[0]) if extra else None,
+        roots=resolved,
         aliases={alias: entry["key"] for entry in entries for alias in entry.get("aliases", [])},
         key_shapes={entry["key"]: str(entry.get("shape", "")) for entry in entries},
     )

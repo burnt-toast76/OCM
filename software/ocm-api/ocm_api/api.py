@@ -13,6 +13,7 @@ nothing else to hold.
 from __future__ import annotations
 
 import functools
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
@@ -46,8 +47,11 @@ def _never_raise(fn: _F) -> _F:
 
 
 class OcmApi:
-    def __init__(self, repo_root: str | Path):
-        self.workspace = Workspace(Path(repo_root))
+    def __init__(self, repo_root: str | Path, extra_claims_roots: Sequence[str | Path] = ()):
+        # `extra_claims_roots`: content-only checkouts whose claims/ trees
+        # are read alongside this one, in order (the corpus split). Empty
+        # is the default and behaves exactly as a single-root workspace.
+        self.workspace = Workspace(Path(repo_root), tuple(Path(root) for root in extra_claims_roots))
 
     # -- Discovery ---------------------------------------------------
 

@@ -157,6 +157,25 @@ than one that borrows the last commit's authority. No synthetic store version �
 and no `get_store_info` tool: every response already answers the question, and the
 contract starts minimal (Decision 1).
 
+*(Amended pre-freeze, when the production corpus moved to its own private repository and
+the registry became two checkouts: the public one carrying code, schema, vocabulary and the
+reference fixtures, and the corpus carrying the real-document entries. Every envelope now
+carries **two** fields — `serving_state` for the public checkout, unchanged in meaning, and
+`corpus_state` for the corpus, `null` when no corpus is configured. Each is that checkout's
+own commit with its own `-dirty` suffix, computed from its own `claims/` tree.*
+
+*The property D8 exists to provide is unchanged, now spelled as a pair: two consumers at the
+same pair of states answer identically, and append-only means a newer pair only ever knows
+more. The rejected alternative was one composite string, `<public>+<corpus>`: fewer fields,
+but the server would join what every consumer then has to re-split, and a reader written
+against the single-hash contract would silently start comparing a string that is no longer
+a commit. `null` is an answer rather than an omission — it says this server serves the
+public registry alone, which a missing field would leave the consumer to infer.*
+
+*Two states, not N: a third claims root cannot be named in an envelope that carries two
+identities, so the index refuses to build over one rather than serve content it cannot
+identify.)*
+
 ## Out of scope
 
 Transport is out of scope beyond one sentence: the contract above is

@@ -27,6 +27,7 @@ promotion commit -- the failure message says exactly which ids.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -36,20 +37,46 @@ VOCAB_PATH = REPO / "spec" / "schema" / "ocm-claims-vocab-1.0.yaml"
 GRANDFATHER_PATH = REPO / "ci" / "alias-grandfather.txt"
 
 
+def corpus_roots() -> list[Path]:
+    """Extra claims roots from OCM_CORPUS (the production corpus), in
+    order. Unset is public-only and changes nothing."""
+    configured = os.environ.get("OCM_CORPUS", "").strip()
+    return [Path(configured)] if configured else []
+
+
+def _read_inventory(path: Path) -> set[str]:
+    if not path.is_file():
+        return set()
+    return {
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+
+
 def main() -> int:
     import yaml
 
     vocab = yaml.safe_load(VOCAB_PATH.read_text(encoding="utf-8"))
     alias_spellings = {alias for entry in vocab["keys"] for alias in entry.get("aliases", [])}
-    grandfathered = {
-        line.strip()
-        for line in GRANDFATHER_PATH.read_text(encoding="utf-8").splitlines()
-        if line.strip() and not line.startswith("#")
-    }
+
+    # The inventory travels with the claims it names: ids of entries that
+    # moved to the production corpus live in that repo's own
+    # ci/alias-grandfather.txt. Both are read when both roots are
+    # configured, so the subset rule below holds over the whole registry
+    # rather than over whichever half is present.
+    corpus = corpus_roots()
+    grandfathered = _read_inventory(GRANDFATHER_PATH)
+    for root in corpus:
+        grandfathered |= _read_inventory(root / "ci" / "alias-grandfather.txt")
 
     problems: list[str] = []
     seen: set[str] = set()
-    for entry in sorted(CLAIMS_DIR.iterdir()):
+    claims_roots = [CLAIMS_DIR, *(root / "claims" for root in corpus)]
+    for entry in sorted(
+        (p for root in claims_roots if root.is_dir() for p in root.iterdir()),
+        key=lambda p: p.name,
+    ):
         claims_file = entry / "claims.yaml"
         if not entry.is_dir() or not claims_file.is_file():
             continue
