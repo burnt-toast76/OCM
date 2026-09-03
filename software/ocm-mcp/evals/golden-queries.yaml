@@ -22,9 +22,11 @@
 #   - every served claim record carries id + citation (document hash,
 #     page, locator) inline -- no bare values anywhere (ADR-0036 D2)
 #
-# Registry snapshot these goldens were authored against: 4 documents,
-# 229 claims (fixtures bc8792ff/c704b86f, datasheet 9ce6342a, catalog
-# cfdb33d3 -- the catalog deliberately unattested).
+# Registry: this repository's reference fixtures -- bc8792ff and c704b86f,
+# 27 claims. The goldens whose expectations named real-document data moved
+# to the production corpus with that data (its evals/golden-queries.yaml);
+# ci/check_serving_evals.py reads both files when OCM_CORPUS is set, so the
+# union is still checked wherever both halves are present.
 
 version: 1
 contract: ADR-0036
@@ -57,62 +59,7 @@ evals:
       citation into document c704b86f... The part's only document is
       attested at 1.0, so attestation_status is all_attested.
 
-  - name: normalization_resolves_spaced_lowercase
-    tool: get_claims
-    args: {part_number: "fs n41n", keys: [supply_voltage]}
-    expect:
-      matched_via: exact
-      resolved_part: FS-N41N
-    note: >
-      D4 normalization is normative: case-fold + strip space/hyphen/
-      underscore/dot. "fs n41n" and "FS-N41N" are the same part.
-
   # --- get_claims: summary mode and keyed retrieval --------------------------
-
-  - name: catalog_part_summarizes_above_threshold
-    tool: get_claims
-    args: {part_number: FS-N41N}
-    expect:
-      matched_via: exact
-      mode: summary
-      attestation_status: mixed   # datasheet attested 1.0+1.1; catalog unattested
-      claim_count: {value: 53, minimum: true}
-      summary_keys_include:
-        supply_voltage: 2
-        power_consumption: 6
-        operating_temp: 6
-        output_configuration: 4
-        x-response_time: 17
-    note: >
-      53 claims across two documents > 25 (D7): per-key summary, never a
-      truncated record list. Counts are minimums -- append-only growth
-      may raise them, never lower them.
-
-  - name: keyed_retrieval_crosses_documents
-    tool: get_claims
-    args: {part_number: FS-N41N, keys: [supply_voltage]}
-    expect:
-      mode: full
-      claim_count: {value: 2, minimum: true}
-      claim_ids:
-        - sha256:41341855c70eec5dd95133d733bc01927175b181ebeda11319dfceabfa849530  # datasheet 9ce6342a
-        - sha256:5c6ac093a479ae2e7198a2ca4eaf57737eeea55e9b2b4d5e531feaec889ffd8b  # catalog cfdb33d3
-    note: >
-      The same statement in two documents is two claims with two ids
-      citing two hashes -- corroboration served as data, never merged.
-
-  - name: keyed_retrieval_includes_the_packed_blob
-    tool: get_claims
-    args: {part_number: FS-N41N, keys: [output_configuration]}
-    expect:
-      mode: full
-      claim_count: {value: 4, minimum: true}
-      claim_ids_include:
-        - sha256:a55d8b6ec5c5027fba1db8fc1a6ad4f2d33b07492a9bf739fc9af4d4ba596e3b  # the verbatim packed record
-    note: >
-      Append-only means the packed control-output record is still served,
-      verbatim, alongside everything else -- the serving layer neither
-      hides nor repairs a record.
 
   # --- absence: the three states (D3) ----------------------------------------
 
@@ -127,16 +74,6 @@ evals:
       The dp8 document names ip_rating a deliberate silence and is
       attested at 1.0: the absence is information (ADR-0035 D4), served
       with the consulted set.
-
-  - name: unattested_document_makes_absence_meaningless
-    tool: get_claims
-    args: {part_number: FS-N41N, keys: [measuring_range]}
-    expect:
-      absence_state: absence_not_yet_meaningful
-    note: >
-      FS-N41N's datasheet is attested but the catalog on file is not:
-      nobody has established the catalog is silent on this key, and the
-      envelope must say so rather than fabricate certainty.
 
   - name: absent_unbound_key_is_never_attested_silence
     tool: get_claims
@@ -199,57 +136,7 @@ evals:
 
   # --- promoted keys: alias binding, shape-gated (vocab 1.2, ADR-0035 D3) ----
 
-  - name: promoted_key_serves_previously_unbound_claims
-    tool: get_claims
-    args: {part_number: LR-XN11N, keys: [response_time]}
-    expect:
-      mode: full
-      claim_count: {value: 13, minimum: true}
-      served_keys_include: [x-response_time]
-      bound_via_all: response_time
-      claim_ids_include:
-        - sha256:ca67cb10241720d3a213b83bce9785bbaaba38f3fdb629e8be8639f3b20deffc
-    note: >
-      The LR-X catalog's response-time claims were unbound x- records
-      until vocab 1.2; the promoted key now serves them. Records keep
-      their STORED key (provenance is the stored form, never relabeled)
-      and carry bound_via naming the promoted key.
-
-  - name: shape_gate_excludes_the_packed_blob
-    tool: get_claims
-    args: {part_number: FS-N41N, keys: [response_time]}
-    expect:
-      mode: full
-      claim_count: {value: 16, minimum: true}
-      bound_via_all: response_time
-      claim_ids_exclude:
-        - sha256:dff3383776aece821ab678710774aef43305f411360632d27615945313e9a955
-    note: >
-      Alias binding is shape-gated: the FS-N41N datasheet's packed text
-      blob does not fit shape spread, stays unbound, and is NOT served
-      under the promoted key -- every record that is served binds.
-
-  - name: x_spelling_still_serves_everything_stored
-    tool: get_claims
-    args: {part_number: FS-N41N, keys: [x-response_time]}
-    expect:
-      mode: full
-      claim_count: {value: 17, minimum: true}
-      claim_ids_include:
-        - sha256:dff3383776aece821ab678710774aef43305f411360632d27615945313e9a955
-    note: >
-      Both spellings resolve after promotion (the alias is an addition,
-      never a retirement), and the stored spelling serves every record
-      stored under it -- the blob included, carrying no bound_via.
-
   # --- search_parts (D1/D4) ---------------------------------------------------
-
-  - name: search_finds_the_fu67_family_of_parts
-    tool: search_parts
-    args: {query: fu-67}
-    expect:
-      results_include: [FU-67TG, FU-67MTG, FU-67MG, FU-67G]
-      results_exclude: [FU-2303]
 
   - name: search_surfaces_family_strings
     tool: search_parts
@@ -270,16 +157,3 @@ evals:
       claim_count: {value: 11, minimum: true}
       bytes_served: false
 
-  - name: unattested_catalog_reports_no_attestations
-    tool: get_document
-    args: {hash: sha256:cfdb33d35f7c8152121d4be026337da47bbceba4c216e503eff4c815b4bc05e9}
-    expect:
-      manufacturer: KEYENCE CORPORATION
-      type: catalog
-      attestations: []
-      claim_count: {value: 175, minimum: true}
-      bytes_served: false
-    note: >
-      A partial pass serves as a partial pass: no attestation, and every
-      absence involving this document is state
-      absence_not_yet_meaningful.

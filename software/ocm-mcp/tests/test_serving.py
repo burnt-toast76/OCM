@@ -1,7 +1,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Serving behaviors the goldens can't express: the index refuses a
 broken registry, and the contract's structural rules hold beyond the
-specific golden answers."""
+specific golden answers.
+
+Two tests that lived here -- summary mode above the threshold, and keyed
+retrieval always full -- moved to the production corpus repository with
+the data they need. Both queried FS-N41N, and the summary-mode test needs
+a part carrying more than SUMMARY_THRESHOLD claims: no fixture here has
+one (the largest is EPS25 at 15), and inventing a bigger fixture to keep
+the test local would be fabricating reference content. The corpus runs
+them against both roots, which is the configuration that actually serves
+them."""
 
 from __future__ import annotations
 
@@ -10,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from ocm_mcp import SUMMARY_THRESHOLD, build_index, get_claims, normalize
+from ocm_mcp import build_index, get_claims, normalize
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -34,24 +43,6 @@ def test_a_registry_that_fails_validation_is_not_served(tmp_path: Path):
 
     with pytest.raises(RuntimeError, match="refusing to serve"):
         build_index(root)
-
-
-def test_summary_mode_never_serves_partial_records(shared_index):
-    # Above the threshold the response is a per-key summary -- never a
-    # truncated list masquerading as the full set (ADR-0036 D7).
-    response = get_claims(shared_index, "FS-N41N")
-    assert response["mode"] == "summary"
-    assert response["claim_count"] > SUMMARY_THRESHOLD
-    assert "claims" not in response
-    assert sum(entry["count"] for entry in response["summary"].values()) == response["claim_count"]
-
-
-def test_keyed_retrieval_is_always_full(shared_index):
-    response = get_claims(shared_index, "FS-N41N", keys=["x-response_time"])
-    assert response["mode"] == "full"
-    assert response["claim_count"] == len(response["claims"])
-    for record in response["claims"]:
-        assert record["citation"]["document"].startswith("sha256:")
 
 
 def test_family_claims_are_never_served_as_part_exact(shared_index):

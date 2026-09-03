@@ -71,9 +71,10 @@ ALLOWLIST = {
     # ocm_core.carrier's exported constant naming the module-schema sections a
     # carrier must never carry (ADR-0031 D1) -- appears quoted in __all__.
     "CARRIER_CONTROL_FIELDS",
-    # ocm-mcp (ADR-0036): the serving env var, and the D7 sizing constants
-    # quoted in __all__.
-    "OCM_ROOT", "SEARCH_CAP", "SUMMARY_THRESHOLD",
+    # ocm-mcp (ADR-0036): the serving env vars, and the D7 sizing constants
+    # quoted in __all__. OCM_CORPUS names the production corpus checkout
+    # (D8 as amended) -- an environment variable, not a refusal code.
+    "OCM_ROOT", "OCM_CORPUS", "SEARCH_CAP", "SUMMARY_THRESHOLD",
 }
 
 

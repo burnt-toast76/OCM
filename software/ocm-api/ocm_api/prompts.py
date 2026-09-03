@@ -89,6 +89,13 @@ ABSOLUTE RULES
    header comment MUST carry an acquisition note -- where and when the copy was
    obtained.
 
+WHERE THE RESULT LANDS
+A real-document entry is committed to the PRODUCTION CORPUS repository, read
+as a second claims root through OCM_CORPUS -- never to the public repo's
+claims/, which holds the reference fixtures. The tooling, schema, and
+vocabulary you read come from the public checkout; the entry you write goes
+to the corpus checkout. Nothing else in the discipline changes.
+
 NORMATIVE REFERENCE
 docs/ingestion.md is the authority for everything else -- preflight, units and
 glyph fidelity, restatements, partial passes and attestation, the end-of-pass

@@ -1,11 +1,26 @@
 # Ingestion discipline
 
 Normative rules for every claims-ingestion pass, codified from the first three
-real-document entries — the FS-N40 (`claims/cfdb33d3…`), LR-X (`claims/7d467249…`),
-and NEO (`claims/ee031e7c…`) catalogs — and governed by ADR-0035 D4–D7. Where a rule
-here restates an ADR decision, the ADR is the authority; where it codifies a
-precedent, the named entry is the precedent. A pass that cannot follow a rule stops
-and says so; it does not improvise (ADR-0014).
+real-document entries — the FS-N40 (`cfdb33d3…`), LR-X (`7d467249…`), and NEO
+(`ee031e7c…`) catalogs — and governed by ADR-0035 D4–D7. Where a rule here restates
+an ADR decision, the ADR is the authority; where it codifies a precedent, the named
+entry is the precedent. A pass that cannot follow a rule stops and says so; it does
+not improvise (ADR-0014).
+
+## Where a pass commits
+
+**Real-document entries are committed to the production corpus repository**, not to
+this one. `claims/` here holds the reference fixtures (see `claims/README.md`); the
+corpus is a separate, private repository read as a second claims root through
+`OCM_CORPUS` (ADR-0036 D8 as amended). The precedent entries named above live there
+now, and their transcription history stays in this repository's commits, cited from
+the corpus rather than replayed into it.
+
+An ingestion session therefore needs both checkouts: this one for the tooling, the
+schema, and the vocabulary — everything a pass reads — and the corpus for the store it
+writes. Nothing else in the discipline changes: the same preflight, the same verbatim
+transcription, the same attestation rule, the same one validator. Only the working
+tree the new entry lands in is different.
 
 ## Source acquisition
 
