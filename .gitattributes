@@ -10,3 +10,10 @@
 
 # If meshes get large, migrate to Git LFS:
 #   git lfs install && git lfs track "*.glb" "*.stl" "*.step"
+
+# An ingested document's bytes ARE its identity (ADR-0035 D5): ci/check_claims.py
+# hashes each claims/<hex>/document.txt and requires the digest to equal its
+# directory name. Line-ending conversion would rewrite those bytes on checkout
+# and break the check on any machine with core.autocrlf=true, so never convert
+# them -- the stored LF form is the hashed form.
+claims/**/document.txt -text
