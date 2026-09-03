@@ -25,7 +25,14 @@
 # A condition says when a value holds; a subject says which thing it is about.
 #
 # Promotion: an x- key enters this file via pull request, with aliases naming
-# the x- key it absorbs. Ingested claim records are never rewritten.
+# the x- key it absorbs (ADR-0035 D3). Ingested claim records are never
+# rewritten. Alias binding is SHAPE-GATED: a record stored under the alias
+# spelling binds to the promoted key only when its value fits the entry's
+# shape; an incompatible record (a packed text blob under a spread key)
+# remains unbound and warned, untouched -- the strict alternative would
+# permanently bar promotion of any key that ever carried one packed record,
+# since the store is append-only. Both spellings resolve in queries; served
+# records keep their stored key and carry bound_via naming the promoted key.
 #
 # Versioning: the filename carries the FORMAT major (like the schema files);
 # `ocm_version` below is the KEY-SET version that attestations pin (ADR-0035
@@ -36,7 +43,7 @@
 # lets a served absence distinguish "attested silence" from "key newer than
 # the attestation" (ADR-0036 D3).
 
-ocm_version: '1.1'
+ocm_version: '1.2'
 keys:
 
   # --- electrical -----------------------------------------------------------
@@ -118,6 +125,28 @@ keys:
 
   # --- environment and construction ----------------------------------------
 
+  - key: cable_length
+    since: '1.2'
+    aliases: [x-cable_length]
+    shape: spread
+    dimension: length
+    definition: >
+      Length of the device's attached or specified cable, as stated. The
+      cable designation or ordering option, where printed, goes in
+      conditions.
+    demand: ['lr-x catalog "Cable length" rows (single document; admitted by standing call)']
+
+  - key: case_material
+    since: '1.2'
+    aliases: [x-case_material]
+    shape: text
+    dimension: none
+    definition: >
+      Case or housing material designation as printed, verbatim (e.g.
+      "Main unit and cover: polycarbonate"). The housing element named in
+      the printed cell stays in the value, as printed.
+    demand: [fs-n41n datasheet, fs-n40 catalog, 'lr-x catalog "Case material"']
+
   - key: operating_temp
     shape: spread
     dimension: temperature
@@ -188,6 +217,29 @@ keys:
     dimension: declared
     definition: Repeatability as stated, in the document's own terms.
     demand: [sensor components generally]
+
+  - key: detecting_distance
+    since: '1.2'
+    aliases: [x-detecting_distance]
+    shape: spread
+    dimension: length
+    definition: >
+      Detecting distance or sensing range of a detection device, as
+      stated, one claim per stated operating/power mode -- the mode, the
+      amplifier series assumed, and the standard target go in conditions
+      as the source states them. Unit as printed.
+    demand: ['fs-n40 catalog fiber tables (per-mode, "when using the FS-N40 Series")', lr-x catalog]
+
+  - key: response_time
+    since: '1.2'
+    aliases: [x-response_time]
+    shape: spread
+    dimension: time
+    definition: >
+      Output response time of the device, as stated, one claim per stated
+      operating/power mode -- the mode designation goes in conditions,
+      verbatim with any footnote markers. Unit as printed.
+    demand: [fs-n41n datasheet, fs-n40 catalog, lr-x catalog per-mode response tables]
 
   - key: output_configuration
     shape: text
