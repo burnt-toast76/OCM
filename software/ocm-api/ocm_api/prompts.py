@@ -78,6 +78,22 @@ ABSOLUTE RULES
    unambiguously determine which printed value fills a field, omit it.
 6. No design fields. Never produce TCP, capabilities, PackML states, or any
    application/assembly attribute. Those are not datasheet facts.
+7. Bind against the CURRENT vocabulary. Read spec/schema/ocm-claims-vocab-1.0.yaml
+   before transcribing and state the version you bound against. Use bound keys
+   wherever the vocabulary -- including its `aliases:` entries -- covers the
+   statement's meaning; use an x- spelling only for a statement the vocabulary
+   genuinely lacks. NEVER write an alias's old x- spelling in a new pass:
+   aliases exist so immutable history binds, not as go-forward spellings.
+8. Provenance of the copy. Prefer the manufacturer's own URL and record it in
+   the document record; when the ingested copy carries no URL, the entry's
+   header comment MUST carry an acquisition note -- where and when the copy was
+   obtained.
+
+NORMATIVE REFERENCE
+docs/ingestion.md is the authority for everything else -- preflight, units and
+glyph fidelity, restatements, partial passes and attestation, the end-of-pass
+x- frequency report. This prompt is the operational summary; when they differ,
+the doc wins.
 
 OUTPUT
 Populate the target fields listed below through your component tools. For each
