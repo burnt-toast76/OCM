@@ -21,6 +21,12 @@ from pathlib import Path
 from typing import Any
 
 from ocm_api import OcmApi
+
+# Private-but-stable, imported deliberately (same posture as ocm_api's own
+# use of ocm_core._read_yaml): shape classification has exactly ONE
+# implementation (ADR-0016), and the shape-gated alias binding here must
+# agree byte-for-byte with validate_claims' binding.
+from ocm_api.claims import _value_shape
 from ocm_api.workspace import Workspace, read_yaml
 
 # ADR-0036 D4, normative: case-fold + strip these separators, both sides.
@@ -49,6 +55,10 @@ class ServingIndex:
     vocab_version: str
     serving_state: str
     key_since: dict[str, str]
+    # alias spelling -> promoted key (ADR-0035 D3), and every vocab key's
+    # declared shape (the gate for alias binding).
+    aliases: dict[str, str] = field(default_factory=dict)
+    key_shapes: dict[str, str] = field(default_factory=dict)
     documents: dict[str, DocumentEntry] = field(default_factory=dict)
     # normalized part -> display spelling (first seen, from applies_to)
     part_names: dict[str, str] = field(default_factory=dict)
@@ -73,6 +83,21 @@ class ServingIndex:
         since = _version_tuple(self.key_since[key])
         return any(_version_tuple(v) >= since for v in self.documents[document_hash].attestations)
 
+    def canonical_key(self, key: str) -> str:
+        """Both spellings are the same key after promotion (ADR-0036 Q2a):
+        an alias spelling canonicalizes to its promoted key; everything
+        else is already canonical."""
+        return self.aliases.get(key, key)
+
+    def bound_key(self, claim: dict[str, Any]) -> str | None:
+        """The promoted key this stored record binds to through an alias,
+        or None. Shape-gated exactly as validate_claims gates it: a record
+        whose value does not fit the promoted shape stays unbound."""
+        canonical = self.aliases.get(claim["key"])
+        if canonical is None:
+            return None
+        return canonical if _value_shape(claim.get("value")) == self.key_shapes.get(canonical) else None
+
 
 def _serving_state(root: Path) -> str:
     try:
@@ -93,13 +118,16 @@ def build_index(root: str | Path) -> ServingIndex:
     api = OcmApi(root)
 
     vocab = read_yaml(ws.claims_vocab_path) or {}
-    key_since = {entry["key"]: str(entry.get("since", "1.0")) for entry in vocab.get("keys", [])}
+    entries = vocab.get("keys", [])
+    key_since = {entry["key"]: str(entry.get("since", "1.0")) for entry in entries}
 
     index = ServingIndex(
         root=root,
         vocab_version=str(vocab.get("ocm_version", "unknown")),
         serving_state=_serving_state(root),
         key_since=key_since,
+        aliases={alias: entry["key"] for entry in entries for alias in entry.get("aliases", [])},
+        key_shapes={entry["key"]: str(entry.get("shape", "")) for entry in entries},
     )
 
     for document_hash in ws.list_claims_document_hashes():

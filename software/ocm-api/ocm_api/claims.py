@@ -82,6 +82,11 @@ def _load_vocab(ws: Workspace) -> dict[str, dict[str, Any]]:
     return {entry["key"]: entry for entry in doc.get("keys", []) if isinstance(entry, dict) and "key" in entry}
 
 
+def _alias_map(vocab: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """alias spelling -> the promoted entry that absorbs it (ADR-0035 D3)."""
+    return {alias: entry for entry in vocab.values() for alias in entry.get("aliases", [])}
+
+
 def _value_shape(value: Any) -> str | None:
     """The shape a value's structure implies. The schema keeps the shapes
     structurally disjoint, so this is a classification, not a guess; None
@@ -111,13 +116,29 @@ def _key_takes_subject(entry: dict[str, Any]) -> bool:
     return "subject" in entry
 
 
-def _check_claim_binding(index: int, claim: dict[str, Any], vocab: dict[str, dict[str, Any]], refusals: list[Refusal], warnings: list[str]) -> None:
+def _check_claim_binding(index: int, claim: dict[str, Any], vocab: dict[str, dict[str, Any]], aliases: dict[str, dict[str, Any]], refusals: list[Refusal], warnings: list[str]) -> None:
     key = claim.get("key")
     if not isinstance(key, str):
         return  # the schema pass already refused the claim's shape
 
     path = f"claims[{index}]"
     if key.startswith("x-"):
+        promoted = aliases.get(key)
+        if promoted is not None:
+            # ADR-0035 D3: the promoted entry absorbs this spelling, and
+            # binding is SHAPE-GATED (vocab header): the record binds --
+            # consumable, no warning -- only when its value fits the
+            # promoted shape. A mismatched record (the packed blob class)
+            # stays unbound and warned, never refused.
+            declared = str(promoted.get("shape", ""))
+            actual = _value_shape(claim.get("value"))
+            if actual == declared:
+                return
+            warnings.append(
+                f"{path}: {key!r} aliases promoted key {promoted['key']!r} but this value is "
+                f"shaped {actual!r}, not {declared!r} -- record remains unbound (shape-gated binding)"
+            )
+            return
         # ADR-0035 D2: the escape hatch relaxes naming, never structure.
         # Well-formed (the schema pass applies in full) but unbound.
         warnings.append(
@@ -229,11 +250,12 @@ def _validate_doc(ws: Workspace, doc: dict[str, Any], addressed: str) -> tuple[l
             seen_versions.add(version)
 
     vocab = _load_vocab(ws)
+    aliases = _alias_map(vocab)
     claims = doc.get("claims") if isinstance(doc.get("claims"), list) else []
     for index, claim in enumerate(claims):
         if not isinstance(claim, dict):
             continue  # the schema pass already refused it
-        _check_claim_binding(index, claim, vocab, refusals, warnings)
+        _check_claim_binding(index, claim, vocab, aliases, refusals, warnings)
 
         # Advisory: a text value stuffed with quantities is usually several
         # statements wearing one claim -- D1 defines a claim as a SINGLE

@@ -35,11 +35,17 @@ def _envelope(index: ServingIndex, **payload: Any) -> dict[str, Any]:
     return {"vocab_version": index.vocab_version, "serving_state": index.serving_state, **payload}
 
 
-def _served_record(document_hash: str, claim: dict[str, Any]) -> dict[str, Any]:
+def _served_record(index: ServingIndex, document_hash: str, claim: dict[str, Any]) -> dict[str, Any]:
     record = dict(claim)
     citation = dict(claim["citation"])
     citation["document"] = document_hash  # the full citation, inline, always (D2)
     record["citation"] = citation
+    # Provenance is the stored form -- the key is never relabeled. An
+    # alias-bound record carries bound_via naming the promoted key
+    # (ADR-0035 D3; shape-gated, so a packed outlier carries nothing).
+    bound = index.bound_key(claim)
+    if bound is not None:
+        record["bound_via"] = bound
     return record
 
 
@@ -57,6 +63,7 @@ def _absence(index: ServingIndex, documents: set[str], key: str) -> dict[str, An
     # documents, not answer no_documents while they sit on file.
     if not documents:
         return {"absence_state": "no_documents"}
+    key = index.canonical_key(key)  # both spellings are the same key (Q2a)
     if key not in index.key_since:
         # An attestation promises full transcription against a VOCABULARY
         # (ADR-0035 D4); a statement outside the vocabulary is outside
@@ -89,7 +96,14 @@ def get_claims(index: ServingIndex, part_number: str, keys: list[str] | None = N
     status = _attestation_status(index, documents)
 
     if keys:
-        served = [(h, c) for h, c in matches if c["key"] in keys]
+        # A query key matches a record's stored key, its canonical form
+        # (querying the x- spelling still works after promotion), or --
+        # shape-gated -- the promoted key an alias record binds to.
+        wanted = {index.canonical_key(k) for k in keys} | set(keys)
+        served = [
+            (h, c) for h, c in matches
+            if c["key"] in wanted or (index.bound_key(c) in wanted)
+        ]
         if not served:
             # One absence state for the whole query: meaningful only when
             # every consulted document covers every asked key (D3).
@@ -108,7 +122,7 @@ def get_claims(index: ServingIndex, part_number: str, keys: list[str] | None = N
             attestation_status=status,
             mode="full",
             claim_count=len(served),
-            claims=[_served_record(h, c) for h, c in served],
+            claims=[_served_record(index, h, c) for h, c in served],
         )
 
     if len(matches) > SUMMARY_THRESHOLD:
@@ -138,7 +152,7 @@ def get_claims(index: ServingIndex, part_number: str, keys: list[str] | None = N
         attestation_status=status,
         mode="full",
         claim_count=len(matches),
-        claims=[_served_record(h, c) for h, c in matches],
+        claims=[_served_record(index, h, c) for h, c in matches],
     )
 
 
