@@ -137,11 +137,18 @@ uncovered for that document, so absence on K answers `absence_not_yet_meaningful
 attestation's promise for K is known-broken; nobody has re-established what the document
 says) rather than `attested_silence`.
 
-The rule is self-healing by construction. When the superseding claim lands,
-`superseded_by` points at it, the retraction is no longer unreplaced, and the
-attestation stands again at full strength — no record was touched in either direction.
-A replaced retraction never weakens coverage: the correction re-establishes what the
-document states for that key, which is all the attestation ever promised.
+The rule is self-healing by construction, along both of its healing paths. When the
+superseding claim lands, `superseded_by` points at it, the retraction is no longer
+unreplaced, and the attestation stands again at full strength. When there is nothing to
+supersede — the retracted claim was noise and the document is silent on K — a **fresh
+attestation** re-covers instead: an attestation dated strictly after the retraction was
+made by a pass that re-read the document knowing the retraction stood, so its promise
+for K is unbroken. (Retraction dates are ISO-constrained by the schema so that ordering
+is well-defined; a pass at the same vocabulary version cannot re-attest — one pass per
+version, ADR-0035 D4 — so in practice the fresh attestation arrives with the next
+vocabulary bump.) In neither direction is any record touched. A replaced retraction
+never weakens coverage: the correction re-establishes what the document states for that
+key, which is all the attestation ever promised.
 
 ## Out of scope
 

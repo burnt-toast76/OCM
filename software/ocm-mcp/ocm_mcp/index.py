@@ -22,6 +22,7 @@ would only make consumers split it apart again.
 
 from __future__ import annotations
 
+import re
 import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -49,12 +50,31 @@ def _version_tuple(version: str) -> tuple[int, ...]:
     return tuple(int(part) for part in version.split("."))
 
 
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _dated_after(candidate: str | None, reference: str) -> bool:
+    """ISO dates order lexicographically; anything not ISO-shaped is
+    conservatively NOT after (the attestation stays masked rather than
+    borrowing freshness from an unparseable date)."""
+    return (
+        isinstance(candidate, str)
+        and bool(_ISO_DATE.match(candidate))
+        and bool(_ISO_DATE.match(reference))
+        and candidate > reference
+    )
+
+
 @dataclass
 class DocumentEntry:
     hash: str
     record: dict[str, Any]
     attestations: list[str]
     claims: list[dict[str, Any]]
+    retractions: list[dict[str, Any]] = field(default_factory=list)
+    # vocab version -> the attestation's date, for the freshness test in
+    # covered() (ADR-0037 D5).
+    attestation_dates: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -96,9 +116,40 @@ class ServingIndex:
         all -- an attestation's promise is scoped to the vocabulary, so
         callers check membership first; an unknown key here is a
         programming error, never silently treated as a 1.0 key.
+
+        One more clause, computed from the record and never authored
+        (ADR-0037 D5): an UNREPLACED retraction whose claim answered `key`
+        is evidence the attesting pass's promise failed for this key --
+        nobody has re-established what the document says -- so the key is
+        uncovered until a replacement claim or a FRESH attestation lands.
+        Fresh means dated strictly after the retraction: a later pass
+        re-read the whole document knowing the retraction stood, so its
+        promise for this key is unbroken. Dates compare as ISO strings
+        (the retraction schema requires the shape; an attestation date
+        that is not ISO-shaped is conservatively never fresh). A replaced
+        retraction never weakens coverage, and no record is touched in
+        either direction -- the rule heals itself.
         """
+        entry = self.documents[document_hash]
+        masks: list[str] = []
+        for retraction in entry.retractions:
+            if "superseded_by" in retraction:
+                continue
+            claim = next((c for c in entry.claims if c.get("id") == retraction["retracts"]), None)
+            if claim is None:
+                continue  # validate_claims refused this file at build time
+            # The key the retracted claim answered: a vocabulary key
+            # directly, or through shape-gated alias binding. An unbound
+            # x- claim answered no vocabulary key and un-covers none.
+            answered = claim["key"] if claim["key"] in self.key_since else self.bound_key(claim)
+            if answered == key:
+                masks.append(str(retraction.get("date", "")))
         since = _version_tuple(self.key_since[key])
-        return any(_version_tuple(v) >= since for v in self.documents[document_hash].attestations)
+        return any(
+            _version_tuple(v) >= since
+            and all(_dated_after(entry.attestation_dates.get(v), mask) for mask in masks)
+            for v in entry.attestations
+        )
 
     def canonical_key(self, key: str) -> str:
         """Both spellings are the same key after promotion (ADR-0036 Q2a):
@@ -183,6 +234,8 @@ def build_index(roots: str | Path | Sequence[str | Path]) -> ServingIndex:
             record=doc.get("document", {}),
             attestations=[a["vocab_version"] for a in doc.get("attestations", [])],
             claims=doc.get("claims", []),
+            retractions=doc.get("retractions", []),
+            attestation_dates={a["vocab_version"]: str(a.get("date", "")) for a in doc.get("attestations", [])},
         )
         index.documents[document_hash] = entry
 

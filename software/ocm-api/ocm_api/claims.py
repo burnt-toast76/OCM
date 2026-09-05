@@ -240,8 +240,9 @@ def validate_claims(ws: Workspace, document_hash: str) -> Envelope:
 
 def _validate_doc(ws: Workspace, doc: dict[str, Any], addressed: str) -> tuple[list[Refusal], list[str]]:
     """The whole check, on an in-memory document: schema, storage-location
-    agreement, attestation uniqueness, vocabulary binding, the stuffed-text
-    advisory, and stored-id verification. validate_claims wraps it for the
+    agreement, attestation uniqueness, retraction references (ADR-0037),
+    vocabulary binding, the stuffed-text advisory, and stored-id
+    verification. validate_claims wraps it for the
     on-disk file; append_claims runs it on the candidate document BEFORE
     writing -- one validation surface, no weaker sibling (ADR-0016).
     """
@@ -281,9 +282,61 @@ def _validate_doc(ws: Workspace, doc: dict[str, Any], addressed: str) -> tuple[l
         elif isinstance(version, str):
             seen_versions.add(version)
 
+    # Retractions (ADR-0037 D2): each must name a claim in THIS file --
+    # a retraction crossing document files would let one document's pass
+    # damage another's record -- retract it at most once, and never name
+    # the retracted claim as its own replacement. The schema checks the
+    # entry's shape; these referential checks are the validator's half.
+    claims = doc.get("claims") if isinstance(doc.get("claims"), list) else []
+    claim_ids = {c.get("id") for c in claims if isinstance(c, dict)}
+    retractions = doc.get("retractions") if isinstance(doc.get("retractions"), list) else []
+    retracted_ids: set[str] = set()
+    for index, retraction in enumerate(retractions):
+        if not isinstance(retraction, dict):
+            continue  # the schema pass already refused it
+        target = retraction.get("retracts")
+        if isinstance(target, str) and target not in claim_ids:
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_NOT_FOUND,
+                    path=f"retractions[{index}].retracts",
+                    message=f"retracted claim {target!r} is not in this document's file",
+                    hint="A retraction names a claim in its own file (ADR-0037 D2) -- check the id, or retract in the file that holds the claim.",
+                )
+            )
+        elif isinstance(target, str) and target in retracted_ids:
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_INVALID_ARGUMENT,
+                    path=f"retractions[{index}].retracts",
+                    message=f"claim {target!r} is retracted twice",
+                    hint="A claim is retracted at most once; two retractions of one claim can disagree about the replacement, and the second says nothing the first did not (ADR-0037 D2).",
+                )
+            )
+        elif isinstance(target, str):
+            retracted_ids.add(target)
+        replacement = retraction.get("superseded_by")
+        if isinstance(replacement, str) and replacement not in claim_ids:
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_NOT_FOUND,
+                    path=f"retractions[{index}].superseded_by",
+                    message=f"superseding claim {replacement!r} is not in this document's file",
+                    hint="The correction is an ordinary claim, appended through the normal path FIRST -- then the retraction points at its id (ADR-0037 D2).",
+                )
+            )
+        elif isinstance(replacement, str) and replacement == target:
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_INVALID_ARGUMENT,
+                    path=f"retractions[{index}].superseded_by",
+                    message="a claim cannot supersede its own retraction",
+                    hint="superseded_by names the NEW claim that replaces the retracted one; a record that does not transcribe its source cannot be its own correction (ADR-0037 D2).",
+                )
+            )
+
     vocab = _load_vocab(ws)
     aliases = _alias_map(vocab)
-    claims = doc.get("claims") if isinstance(doc.get("claims"), list) else []
     for index, claim in enumerate(claims):
         if not isinstance(claim, dict):
             continue  # the schema pass already refused it
@@ -383,9 +436,11 @@ def append_claims(
     new_claims: list[dict[str, Any]],
     attestation: dict[str, Any] | None = None,
 ) -> Envelope:
-    """The one write path into an existing claims file (ADR-0035 D7's two
-    legal mutations): append reviewed claims, and optionally the pass's
-    attestation. Ids are computed here, never supplied. The updated
+    """The one TOOL write path into an existing claims file: append
+    reviewed claims, and optionally the pass's attestation -- two of
+    ADR-0035 D7's three legal mutations. The third, a retraction, is
+    deliberately absent here: no tool writes a retraction, the operator
+    does (ADR-0037 D3). Ids are computed here, never supplied. The updated
     document is built from the on-disk records plus the appends --
     structurally incapable of editing or removing an existing record --
     and the WHOLE result must pass the full validation before a byte is

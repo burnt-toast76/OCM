@@ -85,14 +85,18 @@ refusing on mismatch. That check is what makes the store's append-only property
 enforceable rather than conventional: any edit to an ingested record — including a
 well-meant typo fix — changes its true hash, and the stored id gives it away.
 
-## 5. A claims file changes in exactly two ways
+## 5. A claims file changes in exactly three ways
 
-Informative restatement of ADR-0035 D7: an existing claims file has exactly two legal
-mutations — appending the claims a later transcription pass produces, and appending
-that pass's vocabulary-pinned completeness attestation (ADR-0035 D4). Existing records
-are never edited or removed; this is append-only in exactly D3's sense. Claim ids hash
-record content and citation, never file context, so the appends move no identity; the
-stored-id verification above catches anything else that moved.
+Informative restatement of ADR-0035 D7 and ADR-0037 D2: an existing claims file has
+exactly three legal mutations — appending the claims a later transcription pass
+produces, appending that pass's vocabulary-pinned completeness attestation (ADR-0035
+D4), and appending a retraction record when a claim is found not to transcribe its
+source faithfully (ADR-0037). Existing records are never edited or removed; this is
+append-only in exactly D3's sense. Claim ids hash record content and citation, never
+file context, so the appends move no identity; the stored-id verification above catches
+anything else that moved. A retraction record itself carries no id and is outside every
+hash scope — it names a claim id, it never has one — so retracting a claim changes no
+identity either: the retracted record's bytes, id, and citation all still verify.
 
 ## 6. Worked examples
 
