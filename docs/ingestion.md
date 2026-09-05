@@ -54,6 +54,40 @@ cell a named skip, never a guess — the FS-N40's FU-67TG bend radius, skipped a
 later resolved from the render against the plausible guess, is the standing example
 of why.
 
+Scope before preflighting. "Every page in scope" is not "every page in the file": a
+143-page catalog is mostly ordering matrices and dimension drawings, and its
+specification content may be seven pages. Read the document's own contents page,
+scope the pass from it, and preflight the pages the scope names — preflighting
+everything first spends the session's time where no claim will be written.
+`preflight_page()` re-opens the whole PDF per page; over many pages, run the same
+detectors via `preflight_text_and_tables()` on a single open.
+
+## Hazards the preflight does not detect
+
+The detectors cover interleaving, merged-cell suspects, confusable glyphs, and
+cross-extraction gaps. Three failures fall outside them, each having produced a wrong
+claim before it was caught:
+
+**Off-page text.** Compare the text extent to the page box (`extract_words()` max `x1`
+against `page.width`). A wide table split across a two-page spread duplicates each half
+into the *facing* page's text layer at off-page coordinates — present in the file,
+never printed. The SMC JSY catalog runs text to x=1143.7 on a 595.3-wide page. Trust
+only the page that renders it.
+
+**Substituted glyphs outside the detector's set.** The glyph inventory checks a fixed
+list of confusables; a letter standing in for a symbol passes it silently. The same
+catalog prints an arrow that extracts as `b` — "460 g b 650 g", "6.4 mm b 10 mm" — in a
+document whose flow tables use `b` for the critical pressure ratio. A value that is
+impossible for its column is a glyph artifact until the render says otherwise.
+
+**Spreads.** When a table's row labels are printed on one page and its cells on the
+facing page, reassemble it rather than guessing: verify both pages place the rows at
+the same `y`, then take cell spans from the table's own vertical rules (`page.edges`)
+instead of inferring a merged cell's reach from where its value happens to be centred.
+Every value's centre should land on a cell centre; if it does not, the column model is
+wrong. This is how the JSY manifold enclosure matrix — eight columns of 64.4 pt, values
+spanning three series rows — was resolved without a guess.
+
 ## Units
 
 Values are recorded in the exact unit printed (ADR-0014). When the document declares
