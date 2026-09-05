@@ -42,6 +42,7 @@ from ocm_api.workspace import CORPUS_ENV
 
 from .coverage import COVERAGE_REPO_ENV, COVERAGE_TOKEN_ENV, CoverageQueue, coverage_from_env
 from .index import ServingIndex, build_index
+from .reports import ReportQueue, reports_from_queue
 from .serving import get_claims as _get_claims
 from .serving import get_document as _get_document
 from .serving import search_parts as _search_parts
@@ -203,7 +204,9 @@ def _vocab_instructions(index: ServingIndex, coverage_active: bool = False) -> s
     coverage_sentence = (
         " When absence_state is no_documents or absence_not_yet_meaningful, you MAY "
         "OFFER the user a coverage request (request_coverage) -- never file one "
-        "without the user's explicit yes."
+        "without the user's explicit yes. When the user disputes a served value, you "
+        "MAY OFFER to file a claim report (report_claim, using the served claim id) "
+        "-- never file one without the user's explicit yes."
         if coverage_active
         else ""
     )
@@ -229,6 +232,7 @@ def create_server(
     corpus: str | Path | None = None,
     transport: Transport | None = None,
     coverage: CoverageQueue | None = None,
+    reports: ReportQueue | None = None,
 ) -> FastMCP:
     """Wire the transport over one registry, which may span two checkouts.
 
@@ -250,9 +254,13 @@ def create_server(
     roots = [root, Path(configured)] if configured else [root]
     index = build_index(roots)  # refuses to serve a registry that fails validation
 
-    # Resolved before the instructions are built: the offer-only sentence
-    # appears exactly when the tool it names is registered.
+    # Resolved before the instructions are built: the offer-only sentences
+    # appear exactly when the tools they name are registered. The report
+    # queue exists exactly when the coverage queue does -- one gate, one
+    # repo, one PAT -- and shares its client and daily cap (one identity,
+    # one budget).
     queue = coverage if coverage is not None else coverage_from_env()
+    report_queue = reports if reports is not None else reports_from_queue(queue)
 
     mcp = FastMCP("ocm-claims", instructions=_vocab_instructions(index, coverage_active=queue is not None), **settings)
 
@@ -305,6 +313,64 @@ def create_server(
     else:
         print(
             f"ocm-claims: request_coverage inactive ({COVERAGE_TOKEN_ENV}/{COVERAGE_REPO_ENV} unset)",
+            file=sys.stderr,
+        )
+
+    # ADR-0037 D3: dispute intake, same gate and credentials as the
+    # coverage queue. The unknown-id check lives HERE, where the read-only
+    # index already is -- reports.py stays registry-free, checkably. No
+    # tool writes a retraction; this one files the operator's homework.
+    if report_queue is not None:
+        @mcp.tool(description=(
+            "Report a served claim value the user believes is wrong -- offer first, "
+            "file only with the user's explicit yes. claim_id is required and must be "
+            "an id this registry serves (every served value carries one); reason says "
+            "what the cited page actually shows. Transcription errors get retracted "
+            "and replaced; manufacturer misprints do not -- the erratum ingests as a "
+            "new document. Repeat reports stack onto one public issue whose URL is "
+            "returned either way."
+        ))
+        def report_claim(
+            claim_id: str,
+            reason: str,
+            expected_value: str | None = None,
+            note: str | None = None,
+        ) -> dict[str, Any]:
+            found = index.find_claim(claim_id)
+            if found is None:
+                return {
+                    "status": "refused",
+                    "reason": (
+                        "no claim with this id is served by this registry. Copy the id from "
+                        "a served value -- every value carries one -- and try again."
+                    ),
+                }
+            document_hash, claim = found
+            retraction = index.retraction_of(document_hash, claim_id)
+            if retraction is not None:
+                # Already handled: filing would queue the operator's own
+                # finished work. The reporter gets the story instead.
+                return {
+                    "status": "already_retracted",
+                    "reason": retraction.get("reason"),
+                    **({"superseded_by": retraction["superseded_by"]} if "superseded_by" in retraction else {}),
+                    "detail": "This claim is already retracted; nothing was filed.",
+                }
+            citation = claim.get("citation", {})
+            return report_queue.report(
+                claim_id,
+                reason,
+                expected_value=expected_value,
+                note=note,
+                key=str(claim.get("key", "")),
+                document=document_hash,
+                location=f"page {citation.get('page')}, {citation.get('locator')}",
+            )
+
+        print(f"ocm-claims: report_claim active (queue: {report_queue.repo})", file=sys.stderr)
+    else:
+        print(
+            f"ocm-claims: report_claim inactive ({COVERAGE_TOKEN_ENV}/{COVERAGE_REPO_ENV} unset)",
             file=sys.stderr,
         )
 

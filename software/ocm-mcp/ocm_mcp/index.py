@@ -151,6 +151,16 @@ class ServingIndex:
             for v in entry.attestations
         )
 
+    def find_claim(self, claim_id: str) -> tuple[str, dict[str, Any]] | None:
+        """(document hash, claim) for a stored claim id, or None. The
+        report intake's precision gate (ADR-0037 D3): served values carry
+        their ids, so a genuine dispute always has one to copy."""
+        for document_hash, entry in self.documents.items():
+            for claim in entry.claims:
+                if claim.get("id") == claim_id:
+                    return document_hash, claim
+        return None
+
     def retraction_of(self, document_hash: str, claim_id: str) -> dict[str, Any] | None:
         """The retraction naming this claim, or None. At most one exists
         -- validate_claims refuses a claim retracted twice (ADR-0037)."""

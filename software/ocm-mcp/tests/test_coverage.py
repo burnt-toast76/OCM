@@ -169,8 +169,11 @@ def test_tool_absent_without_env_and_present_with_injected_queue(monkeypatch):
 
     queue, _ = _queue()
     armed = create_server(REPO_ROOT, coverage=queue)
+    # One gate, both intake tools: the coverage queue's presence also
+    # registers report_claim (ADR-0037 D3 -- same repo, same PAT,
+    # shared cap).
     assert sorted(t.name for t in asyncio.run(armed.list_tools())) == [
-        "get_claims", "get_document", "request_coverage", "search_parts",
+        "get_claims", "get_document", "report_claim", "request_coverage", "search_parts",
     ]
 
 

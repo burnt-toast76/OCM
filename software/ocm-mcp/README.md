@@ -127,6 +127,34 @@ identity (OAuth, phase two). A GitHub outage or bad credential answers
 `status: unavailable` without consuming the cap; the diagnosis goes to the server
 log, never the caller.
 
+## Claim reports (`report_claim`)
+
+The dispute channel (ADR-0037 D3): when a user believes a served value is wrong,
+`report_claim(claim_id, reason, expected_value?, note?)` files it as a GitHub
+issue labeled `claim-report` on the same repo, with the same PAT and the same
+env gate as the coverage queue — configuring one configures both, and the two
+tools **share** the daily cap (one client identity, one budget). Reports are
+deduplicated on the claim id; repeats stack as comments.
+
+`claim_id` is required and must be an id this registry serves — every served
+value carries one, so a genuine dispute is precise by construction; an unknown
+id is politely refused and files nothing. A report on an already-retracted
+claim answers with the retraction's story (reason, superseding id) instead of
+filing: the dispute is already settled.
+
+**No tool ever writes a retraction.** The queue files the operator's homework;
+the retraction — a judgment that our record contradicts its source, made after
+reading the document — is written by the operator in a supervised session
+(ADR-0037 D3). Every issue carries the triage line so reporters know the
+asymmetry: a **transcription error** is retracted and replaced; a
+**manufacturer misprint** is not retracted — the erratum ingests as a new
+document (ADR-0035 D5). Either way a valid report resolves visibly in the
+store's history.
+
+**Offer-only rule:** the agent may OFFER a report when the user disputes a
+served value; it never files one without the user's explicit yes. The server
+instructions carry this sentence whenever the tool is active.
+
 ### PAT scoping walkthrough
 
 GitHub → Settings → Developer settings → **Fine-grained personal access tokens** →
@@ -145,8 +173,10 @@ filtered by label and state, `POST /repos/{owner}/{repo}/issues`,
 
 ### Operator setup
 
-1. Create the label once: `gh label create coverage-request
+1. Create the labels once: `gh label create coverage-request
    --repo <owner>/OCM --description "Demand from the ocm-claims serving surface"`
+   and `gh label create claim-report
+   --repo <owner>/OCM --description "Disputed served value (ADR-0037)"`
    (or via the repo's Labels page).
 2. Mint the PAT per the walkthrough; set `OCM_COVERAGE_TOKEN` and
    `OCM_COVERAGE_REPO=<owner>/OCM` in the local MCP registration (`claude mcp add
