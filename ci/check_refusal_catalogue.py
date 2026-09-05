@@ -75,6 +75,8 @@ ALLOWLIST = {
     # quoted in __all__. OCM_CORPUS names the production corpus checkout
     # (D8 as amended) -- an environment variable, not a refusal code.
     "OCM_ROOT", "OCM_CORPUS", "SEARCH_CAP", "SUMMARY_THRESHOLD",
+    # ocm-mcp's coverage-queue env vars (ADR-0036 D1 as amended).
+    "OCM_COVERAGE_TOKEN", "OCM_COVERAGE_REPO", "OCM_COVERAGE_DAILY_CAP",
     # The remote transport's four (server.py). OCM_AUTH_TOKEN in particular
     # reads like a refusal code and is not one: the server does refuse to
     # start without it, but that refusal is a startup message to an

@@ -40,6 +40,7 @@ from starlette.responses import JSONResponse
 
 from ocm_api.workspace import CORPUS_ENV
 
+from .coverage import COVERAGE_REPO_ENV, COVERAGE_TOKEN_ENV, CoverageQueue, coverage_from_env
 from .index import ServingIndex, build_index
 from .serving import get_claims as _get_claims
 from .serving import get_document as _get_document
@@ -219,6 +220,7 @@ def create_server(
     root: str | Path | None = None,
     corpus: str | Path | None = None,
     transport: Transport | None = None,
+    coverage: CoverageQueue | None = None,
 ) -> FastMCP:
     """Wire the transport over one registry, which may span two checkouts.
 
@@ -265,6 +267,35 @@ def create_server(
     ))
     def get_document(hash: str) -> dict[str, Any]:
         return _get_document(index, hash)
+
+    # ADR-0036 D1 as amended: request_coverage exists only when its
+    # credentials are configured -- a session without them sees the three
+    # serving tools and nothing broken. The queue is NOT the registry:
+    # coverage.py imports no index, workspace, or claims path.
+    queue = coverage if coverage is not None else coverage_from_env()
+    if queue is not None:
+        @mcp.tool(description=(
+            "File a coverage request when the store cannot answer (absence_state "
+            "no_documents or absence_not_yet_meaningful) AND the user has said yes -- "
+            "offer first, never file unasked. manufacturer + part_number are a complete "
+            "request; source_url is optional context (vendor logins gate many), and no "
+            "files are accepted. Repeat requests deduplicate onto one public issue whose "
+            "URL is returned either way."
+        ))
+        def request_coverage(
+            manufacturer: str,
+            part_number: str,
+            source_url: str | None = None,
+            note: str | None = None,
+        ) -> dict[str, Any]:
+            return queue.request(manufacturer, part_number, source_url=source_url, note=note)
+
+        print(f"ocm-claims: request_coverage active (queue: {queue.repo})", file=sys.stderr)
+    else:
+        print(
+            f"ocm-claims: request_coverage inactive ({COVERAGE_TOKEN_ENV}/{COVERAGE_REPO_ENV} unset)",
+            file=sys.stderr,
+        )
 
     @mcp.custom_route("/health", methods=["GET"])
     async def health(_request: Request) -> JSONResponse:
