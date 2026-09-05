@@ -121,6 +121,12 @@ With either variable unset the tool is **not registered** — a session sees the
 three serving tools and nothing broken — and the startup log states which mode is
 live. The PAT is never baked into code, config, or images.
 
+Under static-token auth every caller shares one client identity, so the daily cap
+is N per day **total**, not per user — per-client caps arrive with per-client
+identity (OAuth, phase two). A GitHub outage or bad credential answers
+`status: unavailable` without consuming the cap; the diagnosis goes to the server
+log, never the caller.
+
 ### PAT scoping walkthrough
 
 GitHub → Settings → Developer settings → **Fine-grained personal access tokens** →

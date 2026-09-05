@@ -26,13 +26,17 @@ cap -- good enough until real abuse exists.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
 from .index import normalize
+
+_logger = logging.getLogger("ocm_mcp.coverage")
 
 COVERAGE_TOKEN_ENV = "OCM_COVERAGE_TOKEN"
 COVERAGE_REPO_ENV = "OCM_COVERAGE_REPO"
@@ -95,6 +99,13 @@ class GitHubIssues:
 
 @dataclass
 class DailyCap:
+    """Under static-token auth there is exactly ONE client identity (every
+    caller shares the bearer token, and stdio's peer is whoever launched
+    the process), so this cap is N per day GLOBAL -- correct for the
+    single-operator phase, and deliberately not a per-user quota. When
+    per-client identity arrives with OAuth (phase two), `client_id`
+    becomes the OAuth client and this same machinery means per-client."""
+
     cap: int = DEFAULT_DAILY_CAP
     _counts: dict[tuple[str, str], int] = field(default_factory=dict)
 
@@ -106,16 +117,40 @@ class DailyCap:
         self._counts[key] = used + 1
         return True
 
+    def refund(self, client_id: str) -> None:
+        """An unavailable queue must not consume the caller's cap: the
+        take gates GitHub work, so a failed attempt hands it back."""
+        key = (date.today().isoformat(), client_id)
+        if self._counts.get(key, 0) > 0:
+            self._counts[key] -= 1
+
+
+def _sanitize(text: str) -> str:
+    """Backticks stripped so nothing can escape the fence it is served
+    inside -- the note and URL land in a PUBLIC issue body, where raw
+    markdown renders and @mentions ping real users through the PAT's
+    identity. Fenced code is inert; a fence is only inert if the content
+    cannot close it."""
+    return text.replace("`", "")
+
 
 def _context_lines(source_url: str | None, note: str | None, client_id: str) -> str:
-    return "\n".join(
-        [
-            f"source_url: {source_url if source_url else '(operator resolves)'}",
-            f"note: {note if note else '(none)'}",
-            f"requested_by: {client_id}",
-            f"date: {date.today().isoformat()}",
-        ]
-    )
+    lines = [
+        f"source_url: `{_sanitize(source_url)}`" if source_url else "source_url: (operator resolves)",
+        f"requested_by: {client_id}",
+        f"date: {date.today().isoformat()}",
+    ]
+    if note:
+        lines += ["", "note:", "```text", _sanitize(note), "```"]
+    else:
+        lines.append("note: (none)")
+    return "\n".join(lines)
+
+
+_UNAVAILABLE_REASON = (
+    "the coverage queue is temporarily unreachable; the store itself is "
+    "unaffected -- please try again later."
+)
 
 
 @dataclass
@@ -136,6 +171,10 @@ class CoverageQueue:
             return {"status": "refused", "reason": "manufacturer and part_number are both required."}
         if note is not None and len(note) > NOTE_MAX_CHARS:
             return {"status": "refused", "reason": f"note is limited to {NOTE_MAX_CHARS} characters ({len(note)} given)."}
+        # Global under static-token auth (one client identity) -- see
+        # DailyCap. The take gates the GitHub calls; an unavailable
+        # outcome below refunds it, so the queue's failure never burns
+        # the caller's cap.
         if not self.limiter.take(client_id):
             return {
                 "status": "refused",
@@ -146,37 +185,50 @@ class CoverageQueue:
             }
 
         key = coverage_key(manufacturer, part_number)
-        # The template's `key:` line is the dedup anchor -- exact-match
-        # against issue bodies, no free-text guessing.
-        for issue in self.client.list_open(COVERAGE_LABEL):
-            if f"key: {key}" in (issue.get("body") or ""):
-                self.client.comment(
-                    issue["number"],
-                    "Another request for this coverage.\n\n" + _context_lines(source_url, note, client_id),
-                )
-                return {
-                    "status": "already_queued",
-                    "issue_url": issue.get("html_url"),
-                    "detail": "This part was already requested; your context was added to the existing issue.",
-                }
+        try:
+            # The template's `key:` line is the dedup anchor -- exact-match
+            # against issue bodies, no free-text guessing. It stays a bare
+            # template line (never fenced or backticked) so this search
+            # matches the bodies the template produces.
+            for issue in self.client.list_open(COVERAGE_LABEL):
+                if f"key: {key}" in (issue.get("body") or ""):
+                    self.client.comment(
+                        issue["number"],
+                        "Another request for this coverage.\n\n" + _context_lines(source_url, note, client_id),
+                    )
+                    return {
+                        "status": "already_queued",
+                        "issue_url": issue.get("html_url"),
+                        "detail": "This part was already requested; your context was added to the existing issue.",
+                    }
 
-        body = "\n".join(
-            [
-                f"manufacturer: {manufacturer.strip()}",
-                f"part_number: {part_number.strip()}",
-                f"key: {key}",
-                _context_lines(source_url, note, client_id),
-                "",
-                "_Filed by request_coverage (ADR-0036 D1 as amended). This queue feeds the",
-                "human-supervised ingestion pipeline; it never writes the registry._",
-            ]
-        )
-        issue = self.client.create(
-            title=f"Coverage request: {manufacturer.strip()} {part_number.strip()}",
-            body=body,
-            labels=[COVERAGE_LABEL],
-        )
-        return {"status": "queued", "issue_url": issue.get("html_url")}
+            body = "\n".join(
+                [
+                    f"manufacturer: {manufacturer.strip()}",
+                    f"part_number: {part_number.strip()}",
+                    f"key: {key}",
+                    _context_lines(source_url, note, client_id),
+                    "",
+                    "_Filed by request_coverage (ADR-0036 D1 as amended). This queue feeds the",
+                    "human-supervised ingestion pipeline; it never writes the registry._",
+                ]
+            )
+            issue = self.client.create(
+                title=f"Coverage request: {manufacturer.strip()} {part_number.strip()}",
+                body=body,
+                labels=[COVERAGE_LABEL],
+            )
+            return {"status": "queued", "issue_url": issue.get("html_url")}
+        except urllib.error.HTTPError as error:
+            # Diagnosis lives in the server log; the caller gets a polite
+            # refusal with no status code, exception text, or repo name.
+            self.limiter.refund(client_id)
+            _logger.warning("coverage queue: GitHub answered HTTP %s (%s)", error.code, error.reason)
+            return {"status": "unavailable", "reason": _UNAVAILABLE_REASON}
+        except (urllib.error.URLError, TimeoutError) as error:
+            self.limiter.refund(client_id)
+            _logger.warning("coverage queue: GitHub unreachable (%s: %s)", type(error).__name__, error)
+            return {"status": "unavailable", "reason": _UNAVAILABLE_REASON}
 
 
 def coverage_from_env(env: dict[str, str] | None = None) -> CoverageQueue | None:
