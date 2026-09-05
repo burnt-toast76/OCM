@@ -151,6 +151,14 @@ class ServingIndex:
             for v in entry.attestations
         )
 
+    def retraction_of(self, document_hash: str, claim_id: str) -> dict[str, Any] | None:
+        """The retraction naming this claim, or None. At most one exists
+        -- validate_claims refuses a claim retracted twice (ADR-0037)."""
+        return next(
+            (r for r in self.documents[document_hash].retractions if r["retracts"] == claim_id),
+            None,
+        )
+
     def canonical_key(self, key: str) -> str:
         """Both spellings are the same key after promotion (ADR-0036 Q2a):
         an alias spelling canonicalizes to its promoted key; everything

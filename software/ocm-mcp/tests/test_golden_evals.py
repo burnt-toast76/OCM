@@ -39,6 +39,21 @@ def _assert_envelope_invariants(response: dict[str, Any]) -> None:
         citation = record.get("citation", {})
         assert citation.get("document", "").startswith("sha256:"), "citation carries the document hash inline"
         assert citation.get("page") and citation.get("locator"), "citation carries page and locator"
+    # ADR-0037 D4: the retracted: section is provenance-bearing too, its
+    # records are flagged and carry their retraction verbatim, its count
+    # agrees, and exclusion is airtight -- no id appears on both sides.
+    retracted = response.get("retracted", [])
+    if retracted:
+        assert response.get("retracted_count") == len(retracted), "retracted_count agrees with the section"
+    if "retracted_count" in response:
+        # get_document announces the count without relocating records --
+        # the story itself is get_claims' to serve.
+        assert response["retracted_count"] > 0, "retracted_count is absent when zero, never 0"
+    for record in retracted:
+        assert record.get("id", "").startswith("sha256:") and record["citation"].get("document", "").startswith("sha256:")
+        assert record.get("retracted") is True, "every relocated record is flagged"
+        assert record.get("retraction", {}).get("reason"), "the story carries its reason"
+    assert not {r["id"] for r in retracted} & {c["id"] for c in response.get("claims", [])}, "a retracted claim is never also served"
 
 
 def _count_ok(expected, actual: int) -> bool:
@@ -84,5 +99,13 @@ def test_golden(eval_case: dict[str, Any], index) -> None:
             assert response["record"].get(field) == expected
         elif field == "attestations":
             assert response.get("attestations") == expected
+        elif field == "retracted_count":
+            assert response.get("retracted_count") == expected, f"retracted_count {response.get('retracted_count')} != {expected}"
+        elif field == "retracted_include":
+            by_id = {r["id"]: r for r in response.get("retracted", [])}
+            for want in expected:
+                assert want["id"] in by_id, f"{want['id']} missing from the retracted section"
+                if "superseded_by" in want:
+                    assert by_id[want["id"]]["retraction"].get("superseded_by") == want["superseded_by"]
         else:
             raise AssertionError(f"eval {eval_case['name']!r} uses unknown expectation field {field!r}")

@@ -38,7 +38,10 @@ def _registry(tmp_path: Path, mutate) -> Path:
 
 
 def _ip_rating_claim(doc: dict[str, Any]) -> dict[str, Any]:
-    (claim,) = [c for c in doc["claims"] if c["key"] == "ip_rating"]
+    # The ORIGINAL, correct record -- the fixture also carries the
+    # already-retracted IP65 misread (the committed ADR-0037 golden),
+    # which these tests replace with scenarios of their own.
+    (claim,) = [c for c in doc["claims"] if c["key"] == "ip_rating" and c["value"] == "IP67"]
     return claim
 
 

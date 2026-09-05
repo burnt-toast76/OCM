@@ -18,7 +18,11 @@ referentially honest:
   absence_state: no_documents match nothing;
 - every key named exists in the vocabulary or is x- prefixed;
 - claim_count expectations hold: exact counts equal the store's, and
-  {minimum: true} counts never exceed it.
+  {minimum: true} counts never exceed it -- LIVE claims only, because
+  exclusion-by-default (ADR-0037 D4) means golden counts describe what
+  is served;
+- a claim_ids/claim_ids_include entry is never a retracted id, and
+  retracted_include entries match the store's retraction records.
 
 This is a check on the GOLDENS against the store -- deliberately not an
 implementation of the serving semantics (that would be the weaker
@@ -104,14 +108,26 @@ def main() -> int:
     aliases = {alias: entry["key"] for entry in vocab["keys"] for alias in entry.get("aliases", [])}
 
     all_ids: set[str] = set()
+    # claim id -> its retraction record (ADR-0037). Counting is LIVE
+    # claims only: exclusion-by-default means golden counts describe what
+    # is served, and the retractions array is structure this lint can
+    # read without implementing serving semantics.
+    retracted: dict[str, dict] = {}
+    live_claim_counts: dict[str, int] = {}
     part_claims: dict[str, int] = {}
     per_key: dict[tuple[str, str], int] = {}
     families: set[str] = set()
-    for entry in registry.values():
+    for doc_hash, entry in registry.items():
+        for retraction in entry.get("retractions") or []:
+            retracted[retraction["retracts"]] = retraction
+    for doc_hash, entry in registry.items():
         for claim in entry["claims"]:
             all_ids.add(claim["id"])
             if "family" in claim:
                 families.add(norm(claim["family"]))
+            if claim["id"] in retracted:
+                continue
+            live_claim_counts[doc_hash] = live_claim_counts.get(doc_hash, 0) + 1
             for part in claim["applies_to"]:
                 part_claims[norm(part)] = part_claims.get(norm(part), 0) + 1
                 per_key[(norm(part), claim["key"])] = per_key.get((norm(part), claim["key"]), 0) + 1
@@ -137,6 +153,15 @@ def main() -> int:
         for cid in list(expect.get("claim_ids") or []) + list(expect.get("claim_ids_include") or []):
             if cid not in all_ids:
                 problems.append(f"{where}: claim id {cid} not in the registry")
+            elif cid in retracted:
+                problems.append(f"{where}: claim id {cid} is retracted -- it is never served in claims: (ADR-0037 D4)")
+
+        for want in expect.get("retracted_include") or []:
+            cid = want.get("id")
+            if cid not in retracted:
+                problems.append(f"{where}: retracted_include names {cid}, which no retraction record retracts")
+            elif want.get("superseded_by") is not None and retracted[cid].get("superseded_by") != want["superseded_by"]:
+                problems.append(f"{where}: superseded_by {want['superseded_by']} != store's {retracted[cid].get('superseded_by')}")
 
         part = args.get("part_number")
         if part is not None:
@@ -171,8 +196,12 @@ def main() -> int:
                 stated = [a["vocab_version"] for a in entry.get("attestations", [])]
                 if "attestations" in expect and expect["attestations"] != stated:
                     problems.append(f"{where}: attestations {expect['attestations']} != store {stated}")
-                if "claim_count" in expect and not expected_count_ok(expect["claim_count"], len(entry["claims"])):
-                    problems.append(f"{where}: claim_count inconsistent with store ({len(entry['claims'])})")
+                live = live_claim_counts.get(doc_hash, 0)
+                if "claim_count" in expect and not expected_count_ok(expect["claim_count"], live):
+                    problems.append(f"{where}: claim_count inconsistent with store ({live} live)")
+                stated_retracted = len(entry.get("retractions") or [])
+                if "retracted_count" in expect and expect["retracted_count"] != stated_retracted:
+                    problems.append(f"{where}: retracted_count {expect['retracted_count']} != store {stated_retracted}")
 
     print(f"evals: {len(evals)} | registry: {len(registry)} documents, {len(all_ids)} claim ids")
     if problems:

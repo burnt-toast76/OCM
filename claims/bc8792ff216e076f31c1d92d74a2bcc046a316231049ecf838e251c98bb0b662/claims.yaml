@@ -258,3 +258,52 @@ claims:
     locator: wiring, M12 pin table
   extraction:
     method: human
+# -- ADR-0037 golden retraction fixtures ------------------------------------
+# The two claims below are DELIBERATELY WRONG against document.txt and are
+# retracted in the retractions: array beneath -- appended so the correction
+# machinery has committed reference content, exactly as the fixture claims
+# above give the serving surface known-correct answers (ADR-0035 D6).
+# Neither is ever served in claims: -- get_claims excludes retracted records
+# and tells their story in the retracted: envelope section (ADR-0037 D4).
+- id: sha256:e74d4f8bb8ed70e438d4670372570816c27f5b49d8b2ce8dd2ffe7e1cf8577fc
+  key: ip_rating
+  value: IP65
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 1
+    locator: overview, row 'Protection rating'
+  extraction:
+    method: human
+- id: sha256:cb9663ef9b9534148af7f1484f206b175238394b3f1e699c3d75c497033f28b5
+  key: operating_temp
+  value:
+    unqualified: 23
+    unit: C
+  conditions: []
+  applies_to:
+  - EPS25-100WC-1001
+  - EPS25-250WC-1001
+  family: EPS25 series
+  citation:
+    page: 2
+    locator: spec table, row 'Accuracy'
+  extraction:
+    method: human
+retractions:
+# Replaced: the record misread IP67 as IP65; the pre-existing claim
+# 8d63dafd... transcribes the same statement correctly and supersedes it.
+- retracts: sha256:e74d4f8bb8ed70e438d4670372570816c27f5b49d8b2ce8dd2ffe7e1cf8577fc
+  reason: 'transcription error (golden fixture): the document prints IP67, not IP65'
+  date: '2026-09-05'
+  superseded_by: sha256:8d63dafd7d0573a0f5d6aec5c84f0acf3e0015c366613e9814cb1d7f4a38b47b
+# Standalone: nothing to supersede -- the accuracy row's 23 C is a test
+# condition, and the document states no operating temperature at all, so
+# absence on operating_temp recomputes to absence_not_yet_meaningful
+# until a fresh pass re-attests (ADR-0037 D5).
+- retracts: sha256:cb9663ef9b9534148af7f1484f206b175238394b3f1e699c3d75c497033f28b5
+  reason: 'fabricated statement (golden fixture): the 23 C in the accuracy row is a reference test condition, not an operating temperature; the document states no operating temperature'
+  date: '2026-09-05'

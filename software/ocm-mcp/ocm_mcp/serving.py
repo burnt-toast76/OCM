@@ -18,7 +18,13 @@ Contract invariants enforced here, not in the transport:
   only on the family NAME as the query, labeled matched_via: family
   (D4);
 - an unfiltered response above SUMMARY_THRESHOLD claims is a per-key
-  summary; full records come by asking with keys (D7).
+  summary; full records come by asking with keys (D7);
+- retracted claims are excluded from claims: by default and served with
+  their story in the retracted: section instead -- the default consumer
+  cannot quote a retracted value by accident, and a consumer holding the
+  old id learns what happened to it from the same query that used to
+  return it (ADR-0037 D4). Absence recomputes as if a retracted claim
+  never answered.
 """
 
 from __future__ import annotations
@@ -58,6 +64,38 @@ def _served_record(index: ServingIndex, document_hash: str, claim: dict[str, Any
     if bound is not None:
         record["bound_via"] = bound
     return record
+
+
+def _retracted_extras(
+    index: ServingIndex, gone: list[tuple[str, dict[str, Any], dict[str, Any]]]
+) -> dict[str, Any]:
+    """The relocated story (ADR-0037 D4): retracted records the query
+    would have matched, each flagged and carrying its retraction record
+    verbatim -- reason, date, superseding claim id when one exists.
+    Empty when the scope holds none, so the common case pays nothing."""
+    if not gone:
+        return {}
+    retracted = []
+    for document_hash, claim, retraction in gone:
+        record = _served_record(index, document_hash, claim)
+        record["retracted"] = True
+        record["retraction"] = dict(retraction)
+        retracted.append(record)
+    return {"retracted_count": len(retracted), "retracted": retracted}
+
+
+def _partition_retracted(
+    index: ServingIndex, matches: list[tuple[str, dict[str, Any]]]
+) -> tuple[list[tuple[str, dict[str, Any]]], list[tuple[str, dict[str, Any], dict[str, Any]]]]:
+    live: list[tuple[str, dict[str, Any]]] = []
+    gone: list[tuple[str, dict[str, Any], dict[str, Any]]] = []
+    for document_hash, claim in matches:
+        retraction = index.retraction_of(document_hash, claim["id"])
+        if retraction is None:
+            live.append((document_hash, claim))
+        else:
+            gone.append((document_hash, claim, retraction))
+    return live, gone
 
 
 def _attestation_status(index: ServingIndex, document_hashes: set[str]) -> str:
@@ -105,6 +143,11 @@ def get_claims(index: ServingIndex, part_number: str, keys: list[str] | None = N
         return _envelope(index, part_number=part_number, absence_state="no_documents")
 
     status = _attestation_status(index, documents)
+    # Exclusion by default (ADR-0037 D4): retracted records leave the
+    # serving set entirely -- claims:, counts, and the summary threshold
+    # all see live records only -- and every response whose scope touched
+    # one carries the story in retracted:.
+    live, gone = _partition_retracted(index, matches)
 
     if keys:
         # A query key matches a record's stored key, its canonical form
@@ -112,19 +155,27 @@ def get_claims(index: ServingIndex, part_number: str, keys: list[str] | None = N
         # shape-gated -- the promoted key an alias record binds to.
         wanted = {index.canonical_key(k) for k in keys} | set(keys)
         served = [
-            (h, c) for h, c in matches
+            (h, c) for h, c in live
+            if c["key"] in wanted or (index.bound_key(c) in wanted)
+        ]
+        gone_served = [
+            (h, c, r) for h, c, r in gone
             if c["key"] in wanted or (index.bound_key(c) in wanted)
         ]
         if not served:
             # One absence state for the whole query: meaningful only when
-            # every consulted document covers every asked key (D3).
+            # every consulted document covers every asked key (D3). A
+            # retracted claim never answers -- covered() already treats an
+            # unreplaced retraction as un-covering its key (ADR-0037 D5),
+            # so a key answered only by a retracted record recomputes to
+            # absence_not_yet_meaningful, with the story alongside.
             worst = [_absence(index, documents, key) for key in keys]
             state = next(
                 (a for a in worst if a["absence_state"] == "absence_not_yet_meaningful"),
                 worst[0],
             )
             return _envelope(index, part_number=part_number, resolved_part=resolved, matched_via=matched_via,
-                             attestation_status=status, keys=keys, **state)
+                             attestation_status=status, keys=keys, **state, **_retracted_extras(index, gone_served))
         return _envelope(
             index,
             part_number=part_number,
@@ -134,11 +185,12 @@ def get_claims(index: ServingIndex, part_number: str, keys: list[str] | None = N
             mode="full",
             claim_count=len(served),
             claims=[_served_record(index, h, c) for h, c in served],
+            **_retracted_extras(index, gone_served),
         )
 
-    if len(matches) > SUMMARY_THRESHOLD:
+    if len(live) > SUMMARY_THRESHOLD:
         summary: dict[str, dict[str, Any]] = {}
-        for _, claim in matches:
+        for _, claim in live:
             entry = summary.setdefault(claim["key"], {"count": 0, "subjects": []})
             entry["count"] += 1
             subject = claim.get("subject")
@@ -151,8 +203,9 @@ def get_claims(index: ServingIndex, part_number: str, keys: list[str] | None = N
             matched_via=matched_via,
             attestation_status=status,
             mode="summary",
-            claim_count=len(matches),
+            claim_count=len(live),
             summary=summary,
+            **_retracted_extras(index, gone),
         )
 
     return _envelope(
@@ -162,8 +215,9 @@ def get_claims(index: ServingIndex, part_number: str, keys: list[str] | None = N
         matched_via=matched_via,
         attestation_status=status,
         mode="full",
-        claim_count=len(matches),
-        claims=[_served_record(index, h, c) for h, c in matches],
+        claim_count=len(live),
+        claims=[_served_record(index, h, c) for h, c in live],
+        **_retracted_extras(index, gone),
     )
 
 
@@ -184,7 +238,12 @@ def get_document(index: ServingIndex, hash: str) -> dict[str, Any]:
     entry = index.documents.get(hash)
     if entry is None:
         return _envelope(index, hash=hash, found=False)
-    parts = sorted({p for c in entry.claims for p in c["applies_to"]})
+    # Counts describe what the document SERVES: retracted records are out
+    # of claim_count and parts_covered, and announced by retracted_count
+    # when any exist (ADR-0037 D4) -- absent when zero, like everywhere.
+    live = [c for c in entry.claims if index.retraction_of(hash, c["id"]) is None]
+    parts = sorted({p for c in live for p in c["applies_to"]})
+    extras: dict[str, Any] = {"retracted_count": len(entry.retractions)} if entry.retractions else {}
     return _envelope(
         index,
         hash=hash,
@@ -192,6 +251,7 @@ def get_document(index: ServingIndex, hash: str) -> dict[str, Any]:
         bytes_served=False,  # the registry holds citations, never real documents
         record=dict(entry.record),
         attestations=list(entry.attestations),
-        claim_count=len(entry.claims),
+        claim_count=len(live),
         parts_covered=parts,
+        **extras,
     )
