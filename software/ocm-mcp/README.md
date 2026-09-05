@@ -94,3 +94,59 @@ claude mcp add --transport http ocm-claims http://localhost:8000/mcp \
 
 The same registration works against the hosted URL later — only the host part
 changes.
+
+## Coverage queue (`request_coverage`)
+
+When the store cannot answer (`no_documents`, `absence_not_yet_meaningful`), the
+fourth tool files that demand as a GitHub issue labeled `coverage-request` on the
+public repo, deduplicated on the normalized (manufacturer, part) key — repeat
+requests stack onto one issue as comments, and either path returns the issue URL.
+The queue is not the registry (ADR-0036 D1 as amended): it feeds the
+human-supervised ingestion pipeline and can never place, alter, or delete a claim.
+Manufacturer + part number is a complete request — source URLs are optional
+(vendor logins gate many; the operator resolves the document) — and no files are
+accepted, ever.
+
+**Offer-only rule:** the agent may OFFER the user a coverage request on the two
+absence states above; it never files one without the user's explicit yes. The
+server instructions carry this sentence whenever the tool is active.
+
+| Variable                 | Default | Meaning                                             |
+| ------------------------ | ------- | --------------------------------------------------- |
+| `OCM_COVERAGE_TOKEN`     | unset   | Fine-grained PAT for the queue repo. Both or nothing. |
+| `OCM_COVERAGE_REPO`      | unset   | `owner/repo` the issues land on. Both or nothing.   |
+| `OCM_COVERAGE_DAILY_CAP` | `10`    | Per-caller daily request cap (in-memory).           |
+
+With either variable unset the tool is **not registered** — a session sees the
+three serving tools and nothing broken — and the startup log states which mode is
+live. The PAT is never baked into code, config, or images.
+
+### PAT scoping walkthrough
+
+GitHub → Settings → Developer settings → **Fine-grained personal access tokens** →
+Generate new token:
+
+1. **Resource owner:** the account/org that owns the queue repo.
+2. **Repository access:** *Only select repositories* → the public OCM repo alone.
+3. **Repository permissions:** **Issues: Read and write** (Metadata: Read is added
+   automatically). Nothing else — no contents, no workflows.
+4. Set an expiration and rotate on schedule; the server reads it only from
+   `OCM_COVERAGE_TOKEN`.
+
+(Endpoint set used, API version 2022-11-28: `GET /repos/{owner}/{repo}/issues`
+filtered by label and state, `POST /repos/{owner}/{repo}/issues`,
+`POST /repos/{owner}/{repo}/issues/{number}/comments`.)
+
+### Operator setup
+
+1. Create the label once: `gh label create coverage-request
+   --repo <owner>/OCM --description "Demand from the ocm-claims serving surface"`
+   (or via the repo's Labels page).
+2. Mint the PAT per the walkthrough; set `OCM_COVERAGE_TOKEN` and
+   `OCM_COVERAGE_REPO=<owner>/OCM` in the local MCP registration (`claude mcp add
+   --env …`) and in the eventual host's environment alongside the transport
+   variables.
+3. Triage from the label: the issue body's fixed template (`manufacturer:`,
+   `part_number:`, `key:`, `source_url:`, `note:`, `requested_by:`, `date:`) is
+   parseable by eye and by tooling; comment stacks on one issue are the demand
+   ranking.

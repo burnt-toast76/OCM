@@ -198,8 +198,15 @@ def _http_settings(transport: Transport) -> dict[str, Any]:
     }
 
 
-def _vocab_instructions(index: ServingIndex) -> str:
+def _vocab_instructions(index: ServingIndex, coverage_active: bool = False) -> str:
     keys = ", ".join(sorted(index.key_since))
+    coverage_sentence = (
+        " When absence_state is no_documents or absence_not_yet_meaningful, you MAY "
+        "OFFER the user a coverage request (request_coverage) -- never file one "
+        "without the user's explicit yes."
+        if coverage_active
+        else ""
+    )
     return (
         "ocm-claims serves transcribed datasheet/catalog claims, read-only, with "
         "provenance on every value (claim id + document hash + page + locator). "
@@ -213,6 +220,7 @@ def _vocab_instructions(index: ServingIndex) -> str:
         "vocabulary appear under x- prefixed keys and are unbound. "
         f"Serving registry state {index.serving_state}"
         + (f", corpus state {index.corpus_state}." if index.corpus_state else " (no corpus configured).")
+        + coverage_sentence
     )
 
 
@@ -242,7 +250,11 @@ def create_server(
     roots = [root, Path(configured)] if configured else [root]
     index = build_index(roots)  # refuses to serve a registry that fails validation
 
-    mcp = FastMCP("ocm-claims", instructions=_vocab_instructions(index), **settings)
+    # Resolved before the instructions are built: the offer-only sentence
+    # appears exactly when the tool it names is registered.
+    queue = coverage if coverage is not None else coverage_from_env()
+
+    mcp = FastMCP("ocm-claims", instructions=_vocab_instructions(index, coverage_active=queue is not None), **settings)
 
     @mcp.tool(description=(
         "Claims covering one part, every value with claim id and full citation. "
@@ -272,7 +284,6 @@ def create_server(
     # credentials are configured -- a session without them sees the three
     # serving tools and nothing broken. The queue is NOT the registry:
     # coverage.py imports no index, workspace, or claims path.
-    queue = coverage if coverage is not None else coverage_from_env()
     if queue is not None:
         @mcp.tool(description=(
             "File a coverage request when the store cannot answer (absence_state "
