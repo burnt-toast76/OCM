@@ -114,6 +114,9 @@ edit to the record.
 Consequence: document ingestion can be replayed, diffed, and hash-verified at any vocabulary
 version, and no vocabulary change can silently alter what a datasheet was recorded as saying.
 
+*(ADR-0037 defines how a transcription error is corrected without breaking this property:
+a retraction is a pure addition too, and the wrong record's bytes never change.)*
+
 ## Decision 4 — Absence is answered, not implied
 
 When the claims service is asked for a key it has no claim for, it returns an explicit
@@ -199,8 +202,9 @@ served form re-attaches it. Re-ingesting a revised document is one new file, nev
 An existing claims file has exactly two legal mutations: appending the claims a later
 transcription pass produces — vocabulary 1.1 adds keys, so an already-attested document gets
 another pass — and appending that pass's vocabulary-pinned attestation (Decision 4).
-Existing records are never edited or removed: this is still append-only in exactly
-Decision 3's sense. Because a claim id hashes record content and citation — never file
+*(ADR-0037 adds a third: appending a retraction record when a claim is found not to
+transcribe its source faithfully.)* Existing records are never edited or removed: this is
+still append-only in exactly Decision 3's sense. Because a claim id hashes record content and citation — never file
 context — the appends move no identity; the stored-id verification catches anything else
 that moved.
 
