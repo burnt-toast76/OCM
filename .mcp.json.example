@@ -5,7 +5,7 @@
   "mcpServers": {
     "ocm": {
       "command": "<REPO>/.venv/bin/python",
-      "args": ["-m", "ocm_api.mcp_server", "<REPO>"]
+      "args": ["-m", "ocm_api.mcp_server", "--repo", "<REPO>"]
     }
   }
 }
