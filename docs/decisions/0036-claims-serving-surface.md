@@ -24,9 +24,9 @@ transcription, conditions, attestations, content-hash identity) is worthless if 
 side leaks bare values: a consumer that receives "30 V" with no citation has learned a
 rumor with good posture. Provenance is the product.
 
-## Decision 1 — Three tools, read-only, forever
+## Decision 1 — The tool set: nothing writes to the registry, ever
 
-The server exposes exactly three tools:
+The server exposes three serving tools:
 
 - `get_claims(part_number, keys?)` — the claims covering one part. With `keys` omitted it
   returns everything for the part (Decision 7's sizing applies): omission is the
@@ -39,12 +39,26 @@ The server exposes exactly three tools:
   (ADR-0035 D5, `claims/README.md`) and the server cannot serve what the store
   deliberately excludes.
 
-Nothing else in v1: no vocabulary tool (the vocabulary rides in the server's
+Nothing else serves in v1: no vocabulary tool (the vocabulary rides in the server's
 instructions — it is small, changes by pull request, and every envelope names the version
-it was served under), no manifest tools, and no write, transcription, or mutation surface
-— not in v1, not ever. Ingestion is a separate concern with its own machinery. Additions
-to this contract are backward-compatible; removals never are, which is why it starts
+it was served under), and no manifest tools. **No tool writes to the registry — not in
+v1, not ever.** Ingestion is a separate concern with its own machinery. Additions to
+this contract are backward-compatible; removals never are, which is why it starts
 minimal.
+
+One tool exists outside the serving set, added by amendment and registered only when its
+credentials are configured: `request_coverage(manufacturer, part_number, source_url?,
+note?)` appends a demand record to the **coverage queue** — GitHub issues labeled
+`coverage-request` on the public repository, deduplicated on the normalized
+(manufacturer, part number) key so repeat requests stack visibly into ranked demand. The
+queue is not the registry: it feeds the human-supervised ingestion pipeline and cannot
+place, alter, or delete a claim, so the rationale this decision began with — nothing can
+pollute the store — survives intact. The two absence states that mean "the store cannot
+answer" (`no_documents`, `absence_not_yet_meaningful`, Decision 3) are the trigger: the
+consuming agent may OFFER the user a coverage request on them and files one only when
+the user says yes. A source URL is optional by design — vendor logins gate many of
+them, so manufacturer plus part number is a complete request and the operator resolves
+the document — and no file or document intake passes through this tool.
 
 ## Decision 2 — Provenance on every value; the serving layer never computes
 
