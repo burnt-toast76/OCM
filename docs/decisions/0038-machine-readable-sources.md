@@ -1,6 +1,6 @@
 # ADR-0038 — Machine-readable sources
 
-**Status:** Proposed — Decisions 1–4 taken; Questions 5–8 🔴 **OPEN**
+**Status:** Proposed — Decisions 1–5 taken; Questions 6–8 🔴 **OPEN**
 
 **Builds on:** ADR-0035 (claims, citations, attestations), ADR-0036 (serving),
 ADR-0037 (corrections under append-only), ADR-0014 (zero assumption)
@@ -35,7 +35,7 @@ pass — 40 claims, no parser, every strain recorded rather than fixed. What it 
 - **A third of the ingestion discipline does not apply.** Preflight and glyph fidelity are
   properties of rendering; this file *is* text, with no second extraction to cross-check.
 
-Decisions 1–4 settle what the pass proved. The open questions are the ones a second document
+Decisions 1–5 settle what the pass proved. The open questions are the ones a second document
 — a GSDML for the same device, or an EDS from another vendor — would answer better than
 argument, and they are recorded now so the answers are deliberate rather than incidental.
 
@@ -79,9 +79,10 @@ would then grow with every fieldbus and every revision of one.
 
 The format itself is therefore *not* recorded in the document record today. `type` answers
 what kind of document this is; which format it is written in is a different axis, and no
-consumer yet needs to query it. Decision 4 holds the bytes without serving them, so nothing
-fetches by format yet; the day something does, the format has to be recorded rather than
-inferred from a file extension.
+consumer yet needs to query it. Decision 5 is what eventually needs it — a unit attributed
+to a format specification must name that specification — and Decision 4 will need it too the
+day anything fetches bytes by format rather than inferring it from a file extension. The
+field lands with the first pass that writes such a unit, not before.
 
 The name is deliberately the one the component schema already uses. That schema has carried
 a `comms.device_description` field since before any of this — a free-text string whose
@@ -168,19 +169,52 @@ why they may — authored by the project, CC BY-SA 4.0, verdict `permitted`. The
 what right are these bytes here?" is answered on every entry that holds any, including the
 easy ones.
 
-## Question 5 🔴 — Are units defined by a format, rather than by an instance, expressible?
+## Decision 5 — A unit defined by the format is a unit; the instance need not repeat it
 
-All 81 parameters declare an empty units string. CIP defines the RPI as microseconds and
-assembly sizes as bytes; **the file says neither**. Transcribing "µs" would be fabrication
-under ADR-0014, so every numeric fact in the document is text — which means it cannot be
-compared, converted, or sorted downstream.
+All 81 parameters in the EDS declare an *empty* units string. CIP defines the RPI in
+microseconds and assembly sizes in bytes; the file says neither, so every numeric fact in it
+was recorded as text.
 
-- **Option A — A format-defined unit is a unit**, carried with a marker naming its authority
-  (`unit: µs`, `unit_source: CIP Vol 1`). ⚠️ It is no longer "as printed."
-- **Option B — Numeric shapes stay unusable** for this document class; text is the honest
-  answer and consumers parse at their own risk.
-- **Option C — A parser supplies units from the format spec**, making it a property of
-  `parsed` extraction (Question 6) rather than of the claim.
+**A unit defined by the specification that governs an instance may be recorded as the
+claim's unit.** The number stays exactly as printed — this is an attribution, never a
+conversion, and ADR-0014's prohibition on converting units is untouched.
+
+The distinction that makes this transcription rather than invention is where the unit is
+read from. A datasheet routinely prints `[MPa]` in a row header and bare numbers in the
+cells; the unit is transcribed from the header, because it is stated elsewhere in the same
+document. A format specification is "elsewhere" one step further out — normative, published,
+and binding on every instance of the format. The unit is stated; it is simply not restated
+per file.
+
+Two guard rails, and they are the decision as much as the principle is:
+
+1. **The unit comes from the format specification or from nowhere.** Not from the
+   transcriber's general knowledge, not from a sibling product's datasheet, not from what
+   the number "obviously" is. If the specification does not define it, the value stays text.
+2. **The entry must name the format and its edition** in the document record. A unit
+   attributed to an unnamed authority is indistinguishable from one invented, and the whole
+   provenance chain — claim → document → specification — depends on that last link being
+   written down.
+
+The mechanism for guard rail 2 does not exist yet: Decision 2 deliberately left format out
+of the document record because nothing needed to query it. This is what needed it, but the
+field lands with the first pass that actually writes a format-defined unit — most likely the
+parser — rather than being added speculatively here. **Until it exists, no claim may carry a
+format-defined unit**, and machine-readable numerics stay text. Deciding the principle
+without shipping the field is deliberate: the principle is what a parser must be built
+against, and the field's shape is better settled by the code that first fills it.
+
+Not retroactive. The AL1326 entry's 40 text claims stand as an honest hand pass over a file
+that states no units. A later parser pass over the same document is a *new pass*, and the
+store carrying both populations is exactly what ADR-0035 D6 anticipates.
+
+The rejected alternatives. Leaving numerics as text forever is faithful and pushes CIP unit
+knowledge into every consumer, privately and unrecorded — the implicit knowledge this store
+exists to make explicit. Making units a property of `parsed` extraction (Question 6) breaks
+convergence outright: a hand pass would write text and a parser pass `{min: 1000, unit: µs}`,
+two different values and two different ids for one statement, which leaves ADR-0035 D6's
+parity test with nothing to measure. Format-defined units must therefore be applied by every
+pass or by none — which is why this is a rule about claims, not about extraction.
 
 ## Question 6 🔴 — Is `parsed` a third extraction method?
 

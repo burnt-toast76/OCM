@@ -44,7 +44,7 @@ context was.
 | [0035](0035-manifests-cite-claims.md) | A manifest cites claims; a claim cites a document | **Proposed** |
 | [0036](0036-claims-serving-surface.md) | Claims are served read-only, with provenance on every value | **Proposed** |
 | [0037](0037-corrections-under-append-only.md) | Corrections under append-only: retraction is a pure addition | **Proposed** |
-| [0038](0038-machine-readable-sources.md) | Machine-readable sources (EDS/GSDML/ESI/IODD): position, kind, record mutability | **Proposed** (Q5–Q8 open) |
+| [0038](0038-machine-readable-sources.md) | Machine-readable sources (EDS/GSDML/ESI/IODD): position, kind, record mutability | **Proposed** (Q6–Q8 open) |
 
 Numbers are allocated by claim, not by write order: a number is claimed the moment an accepted
 or proposed ADR forward-references it, and a later ADR takes the next free one instead.
