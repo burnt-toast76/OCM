@@ -1,6 +1,6 @@
 # ADR-0038 — Machine-readable sources
 
-**Status:** Proposed — Decisions 1–3 taken; Questions 4–8 🔴 **OPEN**
+**Status:** Proposed — Decisions 1–4 taken; Questions 5–8 🔴 **OPEN**
 
 **Builds on:** ADR-0035 (claims, citations, attestations), ADR-0036 (serving),
 ADR-0037 (corrections under append-only), ADR-0014 (zero assumption)
@@ -35,7 +35,7 @@ pass — 40 claims, no parser, every strain recorded rather than fixed. What it 
 - **A third of the ingestion discipline does not apply.** Preflight and glyph fidelity are
   properties of rendering; this file *is* text, with no second extraction to cross-check.
 
-Decisions 1–3 settle what the pass proved. The open questions are the ones a second document
+Decisions 1–4 settle what the pass proved. The open questions are the ones a second document
 — a GSDML for the same device, or an EDS from another vendor — would answer better than
 argument, and they are recorded now so the answers are deliberate rather than incidental.
 
@@ -79,8 +79,9 @@ would then grow with every fieldbus and every revision of one.
 
 The format itself is therefore *not* recorded in the document record today. `type` answers
 what kind of document this is; which format it is written in is a different axis, and no
-consumer yet needs to query it. Question 4 is where that changes: serving bytes is exactly
-when a caller must know the format before it fetches.
+consumer yet needs to query it. Decision 4 holds the bytes without serving them, so nothing
+fetches by format yet; the day something does, the format has to be recorded rather than
+inferred from a file extension.
 
 The name is deliberately the one the component schema already uses. That schema has carried
 a `comms.device_description` field since before any of this — a free-text string whose
@@ -91,9 +92,9 @@ pretending the file was reachable. That field and this enum value are the same c
 two layers: one says a component has such a description somewhere, the other says a
 transcribed value came from one. They do not collide — an enum value inside `$defs.source`
 and a property under `comms` are different scopes — and sharing the word is the point. If
-Question 4 lands, `comms.device_description` should stop being prose and start citing a
-document by hash, which is the whole distance between "available from vendor" and a
-verifiable source.
+the bytes an entry now holds (Decision 4) become reachable, `comms.device_description`
+should stop being prose and start citing a document by hash, which is the whole distance
+between "available from vendor" and a verifiable source.
 
 ## Decision 3 — The document record is descriptive; only claim records are immutable
 
@@ -119,28 +120,53 @@ and its 40 claims and their ids are untouched.
 The remaining questions are open. Each is recorded with what the EDS pass observed, because
 the evidence is the part that gets lost.
 
-## Question 4 🔴 — Does the corpus hold, and does the server serve, source bytes?
+## Decision 4 — A machine-readable source's bytes may be held; none are served
 
-ADR-0035 D5 keeps manufacturer documents out of the repository and cites them by hash,
-because redistributing a vendor's copyrighted catalog is not ours to do. **That reasoning
-may not transfer.** An EDS is published *to be* redistributed: it ships inside PLC vendor
-tool libraries, gets committed to integrators' project repositories, and is worthless unless
-copied. And the practical case is sharp — an agent that can retrieve the exact EDS can
-configure a connection; one holding 40 claims about it cannot.
+Holding and serving were one question until the terms were actually read, and they are not
+one question. They are separated here, and only the first is decided.
 
-**The blocker is vendor terms, and they are unread.** The AL1326 EDS carries no license,
-copyright, or redistribution text of any kind; its only notice is "ATTENTION: Changes in
-this file can cause configuration or communication problems." The ifm product page shows no
-visible terms for its downloads. ifm's general Terms and conditions were **not** inspected.
-Silence is not permission.
+**Holding.** An entry may carry the ingested document's bytes as `document.<ext>` beside
+`claims.yaml`, when a **terms check recorded in the document record** finds redistribution
+permitted or unaddressed. The `redistribution` field states the terms consulted, the ISO
+date they were read, and a verdict of `permitted`, `silent`, or `prohibited`; bytes may be
+held on the first two and never on the third. `ci/check_claims.py` enforces both halves — an
+entry holding bytes must record a verdict, and a `prohibited` verdict with bytes present is
+a failure, not a warning.
 
-- **Option A — Hold and serve bytes**, gated on a per-vendor terms check recorded in the
-  document record (a `redistribution` field naming the terms URL and the verdict).
-  ⚠️ `get_document` gains a bytes path, which needs a size cap and a content type — and
-  ADR-0036 D2's "never document bytes" stops being true, so it must be amended, not bent.
-- **Option B — Hold bytes, serve none.** The corpus can verify a hash it holds; callers
-  still get citations only.
-- **Option C — Neither.** Status quo; machine-readable sources stay cited, never carried.
+**Serving stays off.** ADR-0036 D2 promises the registry never serves document bytes, and
+that promise is not amended here. Serving is redistribution however authorized the caller,
+it would need a size cap and a content type, and nothing currently asks for it. It becomes a
+decision when a caller needs it — and it should require a `permitted` verdict, not a silent
+one.
+
+Why hold at all, given serving is off? Because it makes the hash **verifiable**. Until now
+the store asserted `sha256:77e0fd12…` and no one — including its authors — could re-derive
+it. An entry that holds its bytes turns the citation from a claim about a file into a
+checkable fact, which is the same move ADR-0035 D7 made for claim ids. That value is
+independent of anyone ever fetching the file.
+
+ADR-0035 D5's reasoning is respected, not overturned. It keeps documents out because
+redistributing a vendor's copyrighted catalog is not ours to do — and a 56 MB PDF written to
+be read is a different artifact from a 103 KB device description written to be copied into
+every integrator's project folder and shipped inside PLC vendor tool libraries. The class
+boundary is explicit: bytes are held for documents whose terms were read and recorded, and
+in practice that is the `device_description` kind. Every other entry remains cited by hash
+alone.
+
+What was read, for the AL1326: the file carries no license, copyright, or redistribution
+text of any kind — its only notice is *"ATTENTION: Changes in this file can cause
+configuration or communication problems."* The product page carries no terms for its
+downloads. ifm's Terms of Service is a sales-and-software-licence document whose IP clauses
+are scoped to ifm's own software products (*"the Cloud Software, Documentation, and related
+services are provided under license, and not sold"*) and which says nothing about
+downloading or redistributing website materials. Verdict: **`silent`** — not permission and
+not prohibition, recorded as exactly that. A written answer from the vendor would upgrade it
+to `permitted`, and that is the prerequisite for ever serving these bytes.
+
+Consequence, applied immediately: the synthetic fixtures already held bytes and now record
+why they may — authored by the project, CC BY-SA 4.0, verdict `permitted`. The question "by
+what right are these bytes here?" is answered on every entry that holds any, including the
+easy ones.
 
 ## Question 5 🔴 — Are units defined by a format, rather than by an instance, expressible?
 
@@ -210,6 +236,6 @@ meaning is fixed by the CIP specification, not by how many vendors happen to agr
 ## Out of scope
 
 The parser itself, any GSDML/ESI/IODD ingestion, and changes to the serving contract beyond
-what Question 4 would require. `docs/ingestion.md` needs a machine-readable sources section —
+what Decision 4 already took, and any serving of bytes, which stays out until asked for. `docs/ingestion.md` needs a machine-readable sources section —
 preflight and glyph fidelity are inapplicable, and saying so belongs in the discipline rather
 than in each entry's header — but that is a documentation task, not a decision.

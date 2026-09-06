@@ -93,6 +93,7 @@ def check_vocab(problems: list[str]) -> None:
 
 def check_store(problems: list[str]) -> None:
     from ocm_api import OcmApi
+    from ocm_api.workspace import read_yaml
     from ocm_api.workspace import corpus_roots_from_env
 
     # OCM_CORPUS appends the production corpus's claims root. Unset -- the
@@ -113,27 +114,55 @@ def check_store(problems: list[str]) -> None:
         if not HEX64.match(name):
             problems.append(f"claims/{name}: directory name is not 64 hex digits of a sha256")
             continue
-        document = entry / "document.txt"
+        # Any document.<ext> beside claims.yaml IS the ingested document's
+        # bytes: document.txt for the synthetic fixtures, document.eds and
+        # its siblings for machine-readable sources an entry may now hold
+        # (ADR-0038 D4). The extension carries the format; the hash carries
+        # identity.
+        held = sorted(p for p in entry.glob("document.*") if p.is_file())
         claims_file = entry / "claims.yaml"
         if not claims_file.is_file():
             problems.append(f"claims/{name}: no claims.yaml")
             continue
+        if len(held) > 1:
+            problems.append(
+                f"claims/{name}: {len(held)} document files ({', '.join(p.name for p in held)}) -- "
+                "an entry is one document, and one document is one file"
+            )
+            continue
 
-        # Synthetic example documents live in the repo and are hash-anchored
-        # here. Real manufacturer documents NEVER enter the repo (see
-        # claims/README.md): their hash was computed at ingest and only
-        # validate_claims can be re-run against such an entry -- the hash
-        # anchor is verifiable exactly when the bytes are ours to commit.
-        if document.is_file():
+        # Bytes in the repo are hash-anchored here; bytes outside it can only
+        # be validated, never re-hashed. That asymmetry is the point: the
+        # anchor is verifiable exactly when the bytes are ours to hold.
+        if held:
+            document = held[0]
             actual = hashlib.sha256(document.read_bytes()).hexdigest()
             if actual != name:
                 problems.append(
-                    f"claims/{name}: document.txt hashes to {actual} -- storage location is derived "
+                    f"claims/{name}: {document.name} hashes to {actual} -- storage location is derived "
                     "from the document hash, never chosen (ADR-0035 D5/D7)"
                 )
                 continue
+            # Holding bytes is a redistribution question, and ADR-0038 D4
+            # requires the answer to be recorded, not assumed.
+            record = (read_yaml(claims_file) or {}).get("document") or {}
+            terms = record.get("redistribution")
+            if not isinstance(terms, dict):
+                problems.append(
+                    f"claims/{name}: holds {document.name} but records no `redistribution` -- an entry "
+                    "carrying a publisher's bytes must record whose terms were read and what they said "
+                    "(ADR-0038 D4)"
+                )
+            elif terms.get("verdict") == "prohibited":
+                problems.append(
+                    f"claims/{name}: holds {document.name} while recording redistribution.verdict "
+                    "'prohibited' -- those bytes must not be in the repository (ADR-0038 D4)"
+                )
+            else:
+                print(f"claims/{name[:8]}...: document bytes held ({document.name}, "
+                      f"redistribution: {terms.get('verdict')})")
         else:
-            print(f"claims/{name[:8]}...: document bytes not in repo (real document, cited by hash only)")
+            print(f"claims/{name[:8]}...: document bytes not in repo (cited by hash only)")
 
         # The directory checks above are per-root; validation is per
         # DOCUMENT. A hash under two roots is one refusal naming both

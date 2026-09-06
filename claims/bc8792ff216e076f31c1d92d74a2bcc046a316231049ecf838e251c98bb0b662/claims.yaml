@@ -9,6 +9,16 @@ document:
   type: datasheet
   date: '2026-09-01'
   url: repository file claims/bc8792ff216e076f31c1d92d74a2bcc046a316231049ecf838e251c98bb0b662/document.txt
+  redistribution:
+    terms: LICENSING.md in this repository (claims/ is CC BY-SA 4.0)
+    checked: '2026-09-06'
+    verdict: permitted
+    note: >-
+      A synthetic example document authored by the OCM project itself, not a
+      publisher's file -- there is no third party whose terms could restrict it.
+      The field is recorded rather than omitted because the question "by what
+      right are these bytes here?" deserves an answer on every entry that holds
+      any, including the easy ones.
 attestations:
 - vocab_version: '1.0'
   date: '2026-09-01'

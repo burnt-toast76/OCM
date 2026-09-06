@@ -86,6 +86,40 @@
         "url": {
           "type": "string",
           "description": "Source URL. Prefer the manufacturer's own un-gated URL -- distributor downloads may be per-download watermarked (D5)."
+        },
+        "redistribution": {
+          "type": "object",
+          "description": "The publisher's terms as actually read, and what they permit (ADR-0038 D4). REQUIRED when this entry holds the document's bytes; meaningless otherwise. Bytes may be held when the verdict is 'permitted' or 'silent', never when it is 'prohibited'. Serving bytes to a caller would require 'permitted' AND an amendment to ADR-0036 D2, which today promises the registry never serves document bytes.",
+          "required": [
+            "terms",
+            "checked",
+            "verdict"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "terms": {
+              "type": "string",
+              "minLength": 1,
+              "description": "URL of the terms consulted, or a verbatim note when the publisher publishes none."
+            },
+            "checked": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "ISO date the terms were read. Terms change; a verdict without a date is an opinion without a subject."
+            },
+            "verdict": {
+              "enum": [
+                "permitted",
+                "silent",
+                "prohibited"
+              ],
+              "description": "permitted: the terms grant redistribution. silent: the terms exist and say nothing about it -- not permission, not prohibition. prohibited: the terms forbid it, and the bytes stay out."
+            },
+            "note": {
+              "type": "string",
+              "description": "What was read and what it did not say, in the reader's words."
+            }
+          }
         }
       }
     },
