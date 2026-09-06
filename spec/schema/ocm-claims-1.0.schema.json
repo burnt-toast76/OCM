@@ -70,9 +70,10 @@
           "enum": [
             "datasheet",
             "manual",
-            "catalog"
+            "catalog",
+            "device_description"
           ],
-          "description": "Document kind -- the component schema's source.kind minus 'measured' (a measurement is not an ingested document)."
+          "description": "Document kind -- the component schema's source.kind minus 'measured' (a measurement is not an ingested document). device_description is the machine-readable class (EDS, GSDML, ESI, IODD): page-less, semantics fixed by a format specification rather than by prose, published to be consumed by tools (ADR-0038 D2). It names the KIND, not the format -- which format a document is written in is a separate axis."
         },
         "revision": {
           "type": "string",

@@ -45,7 +45,8 @@
             "datasheet",
             "manual",
             "catalog",
-            "measured"
+            "measured",
+            "device_description"
           ]
         },
         "ref": {

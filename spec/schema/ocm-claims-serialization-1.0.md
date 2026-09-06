@@ -44,9 +44,18 @@ intra-document discrepancies stay visible instead of silently merging.
 
 `page` is the printed page number, as the document labels it; PDF position is used
 only when the document's pages are unlabeled, and the locator should then say so.
-Without this convention, two correct transcriptions of the same statement disagree on
-`page` and mint two different ids — a fabricated discrepancy where the documents have
-none.
+A source with no pages at all — a machine-readable device description such as an EDS
+or GSDML (ADR-0038 D1) — puts its **1-based line number** there, and its locator names
+the section and entry (`"[Device], ProdCode"`). Without this convention, two correct
+transcriptions of the same statement disagree on `page` and mint two different ids — a
+fabricated discrepancy where the documents have none.
+
+The rule is one rule at three depths: use the coordinate the source itself publishes,
+fall back to the smallest unit two independent transcribers would both compute
+identically, and disclose in the locator which one was used. A line number satisfies
+that better than the PDF index above it, being exact rather than layout-dependent. The
+field is still named `page` while holding a line; the locator is what disambiguates,
+and it always leads with a section name no reader mistakes for a page label.
 
 ## 2. Canonical bytes
 
