@@ -43,8 +43,63 @@
 # lets a served absence distinguish "attested silence" from "key newer than
 # the attestation" (ADR-0036 D3).
 
-ocm_version: '1.2'
+ocm_version: '1.3'
 keys:
+
+  # --- identity -------------------------------------------------------------
+  # Promoted at 1.3 from the two machine-readable sources (ADR-0038 D8, by the
+  # ordinary ADR-0035 D3 route: two documents, two manufacturers, two formats).
+  # Every document states these; a datasheet prints them on the front page and
+  # a device description states them as fields. The protocol-issued identifiers
+  # from the same documents -- vendor id, product code, device revision -- are
+  # deliberately NOT here; see ADR-0038 D7.
+
+  - key: vendor_name
+    since: '1.3'
+    aliases: [x-vendor_name]
+    shape: text
+    dimension: none
+    definition: >
+      Manufacturer or vendor name as the document states it, verbatim. This is
+      a transcription of a stated field and is not the document record's
+      `manufacturer`, which is descriptive provenance and correctable
+      (ADR-0038 D3): a manifest sources component.vendor from this claim, which
+      cites where the document says it, never from that metadata. Where a
+      document names a manufacturer and a separate distributor or brand, each
+      is its own claim, distinguished in conditions as the document labels it.
+    demand: [component.vendor, 'ifm AL1326 EDS "[Device], VendName"', 'Beckhoff ELX ESI "Vendor/Name"']
+
+  - key: product_name
+    since: '1.3'
+    aliases: [x-product_name]
+    shape: text
+    dimension: none
+    definition: >
+      The device's descriptive product name as the document states it,
+      verbatim -- what the device is called, not what is ordered, which is
+      `catalog_number`. Printed spacing and punctuation are kept as printed.
+      Where a document prints the name in more than one language, each is a
+      separate claim and the language identifier goes in conditions exactly as
+      the document states it; choosing one language is an editorial act
+      transcription does not permit (ADR-0014).
+    demand: [component.name, 'ifm AL1326 EDS "[Device], ProdName"', 'Beckhoff ELX ESI "Name[@LcId]", both languages']
+
+  - key: catalog_number
+    since: '1.3'
+    aliases: [x-catalog_number]
+    shape: text
+    dimension: none
+    definition: >
+      The orderable part designation the document prints for the device
+      ("Catalog" in an EDS, "Type" in an ESI, "Model No." on many datasheets),
+      verbatim. Its value commonly equals the claim's own `applies_to` entry
+      and is not redundant with it: `applies_to` is the transcriber's statement
+      of which parts a claim covers, while this key is the document's own
+      statement, at a citable position, that the part is designated so. A
+      document that states an ordering scheme rather than one designation
+      (a base with option suffixes) states it in whatever form it prints; this
+      key never assembles one.
+    demand: [component.part_number, 'ifm AL1326 EDS "[Device], Catalog"', 'Beckhoff ELX ESI "Device Type"']
 
   # --- electrical -----------------------------------------------------------
 
