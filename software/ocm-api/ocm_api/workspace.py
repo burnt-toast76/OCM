@@ -134,7 +134,16 @@ def write_yaml(path: Path, data: Any) -> None:
 
         fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
         try:
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
+            # The newline is pinned explicitly: text mode translates a newline
+            # to os.linesep, so the same append writes different BYTES on
+            # Windows and on Linux. The store is content-addressed and lives in
+            # git under `claims/** -text`, so a platform-dependent writer means
+            # a one-line append lands as a whole-file diff and two machines
+            # disagree byte-for-byte about a file neither has changed. Claim ids
+            # hash record content, never file bytes, so nothing here ever moved
+            # an id -- which is exactly why this went unnoticed until a 492-line
+            # entry came back as 492 changed lines.
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
                 f.write(text)
             os.replace(tmp_name, path)
         except BaseException:

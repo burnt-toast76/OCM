@@ -286,7 +286,11 @@ def cmd_fmt(args: argparse.Namespace) -> int:
         if args.check:
             not_canonical.append(path)
         else:
-            path.write_text(canonical, encoding="utf-8")
+            # The newline is pinned for the reason write_yaml pins it: on
+            # Windows this would rewrite every formatted manifest with CRLF,
+            # and --check reads with universal newlines, so it compares equal
+            # and never reports what it just did.
+            path.write_text(canonical, encoding="utf-8", newline="\n")
             changed.append(path)
 
     if args.check:
