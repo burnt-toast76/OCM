@@ -1,6 +1,6 @@
 # ADR-0038 — Machine-readable sources
 
-**Status:** Proposed — Decisions 1–5 and 7–9 taken; Questions 6 and 10 🔴 **OPEN**
+**Status:** Proposed — Decisions 1–5 and 7–9 taken; Questions 6 and 10–12 🔴 **OPEN**
 
 **Builds on:** ADR-0035 (claims, citations, attestations), ADR-0036 (serving),
 ADR-0037 (corrections under append-only), ADR-0014 (zero assumption)
@@ -60,6 +60,33 @@ question about what generalizes is not answered by a second example of the same 
   revision, it is bilingual throughout, it is ISO-8859-1, and Decision 1's line numbers work
   on it only because Beckhoff happens to pretty-print. Decision 9 and Question 10.
 
+### The third pass, over the second document again
+
+Both passes so far read small devices, so neither met the content that makes these files
+large: the **CoE object dictionary**. A third pass took ELX3184 from the same ESI (corpus
+`41efad4`) — 4,191 elements against ELX1052's 53, with 73 objects, 128 data types and 140
+subitems — to ask one question the earlier passes could not: *is a dictionary entry a claim?*
+
+**It is sometimes, and the file says which.** 106 of the device's 140 subitems are `ro` — the
+device stating facts about itself, `#x1000 Device type` and `#x1008 Device name` among them.
+34 are `rw` and 24 carry `Flags/Setting 1`: values a master *writes* at commissioning. A
+setting is not a property of a component; it is a property of a configured cell. The
+transcription keeps them under separate keys so the distinction survives into the store, and
+Question 12 asks whether the settings belong in this store at all.
+
+That answer is what makes the scope question tractable. Transcribing every dictionary entry in
+this file would be roughly ten thousand records, most of them settings and all of them `x-`,
+which nothing downstream may consume (ADR-0035 D2). Vocabulary-complete for all 42 devices is
+one to two hundred claims. The gap between those numbers is not a budget decision; it is the
+difference between transcribing a document and transcribing a configuration.
+
+Three further strains, each recorded rather than fixed: a parameter's facts are spread over
+**three** elements up to 3,175 lines apart (Decision 1); values are printed as hexadecimal byte
+strings whose meaning requires decoding (`454c5833313834` is the ASCII of `ELX3184`), and
+decoding is interpretation ADR-0014 does not permit; and the only units in the device are
+*inside labels* — `4-20mA` in a product name, `50 Hz FIR` in an enumeration — where a unit
+qualifies a string rather than a number, so Decision 5 still has nothing to fire on.
+
 ## Decision 1 — Position in a citation is the source's own smallest addressable unit
 
 `citation.page` carries the **1-based line number** for a source with no pages, and the
@@ -84,6 +111,18 @@ Accepted knowingly: the field is named `page` and holds a line. The locator is w
 disambiguates, and it always begins with a section name no consumer can mistake for a page
 label. If position ever becomes typed, this is the decision to revisit — and the cost of
 revisiting grows with every machine-readable entry, which is why it was taken first.
+
+**A strain this decision does not resolve, found by the third pass.** It assumes a statement
+*has* a position. In XML a statement is frequently assembled from several. The ELX3184
+parameter `Filter settings` is defined in `DataType DT8000` (line 33516), its default is
+stated in `Object #x8000` (line 35491), and its legal values are enumerated in
+`DataType DT0801EN16` (line 32333 onward) — three elements up to 3,175 lines apart, none of
+which states the parameter by itself. The pass recorded three claims rather than one, which is
+faithful and leaves the reader to reassemble; the alternative — one claim citing one of the
+three lines with the rest in conditions — would cite a position the value did not come from,
+which is worse than fragmentation. Whether a citation should be able to name several positions
+is left open deliberately: it changes the hash scope, so it is the same blast radius as typed
+positions, and it should be decided once, with that.
 
 ## Decision 2 — `device_description` is a document kind
 
@@ -310,7 +349,16 @@ of the source field. Any promotion of one (Decision 8) must therefore define the
 its value shape, and say what a format does when its granularity does not match — a question
 the key's name alone will hide.
 
-**Left unresolved by this decision:** a **record shape for structured entries**.
+**Left unresolved by this decision: protocols nest.** The rule says "prefix with its
+protocol" and does not say which protocol when there are two. A CoE object is CANopen,
+carried over EtherCAT's mailbox, described in an ESI. The third pass minted `x-coe_object`,
+`x-coe_parameter`, `x-coe_default_data` and `x-coe_enum_value` — naming the payload rather
+than the carrier — on the reasoning that the same CANopen dictionary appears over CAN and over
+Powerlink, so `coe` describes what the entry *is* while `ethercat` describes only how it
+arrived. That reasoning is defensible and untested; a CANopen EDS would test it, exactly as
+the ESI tested this decision's main clause.
+
+**Also left unresolved:** a **record shape for structured entries**.
 `x-assembly_definition` holds `Assem100 = "Assembly 100 Input ", "20 04 24 64 30 03", 446,
 0x0000` as text, which is legal and unqueryable. A `record_assembly` (instance, name, path,
 size, direction, optional members) would follow the `record_pinout` precedent — but Assem100
@@ -394,12 +442,65 @@ facts as belonging to the document record rather than the claims store (simplest
 concedes that vendor identity is provenance rather than a claim — which Decision 3 would then
 make correctable, unlike everything else in this list).
 
+## Question 11 🔴 — What happens when an append re-states a claim already in the store?
+
+`append_claims` computes each claim's id and appends the record. It does not look at whether
+that id is already present (`software/ocm-api/ocm_api/claims.py`, the append loop). Two
+transcribers reading the same statement in the same document produce byte-identical records
+with the same id, and the file would hold both.
+
+Nothing is corrupted by that — a matching id is *proof* the two records are identical, which
+is the property content-addressing was chosen for. But nothing catches it either, and the
+store grows a second copy of a record that says exactly what the first one says. This becomes
+ordinary rather than hypothetical the moment a document has more than one contributor: a
+2.8 MB ESI describing 42 devices is a document many passes will touch, each pass re-stating
+the file-level facts it needs (Question 10 is the same soft spot seen from the other side).
+
+The two candidate answers are not equivalent, which is why this is a question:
+
+- **A no-op** — an id already present is silently skipped, and the append reports what it
+  actually wrote. This makes appends **idempotent**, which matters as soon as a submission can
+  be retried, replayed, or run twice by a nervous operator.
+- **A refusal** — an id already present is an error naming it. This makes duplication visible
+  rather than absorbed, at the cost that a retried submission fails where it should have been
+  harmless.
+
+Note what is *not* at stake: this is not corroboration. Two different documents stating the
+same fact produce different ids (the document hash is inside the hash scope) and are already
+distinct claims, correctly. This question is only about one document, one statement, twice.
+
+## Question 12 🔴 — Do a device's settings belong in the claims store?
+
+The third pass established that a CoE dictionary holds two kinds of entry and that the file
+distinguishes them: `Access ro` entries where the device states facts about itself, and
+`Access rw` entries carrying `Flags/Setting 1`, which are values a master **writes** at
+commissioning. For ELX3184 the split is 106 to 34, with 24 flagged as settings.
+
+A setting is not a property of a component. `Enable user scale = 00` is not a fact about what
+an ELX3184 *is*; it is the state some particular cell puts one *into*, and the same device in
+the next cell has a different value. The claims store exists to record what a document says
+about a part, and ADR-0035 D1 is explicit that a claim is a datasheet-answerable statement.
+
+But the document *does* state something durable about a setting: that the parameter exists, at
+this index and subindex, of this type and bit length, with this **default**, and with these
+legal values. That is a fact about the device, and a cell-design agent needs it — it is how a
+configuration is known to be expressible at all. The third pass transcribed exactly that shape
+and no actual configured values, which is a workable line, taken by one pass without a rule
+behind it.
+
+What needs deciding is whether that line is the rule: **the existence, shape and default of a
+parameter are claims; a parameter's configured value is not, and belongs to whatever describes
+a configured cell.** The consequence of getting it wrong in one direction is a store full of
+values that are true of nobody's device; in the other, a design agent that cannot tell whether
+a device can be made to do what a cell needs.
+
 ## Out of scope
 
 The parser itself, any GSDML or IODD ingestion, changes to the serving contract beyond what
 Decision 4 already took, and any serving of bytes, which stays out until asked for. ESI
 ingestion was out of scope when this ADR was drafted and is no longer: one was mapped by hand
-to answer Decisions 7 and 8, on the same evidence-pass terms as the EDS — 26 claims, no
-parser, every strain recorded rather than fixed. `docs/ingestion.md` needs a machine-readable sources section —
+to answer Decisions 7 and 8, and read a second time to answer the object-dictionary question,
+on the same evidence-pass terms as the EDS — 59 claims across the two passes, no parser, every
+strain recorded rather than fixed. `docs/ingestion.md` needs a machine-readable sources section —
 preflight and glyph fidelity are inapplicable, and saying so belongs in the discipline rather
 than in each entry's header — but that is a documentation task, not a decision.
