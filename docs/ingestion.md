@@ -105,6 +105,65 @@ pp.17/42/57 and U+00B5 on p65, so two response-time claims that read alike diffe
 bytes, and in id, on purpose. The preflight's glyph inventory is the detection; the
 header note is the record.
 
+## Machine-readable sources
+
+A **device description** — EDS, ESI, GSDML, IODD — is ingested under the rules above
+except where this section replaces them (ADR-0038). The document record states
+`type: device_description` and `format`, which is required for this kind: a consumer
+asking for ESI-sourced claims has nothing else to filter on, and D5's format-defined
+units are unusable by a reader who does not know which specification governs (D2, D9).
+
+**Preflight and the glyph inventory do not apply, and the header says so.** Both are
+properties of rendering a PDF; these files *are* text, with no second extraction to
+cross-check against. Skipping them silently would read as an omission, so the entry's
+header states that they are inapplicable and why.
+
+**Position is the 1-based line number, in `page`, with a section-first locator** —
+`"[Device], ProdCode"`, `"Device[ELX3184], Objects/Object[Index=#x1000]/Name"` (D1).
+The locator always leads with a section name no reader mistakes for a page label. Cite
+the line the value is *printed* on: in XML an element's name is usually the line after
+its index, and citing the wrong one of the two is a wrong citation, not a rounding
+error. Where one statement is assembled from several elements — a CoE parameter is
+defined, defaulted and enumerated in three places — transcribe one claim per position
+rather than citing a line the value did not come from.
+
+**The declared encoding goes on the document record; transcription transcodes faithfully
+from it** (D6). `document.encoding` holds what the file declares about itself
+(`ISO-8859-1`, `us-ascii`); a pass reads accordingly and records characters, not bytes.
+Byte fidelity is the held file's job (D4), not the claims'.
+
+**A format-defined unit may be attributed only where the record names the format**, and
+only from the format's specification — never from the transcriber's knowledge of what a
+number "obviously" is (D5's two guard rails). Absent that, the value stays text. Both
+evidence passes left every numeric as text, correctly: neither file declares a unit
+anywhere. Note what does *not* count — a unit inside a label (`4-20mA` in a product
+name, `50 Hz FIR` in an enumeration) qualifies a string, not a number, and the claim's
+conditions say so.
+
+**`applies_to` carries the document's stated scope, not the pass's** (D10). A file-level
+statement — a vendor block above 42 devices — applies to every part the document
+enumerates, and enumerating them is part of transcribing it. A pass that reads one
+device still writes the full scope for the file-level facts it transcribes; otherwise
+two faithful passes mint two ids for one statement.
+
+**A parameter's existence, shape, default and legal values are claims; its configured
+value never is** (D12). The file's own access flags are the cue: `ro` entries are the
+device stating facts about itself, `rw` entries flagged `Setting` are values a master
+writes at commissioning. An `rw` parameter is still transcribed — its index, type, bit
+length, default and enumerated values are facts about the device — but what some
+deployment wrote into it belongs to whatever describes a configured cell, not here.
+
+**A hex payload is transcribed as printed.** `#x1008` states `454c5833313834`; that is
+the ASCII of `ELX3184`, and decoding it is interpretation ADR-0014 does not permit in
+transcription. The condition may say what the bytes are; the value stays as the file
+prints it.
+
+**`extraction.method` is `parsed` only for a deterministic parser**, and then `tool` and
+`tool_version` are required (D6). An agent navigating XML with an off-the-shelf library
+and selecting claims by hand is `automated`, with the tool named and the absence of a
+parser stated — that is what both evidence passes were. Claiming `parsed` for judgment
+work contaminates the population the parity test measures.
+
 ## Restatements
 
 A statement the document prints at multiple locators is transcribed **once, at its
@@ -125,9 +184,11 @@ document is silent" (ADR-0035 D4, ADR-0036 D3). The attestation is appended only
 when every applicable vocabulary key at the bound version is covered for the whole
 document; a partial pass carries none. `extraction.method` states how the claims
 were actually produced: drafted by an agent — however carefully reviewed — is
-`automated`, with the tool named; `human` means a human transcribed. The FS-N41N
-relabel (commit `18b63d8`) is the precedent: mislabeling agent output as `human`
-contaminates the trusted population D6's parity test measures against.
+`automated`, with the tool named; `human` means a human transcribed; `parsed` means a
+deterministic parser and nothing else (ADR-0038 D6). The FS-N41N relabel (commit
+`18b63d8`) is the precedent: mislabeling agent output as `human` contaminates the
+trusted population D6's parity test measures against, and mislabeling it `parsed`
+contaminates it the same way from the other side.
 
 ## End-of-pass report
 

@@ -558,6 +558,6 @@ Decision 4 already took, and any serving of bytes, which stays out until asked f
 ingestion was out of scope when this ADR was drafted and is no longer: one was mapped by hand
 to answer Decisions 7 and 8, and read a second time to answer the object-dictionary question,
 on the same evidence-pass terms as the EDS — 59 claims across the two passes, no parser, every
-strain recorded rather than fixed. `docs/ingestion.md` needs a machine-readable sources section —
-preflight and glyph fidelity are inapplicable, and saying so belongs in the discipline rather
-than in each entry's header — but that is a documentation task, not a decision.
+strain recorded rather than fixed. `docs/ingestion.md` now carries the machine-readable
+sources section these decisions imply — preflight and glyph fidelity are inapplicable, and
+saying so belongs in the discipline rather than in each entry's header.
