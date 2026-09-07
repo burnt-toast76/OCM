@@ -10,7 +10,9 @@ validate_claims, and a registry that refuses does not get served.
 One process lifetime serves exactly one registry state, identified by
 the git commit of the checkout (D8) -- suffixed "-dirty" when the
 claims/ tree carries uncommitted changes, because an honest identity
-beats a clean-looking one.
+beats a clean-looking one. Where a root is a baked snapshot rather than
+a checkout, the commit comes from a `.ocm-state` file written when the
+snapshot was built; where neither exists, the state is "untracked".
 
 A registry can span two checkouts: the public repo (code, schema,
 vocabulary, reference fixtures) and a production corpus read from a
@@ -185,7 +187,42 @@ class ServingIndex:
         return canonical if _value_shape(claim.get("value")) == self.key_shapes.get(canonical) else None
 
 
+# A build-time state file, for roots that are real but not checkouts.
+STATE_FILE = ".ocm-state"
+_COMMIT = re.compile(r"\A[0-9a-f]{40}\Z")
+
+
 def _serving_state(root: Path) -> str:
+    """Which commit of this root is being served (ADR-0036 D8).
+
+    Three sources, in this order, and the order is the whole design.
+
+    1. GIT, when the root is a checkout: the commit, suffixed `-dirty` when
+       the claims tree carries uncommitted changes. This is the developer's
+       case and the deployed case wherever `.git` survives, and it is
+       unchanged in every particular -- an honest identity beats a
+       clean-looking one.
+
+    2. A `.ocm-state` FILE at the root, when git has nothing to say. A
+       baked image may hold a registry copied as plain files, with the
+       history left behind; the state is then recorded at build time by
+       whatever did the copying, and read back verbatim. Deliberately NO
+       `-dirty` suffix: an image is immutable, so there is nothing for
+       `dirty` to mean, and appending it would invent a distinction the
+       artifact cannot have.
+
+    3. `untracked`, the honest floor. Non-null so the envelope always has
+       an answer, and unmistakable so nobody reads it as a commit.
+
+    Git wins over the file wherever both exist, because a checkout can
+    move and a file recorded when it was built cannot. A stale `.ocm-state`
+    in a working tree would otherwise pin the identity to whatever it said
+    the day it was written, which is exactly the silent downgrade this
+    whole field exists to prevent. For the same reason the file must
+    contain one full 40-character hash and nothing else: anything else
+    falls through to `untracked` rather than being served as though it
+    were a commit.
+    """
     try:
         commit = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
@@ -195,7 +232,13 @@ def _serving_state(root: Path) -> str:
         ).stdout.strip()
         return f"{commit}-dirty" if dirty else commit
     except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+
+    try:
+        recorded = (root / STATE_FILE).read_text(encoding="utf-8").strip()
+    except OSError:
         return "untracked"
+    return recorded if _COMMIT.match(recorded) else "untracked"
 
 
 def build_index(roots: str | Path | Sequence[str | Path]) -> ServingIndex:
