@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from mcp.server.auth.provider import AccessToken, TokenVerifier
+from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
 from pydantic import AnyHttpUrl
@@ -40,6 +40,13 @@ from starlette.responses import JSONResponse
 
 from ocm_api.workspace import CORPUS_ENV
 
+from .auth import (
+    OPERATOR_IDENTITY,
+    AuthKitVerifier,
+    CompositeVerifier,
+    OAuthConfig,
+    StaticTokenVerifier,
+)
 from .coverage import COVERAGE_REPO_ENV, COVERAGE_TOKEN_ENV, CoverageQueue, coverage_from_env
 from .index import ServingIndex, build_index
 from .reports import ReportQueue, reports_from_queue
@@ -51,6 +58,9 @@ TRANSPORT_ENV = "OCM_TRANSPORT"
 HOST_ENV = "OCM_HOST"
 PORT_ENV = "OCM_PORT"
 TOKEN_ENV = "OCM_AUTH_TOKEN"
+OAUTH_ISSUER_ENV = "OCM_OAUTH_ISSUER"
+OAUTH_AUDIENCE_ENV = "OCM_OAUTH_AUDIENCE"
+OAUTH_JWKS_ENV = "OCM_OAUTH_JWKS"
 
 DEFAULT_HOST = "0.0.0.0"  # a hosted container publishes on every interface
 DEFAULT_PORT = 8000
@@ -67,19 +77,26 @@ class Transport:
     """How this process serves, resolved from the environment ONCE,
     before anything is built or bound.
 
-    stdio ignores `token` entirely -- a pipe carries no Authorization
-    header, and the peer is already whoever launched the process. http
-    requires one, and that requirement is not a default something can
-    override: there is no setting of these four variables that produces
-    an HTTP server anyone can talk to without a token. Which is why the
-    check lives at resolution time rather than in a request handler that
-    only runs once the port is already open.
+    stdio ignores `token` and `oauth` entirely -- a pipe carries no
+    Authorization header, and the peer is already whoever launched the
+    process. http requires AT LEAST ONE credential kind, and that
+    requirement is not a default something can override: there is no
+    setting of these variables that produces an HTTP server anyone can
+    talk to unauthenticated. Which is why the check lives at resolution
+    time rather than in a request handler that only runs once the port is
+    already open.
+
+    Two kinds, either or both. The operator token is the credential that
+    works when the identity provider is down, misconfigured, or being
+    migrated; OAuth is how a stranger who has never met the operator gets
+    in. Both configured together is the expected production state.
     """
 
     kind: str = "stdio"
     host: str = DEFAULT_HOST
     port: int = DEFAULT_PORT
     token: str | None = None
+    oauth: OAuthConfig | None = None
 
     @property
     def run_argument(self) -> str:
@@ -90,16 +107,50 @@ class Transport:
         return "streamable-http" if self.kind == "http" else "stdio"
 
 
-def _refuse_without_token(token: str | None) -> str:
-    if token is None or len(token) < MIN_TOKEN_CHARS:
-        have = "unset" if not token else f"{len(token)} characters"
+def _refuse_short_token(token: str) -> str:
+    if len(token) < MIN_TOKEN_CHARS:
         raise RuntimeError(
-            f"{TRANSPORT_ENV}=http requires {TOKEN_ENV} of at least {MIN_TOKEN_CHARS} "
-            f"characters ({have}). Refusing to start: this server has no "
-            "unauthenticated HTTP mode. Generate a token with "
+            f"{TOKEN_ENV} is {len(token)} characters; at least {MIN_TOKEN_CHARS} are "
+            "required. Refusing to start rather than serving behind a placeholder: "
+            "this server has no unauthenticated HTTP mode, and it does not quietly "
+            "ignore a credential you set. Generate a token with "
             'python -c "import secrets; print(secrets.token_urlsafe(48))"'
         )
     return token
+
+
+def _resolve_oauth(env: Mapping[str, str]) -> OAuthConfig | None:
+    """A complete OAuth configuration, nothing, or a refusal.
+
+    Half-configured is the case worth refusing. An operator who set the
+    issuer and forgot the audience has plainly asked for OAuth, and the
+    quiet alternative -- falling back to bearer-only -- would leave a
+    server that looks configured, answers 401 to every OAuth client, and
+    tells nobody why. Worse, a missing audience is not a cosmetic gap: it
+    is the check that stops a token minted for a DIFFERENT resource on the
+    same authorization server from opening this one (MCP authorization
+    spec; RFC 8707).
+    """
+    issuer = env.get(OAUTH_ISSUER_ENV, "").strip()
+    audience = env.get(OAUTH_AUDIENCE_ENV, "").strip()
+    jwks = env.get(OAUTH_JWKS_ENV, "").strip()
+    if not issuer and not audience:
+        return None if not jwks else _refuse_partial_oauth(issuer, audience)
+    if not issuer or not audience:
+        return _refuse_partial_oauth(issuer, audience)
+    return OAuthConfig(issuer=issuer, audience=audience, jwks_uri=jwks or OAuthConfig.jwks_uri_for(issuer))
+
+
+def _refuse_partial_oauth(issuer: str, audience: str) -> OAuthConfig:
+    missing = [name for name, value in ((OAUTH_ISSUER_ENV, issuer), (OAUTH_AUDIENCE_ENV, audience)) if not value]
+    raise RuntimeError(
+        f"OAuth is partly configured: {', '.join(missing)} "
+        f"{'is' if len(missing) == 1 else 'are'} unset. Refusing to start rather than "
+        "silently serving bearer-only -- a server that looks OAuth-enabled and answers "
+        "401 to every OAuth client is the expensive kind of wrong. Set both "
+        f"({OAUTH_ISSUER_ENV} is the AuthKit domain, {OAUTH_AUDIENCE_ENV} the resource "
+        "indicator this server is reached at), or neither."
+    )
 
 
 def resolve_transport(env: Mapping[str, str] | None = None) -> Transport:
@@ -125,41 +176,30 @@ def resolve_transport(env: Mapping[str, str] | None = None) -> Transport:
     # Deliberately unstripped: the token is compared as the operator set
     # it, and silently trimming whitespace here would accept a value the
     # comparison then rejects.
-    token = _refuse_without_token(env.get(TOKEN_ENV))
+    raw_token = env.get(TOKEN_ENV)
+    token = _refuse_short_token(raw_token) if raw_token else None
+    oauth = _resolve_oauth(env)
+    if token is None and oauth is None:
+        raise RuntimeError(
+            f"{TRANSPORT_ENV}=http requires a credential: {TOKEN_ENV} (at least "
+            f"{MIN_TOKEN_CHARS} characters), or a complete OAuth configuration "
+            f"({OAUTH_ISSUER_ENV} and {OAUTH_AUDIENCE_ENV}), or both -- which is the "
+            "expected production state. Refusing to start: this server has no "
+            "unauthenticated HTTP mode. Generate a token with "
+            'python -c "import secrets; print(secrets.token_urlsafe(48))"'
+        )
     port_text = env.get(PORT_ENV, "").strip() or str(DEFAULT_PORT)
     try:
         port = int(port_text)
     except ValueError:
         raise RuntimeError(f"{PORT_ENV}={port_text!r} is not a port number.") from None
-    return Transport(kind="http", host=env.get(HOST_ENV, "").strip() or DEFAULT_HOST, port=port, token=token)
-
-
-class StaticTokenVerifier(TokenVerifier):
-    """One operator, one token, handed over out of band.
-
-    This is FastMCP's supported bearer path -- a TokenVerifier paired
-    with AuthSettings -- not hand-parsed headers: the library's
-    BearerAuthBackend extracts the credential and RequireAuthMiddleware
-    answers 401 before the request reaches any tool, so there is exactly
-    one place an unauthenticated request could get through and it is not
-    code written here.
-
-    The comparison is constant-time and runs over bytes: a non-ASCII
-    token is then a wrong token rather than a TypeError, and "wrong
-    token" costs the same whether the first character differed or the
-    last.
-    """
-
-    def __init__(self, token: str) -> None:
-        self._token = token.encode("utf-8")
-
-    async def verify_token(self, token: str) -> AccessToken | None:
-        if not secrets.compare_digest(token.encode("utf-8"), self._token):
-            return None
-        # No scopes: the token IS the whole authorization decision, and
-        # every tool behind it is read-only (D1), so there is nothing to
-        # subdivide. required_scopes stays empty to match.
-        return AccessToken(token=token, client_id="ocm-operator", scopes=[])
+    return Transport(
+        kind="http",
+        host=env.get(HOST_ENV, "").strip() or DEFAULT_HOST,
+        port=port,
+        token=token,
+        oauth=oauth,
+    )
 
 
 def _http_settings(transport: Transport) -> dict[str, Any]:
@@ -171,32 +211,74 @@ def _http_settings(transport: Transport) -> dict[str, Any]:
     """
     if transport.kind != "http":
         return {}
-    token = _refuse_without_token(transport.token)
+    if transport.token is None and transport.oauth is None:
+        raise RuntimeError(
+            f"{TRANSPORT_ENV}=http requires {TOKEN_ENV} or a complete OAuth "
+            "configuration. Refusing to start: this server has no unauthenticated "
+            "HTTP mode."
+        )
+    static = StaticTokenVerifier(_refuse_short_token(transport.token)) if transport.token else None
+    oauth = AuthKitVerifier(transport.oauth) if transport.oauth else None
+
     # A literal IPv6 host needs brackets or AnyHttpUrl refuses it -- and
     # refusing at startup over a URL nothing reads would be an absurd way
     # to lose an OCM_HOST=:: deployment.
     authority = f"[{transport.host}]" if ":" in transport.host else transport.host
+    local_url = AnyHttpUrl(f"http://{authority}:{transport.port}")
+
+    # THE METADATA REVERSAL. Step one set resource_server_url=None with a
+    # comment explaining the absence: there was no authorization server to
+    # name, the operator minted tokens by hand, and a discovery document
+    # advertising an OAuth endpoint that did not exist would have sent
+    # clients chasing a flow nobody could complete. That reasoning was
+    # right then and is obsolete now -- AuthKit is a real authorization
+    # server, and RFC 9728 metadata is how a client that has never met the
+    # operator finds it. The MCP authorization spec makes it mandatory for
+    # a protected server ("MCP servers MUST implement OAuth 2.0 Protected
+    # Resource Metadata"), and the SDK publishes the route and the
+    # WWW-Authenticate pointer once resource_server_url is set. So the
+    # deliberate absence is deliberately reversed, and this comment
+    # replaces the one that explained it.
+    #
+    # Bearer-only deployments keep the old posture exactly: with no OAuth
+    # configured there is still no authorization server to name, so no
+    # metadata is published and issuer_url stays inert -- required by
+    # AuthSettings, never served, and pointing at this process so that if
+    # it ever does surface it is not a fiction.
     return {
         "host": transport.host,
         "port": transport.port,
-        "token_verifier": StaticTokenVerifier(token),
+        "token_verifier": CompositeVerifier(static, oauth),
         # token_verifier and auth always travel together (FastMCP refuses
-        # one without the other). There is no authorization server to
-        # name -- the operator mints the token by hand, so this server is
-        # its own issuer -- and resource_server_url stays None so NO
-        # protected-resource metadata is published. A discovery document
-        # advertising an OAuth endpoint that does not exist would send
-        # clients chasing a flow nobody can complete; a client here is
-        # configured with the token directly. With no metadata route and
-        # no authorization-server provider, issuer_url is inert: it is
-        # required, never served, and points at this process so that if
-        # it ever does surface it is not a fiction.
+        # one without the other).
         "auth": AuthSettings(
-            issuer_url=AnyHttpUrl(f"http://{authority}:{transport.port}"),
-            resource_server_url=None,
+            issuer_url=AnyHttpUrl(transport.oauth.issuer) if transport.oauth else local_url,
+            resource_server_url=AnyHttpUrl(transport.oauth.audience) if transport.oauth else None,
+            # No scope subdivision in v1: an authenticated caller gets
+            # every tool this server has. They are all read-only and the
+            # two queues are capped, so there is nothing to subdivide;
+            # paid tiers can introduce scopes later without breaking any
+            # client that registered against this.
             required_scopes=None,
         ),
     }
+
+
+def _caller_identity() -> str:
+    """Who this request's daily cap belongs to.
+
+    The OAuth `sub`, or the operator sentinel. stdio reaches the second
+    branch and should: a pipe carries no Authorization header and its peer
+    is whoever launched the process, which is the operator.
+
+    `sub` rather than `client_id` because `sub` is the claim AuthKit's
+    access tokens are documented to carry; `client_id` is not guaranteed,
+    and keying a budget on a claim that may be absent would silently
+    collapse every such caller into one bucket -- the exact failure this
+    replaces.
+    """
+    token = get_access_token()
+    return token.client_id if token is not None else OPERATOR_IDENTITY
 
 
 def _vocab_instructions(index: ServingIndex, coverage_active: bool = False) -> str:
@@ -257,8 +339,10 @@ def create_server(
     # Resolved before the instructions are built: the offer-only sentences
     # appear exactly when the tools they name are registered. The report
     # queue exists exactly when the coverage queue does -- one gate, one
-    # repo, one PAT -- and shares its client and daily cap (one identity,
-    # one budget).
+    # repo, one PAT -- and shares its client and its DailyCap. Sharing the
+    # cap object is not sharing a budget: the cap keys on the caller, so
+    # each OAuth client and the operator each get their own, and the two
+    # queues draw from that caller's single daily allowance.
     queue = coverage if coverage is not None else coverage_from_env()
     report_queue = reports if reports is not None else reports_from_queue(queue)
 
@@ -307,7 +391,13 @@ def create_server(
             source_url: str | None = None,
             note: str | None = None,
         ) -> dict[str, Any]:
-            return queue.request(manufacturer, part_number, source_url=source_url, note=note)
+            return queue.request(
+                manufacturer,
+                part_number,
+                source_url=source_url,
+                note=note,
+                client_id=_caller_identity(),
+            )
 
         print(f"ocm-claims: request_coverage active (queue: {queue.repo})", file=sys.stderr)
     else:
@@ -362,6 +452,7 @@ def create_server(
                 reason,
                 expected_value=expected_value,
                 note=note,
+                client_id=_caller_identity(),
                 key=str(claim.get("key", "")),
                 document=document_hash,
                 location=f"page {citation.get('page')}, {citation.get('locator')}",

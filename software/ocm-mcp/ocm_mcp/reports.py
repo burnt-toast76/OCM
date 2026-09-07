@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from .auth import OPERATOR_IDENTITY
 from .coverage import NOTE_MAX_CHARS, DailyCap, GitHubIssues, _sanitize
 
 _logger = logging.getLogger("ocm_mcp.reports")
@@ -81,7 +82,7 @@ class ReportQueue:
         key: str = "",
         document: str = "",
         location: str = "",
-        client_id: str = "ocm-operator",
+        client_id: str = OPERATOR_IDENTITY,
     ) -> dict[str, Any]:
         """File one dispute. The caller (the server's tool wrapper) has
         already resolved claim_id against the serving index -- key,

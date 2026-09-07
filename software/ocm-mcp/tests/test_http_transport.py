@@ -306,3 +306,95 @@ def test_the_process_exits_rather_than_serving_http_unauthenticated(token):
     assert "no unauthenticated HTTP mode" in finished.stderr
     # The refusal is a message, not a traceback.
     assert "Traceback" not in finished.stderr
+
+
+# --------------------------------------------------------------------
+# Phase two over a real socket: discovery, and the posture without OAuth
+# --------------------------------------------------------------------
+
+AUTHKIT_ISSUER = "https://cellwright-test-00000.authkit.app"
+RESOURCE = "https://mcp.cellwright.ai/mcp"
+PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource/mcp"
+
+
+@pytest.fixture(scope="module")
+def oauth_server(tmp_path_factory):
+    """The production shape: an operator token AND a complete OAuth
+    configuration. No token is ever verified against AuthKit here -- what
+    is being tested is that this server advertises the flow correctly, and
+    still lets the operator in while it does."""
+    port = _free_port()
+    log = tmp_path_factory.mktemp("oauth-server") / "ocm-claims.log"
+    env = _server_env(
+        OCM_TRANSPORT="http",
+        OCM_AUTH_TOKEN=TOKEN,
+        OCM_HOST="127.0.0.1",
+        OCM_PORT=str(port),
+        OCM_OAUTH_ISSUER=AUTHKIT_ISSUER,
+        OCM_OAUTH_AUDIENCE=RESOURCE,
+    )
+    base = f"http://127.0.0.1:{port}"
+    with log.open("w", encoding="utf-8") as sink:
+        process = subprocess.Popen(
+            [sys.executable, "-m", "ocm_mcp.server"], env=env, stdout=sink, stderr=subprocess.STDOUT
+        )
+        try:
+            _wait_until_listening(process, base, log)
+            yield base
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=30)
+            except subprocess.TimeoutExpired:  # pragma: no cover -- a wedged server
+                process.kill()
+
+
+def test_protected_resource_metadata_names_the_authorization_server(oauth_server):
+    """RFC 9728, which the MCP spec makes mandatory for a protected
+    server. This is how a client that has never met the operator finds
+    where to get a token -- and it is the reversal of step one's
+    deliberate silence."""
+    document = httpx.get(f"{oauth_server}{PROTECTED_RESOURCE_PATH}", timeout=30).json()
+    assert document["resource"] == RESOURCE
+    assert [str(url).rstrip("/") for url in document["authorization_servers"]] == [AUTHKIT_ISSUER]
+
+
+def test_an_anonymous_request_is_challenged_with_the_metadata_pointer(oauth_server):
+    """The first step of the discovery chain: 401 carrying the location of
+    the metadata document, per the MCP spec's authorization flow."""
+    response = _initialize(oauth_server)
+    assert response.status_code == 401
+    challenge = response.headers["www-authenticate"]
+    assert challenge.startswith("Bearer ")
+    assert PROTECTED_RESOURCE_PATH in challenge
+
+
+def test_the_operator_token_still_opens_an_oauth_configured_server(oauth_server):
+    """The whole point of the composite verifier: the operator keeps a
+    credential that works when the IdP is down, misconfigured, or being
+    migrated."""
+    assert anyio.run(_tool_names, oauth_server, TOKEN) == [
+        "get_claims",
+        "get_document",
+        "search_parts",
+    ]
+
+
+def test_a_bogus_bearer_is_still_refused_when_oauth_is_configured(oauth_server):
+    assert _initialize(oauth_server, Authorization="Bearer not-a-jwt-and-not-the-token").status_code == 401
+
+
+def test_health_is_unchanged_and_says_nothing_about_the_auth_posture(oauth_server):
+    """`/health` does not speak the registration posture -- the marketing
+    page is where that story lives. It answers D8's two identifiers and
+    nothing else, on an OAuth-configured server exactly as on a
+    bearer-only one."""
+    payload = httpx.get(f"{oauth_server}/health", timeout=30).json()
+    assert set(payload) == {"status", "serving_state", "corpus_state"}
+
+
+def test_a_bearer_only_server_publishes_no_oauth_metadata(live_server):
+    """Step one's posture, preserved exactly. With no authorization server
+    configured there is none to name, and advertising a flow nobody can
+    complete would send clients chasing it."""
+    assert httpx.get(f"{live_server}{PROTECTED_RESOURCE_PATH}", timeout=30).status_code == 404

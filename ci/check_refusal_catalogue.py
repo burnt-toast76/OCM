@@ -82,6 +82,11 @@ ALLOWLIST = {
     # start without it, but that refusal is a startup message to an
     # operator, not a catalogued outcome an engine returns to a caller.
     "OCM_TRANSPORT", "OCM_HOST", "OCM_PORT", "OCM_AUTH_TOKEN",
+    # Phase-two auth (ADR-0036 remote auth): the OAuth resource-server
+    # configuration. Same class as the four above -- environment variables
+    # an operator sets, named in startup refusals, never returned to a
+    # caller as an outcome.
+    "OCM_OAUTH_ISSUER", "OCM_OAUTH_AUDIENCE", "OCM_OAUTH_JWKS",
 }
 
 

@@ -18,6 +18,13 @@ dependencies = [
     # JSONResponse for /health). A dependency you import is a dependency
     # you declare -- otherwise it vanishes the day mcp stops needing it.
     "pydantic>=2",
+    # OAuth token verification (ADR-0036 remote auth, phase two). The MCP
+    # SDK ships the TokenVerifier protocol and the RFC 9728 metadata
+    # routes but no JWT validation, so auth.py does that against the
+    # authorization server's JWKS. [crypto] is not optional here: RS256
+    # verification needs the cryptography backend, and without it every
+    # token fails at runtime rather than at install.
+    "PyJWT[crypto]>=2.8",
     "starlette>=0.27",
 ]
 

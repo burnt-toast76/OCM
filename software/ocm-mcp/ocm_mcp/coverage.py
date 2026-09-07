@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
+from .auth import OPERATOR_IDENTITY
 from .index import normalize
 
 _logger = logging.getLogger("ocm_mcp.coverage")
@@ -99,12 +100,23 @@ class GitHubIssues:
 
 @dataclass
 class DailyCap:
-    """Under static-token auth there is exactly ONE client identity (every
-    caller shares the bearer token, and stdio's peer is whoever launched
-    the process), so this cap is N per day GLOBAL -- correct for the
-    single-operator phase, and deliberately not a per-user quota. When
-    per-client identity arrives with OAuth (phase two), `client_id`
-    becomes the OAuth client and this same machinery means per-client."""
+    """N per day PER CALLER, where a caller is an OAuth `sub` or the
+    operator's static-token sentinel.
+
+    This machinery did not change when OAuth arrived -- `client_id` was
+    always the key -- but its meaning did. Under static-token auth there
+    was exactly one identity, every caller sharing one bearer token, so
+    the cap was N per day global: correct for the single-operator phase
+    and deliberately not a per-user quota. Now the server verifies tokens
+    an authorization server issued, `client_id` is the authenticated
+    subject, and one registered client exhausting its budget leaves every
+    other caller untouched. The operator's identity is a sentinel no `sub`
+    can equal, so the operator's allowance is never spent by a stranger.
+
+    Still in memory, still per process: a restart forgives everyone, and
+    two replicas keep two tallies. That is the honest cost of not having a
+    shared store, and it is acceptable while the cap exists to blunt
+    accidents rather than to meter a paid tier."""
 
     cap: int = DEFAULT_DAILY_CAP
     _counts: dict[tuple[str, str], int] = field(default_factory=dict)
@@ -165,14 +177,15 @@ class CoverageQueue:
         part_number: str,
         source_url: str | None = None,
         note: str | None = None,
-        client_id: str = "ocm-operator",
+        client_id: str = OPERATOR_IDENTITY,
     ) -> dict[str, Any]:
         if not manufacturer.strip() or not part_number.strip():
             return {"status": "refused", "reason": "manufacturer and part_number are both required."}
         if note is not None and len(note) > NOTE_MAX_CHARS:
             return {"status": "refused", "reason": f"note is limited to {NOTE_MAX_CHARS} characters ({len(note)} given)."}
-        # Global under static-token auth (one client identity) -- see
-        # DailyCap. The take gates the GitHub calls; an unavailable
+        # Per caller: `client_id` is the OAuth subject, or the operator
+        # sentinel -- see DailyCap. The take gates the GitHub calls; an
+        # unavailable
         # outcome below refunds it, so the queue's failure never burns
         # the caller's cap.
         if not self.limiter.take(client_id):
