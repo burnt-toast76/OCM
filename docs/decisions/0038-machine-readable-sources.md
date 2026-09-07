@@ -1,6 +1,7 @@
 # ADR-0038 — Machine-readable sources
 
-**Status:** Proposed — Decisions 1–5 taken; Questions 6–8 🔴 **OPEN**
+**Status:** Proposed — Decisions 1–5, 7 and 8 taken; Question 6 🔴 **OPEN**;
+Questions 9–10 🔴 **OPEN**, raised by the second document
 
 **Builds on:** ADR-0035 (claims, citations, attestations), ADR-0036 (serving),
 ADR-0037 (corrections under append-only), ADR-0014 (zero assumption)
@@ -35,9 +36,30 @@ pass — 40 claims, no parser, every strain recorded rather than fixed. What it 
 - **A third of the ingestion discipline does not apply.** Preflight and glyph fidelity are
   properties of rendering; this file *is* text, with no second extraction to cross-check.
 
-Decisions 1–5 settle what the pass proved. The open questions are the ones a second document
+Decisions 1–5 settle what the pass proved. The open questions were the ones a second document
 — a GSDML for the same device, or an EDS from another vendor — would answer better than
-argument, and they are recorded now so the answers are deliberate rather than incidental.
+argument, and they were recorded so the answers would be deliberate rather than incidental.
+
+### The second document
+
+Two of those questions rested on a single file, which is the weakness ADR-0035 D3 exists to
+guard against, so a second was mapped: the **Beckhoff ELX ESI**, `sha256:13359101…` (corpus
+`bf3b11d`), 26 claims hand-selected from a 101,452-line, 2.8 MB EtherCAT description covering
+42 devices. It was chosen to be as unlike the first as a device description can be — another
+protocol (ADR-0002's), another format, another vendor, another specification body — because a
+question about what generalizes is not answered by a second example of the same thing.
+
+- **Identity generalized; transport did not.** Reaching for the EDS's generic keys first, five
+  carried over unchanged and every EtherCAT structure key had to be minted. Decision 7.
+- **The ordinary frequency test now fires.** Five identity keys appear in two documents from
+  two manufacturers in two formats. Decision 8, which is why no special rule was needed.
+- **Zero vocabulary keys bind** — worse than the EDS's one. The EDS at least declared
+  `protocol = EtherNetIP`; the ESI never names its protocol, because being an ESI is how it
+  says EtherCAT.
+- **Still no units.** 26 values, 26 text, which is Decision 5 holding rather than failing.
+- **New strains, none of them predicted:** the file is a catalog of 42 devices repeated per
+  revision, it is bilingual throughout, it is ISO-8859-1, and Decision 1's line numbers work
+  on it only because Beckhoff happens to pretty-print. Questions 9 and 10.
 
 ## Decision 1 — Position in a citation is the source's own smallest addressable unit
 
@@ -231,45 +253,140 @@ and an automated pass of the same statement converge on one id. A parser version
 re-mint ids, so it stays outside — which means the store cannot tell, from ids alone, which
 parser version produced a record.
 
-## Question 7 🔴 — Are network keys protocol-namespaced or generic?
+The ESI pass recorded `automated` with the same disowning tool string, and added three things.
 
-The pass minted 17 `x-` keys, and they split cleanly. **Device identity** —
-`x-vendor_id`, `x-product_code`, `x-product_name`, `x-catalog_number`,
-`x-device_major_revision` — exists in every fieldbus format under different spellings
-(`VendCode` in EDS, `VendorID` in GSDML, `VendorId` in ESI) and means the same thing.
-**Transport structure** — `x-assembly_size`, `x-assembly_definition`, `x-connection_name`,
-the RPI range — is CIP and only CIP. Profinet has no assemblies; it has modules, submodules
-and slots. EtherCAT has PDOs and sync managers. IO-Link has process-data lengths and a
-minimum cycle time.
+**Scale makes the parser inevitable rather than optional.** 26 hand claims covered one device
+at one revision out of 42 devices in 101,452 lines — about 0.03% of the file. Hand
+transcription cannot reach the rest, and when a parser does it will emit claims by the tens of
+thousands, whose provenance has to be distinguishable from these 26 by something better than a
+sentence in a header comment.
 
-The recommendation from this evidence is **generic keys for identity, namespaced keys for
-transport structure** (`x-cip_assembly_size`, `x-profinet_module_*`), so that when a GSDML
-for the same device lands under its own hash and joins via `applies_to: [AL1326]`, the two
-documents visibly describe one device through two incompatible models rather than appearing
-to contradict each other. It is recorded as a question, not a decision, because it is argued
-from a single document — the weakness ADR-0035 D3 exists to guard against.
+**A parser's encoding decision sits inside the hash scope while the parser sits outside it.**
+The ESI is ISO-8859-1, so transcribing it means transcoding — 174 non-ASCII bytes, `°`, `µ`,
+`ä`. Two parsers that resolve the encoding differently produce different `value` strings, and
+therefore different claim ids, from identical source bytes. Nothing in the record says which
+decision was made, because everything about *how* a source was read is deliberately excluded
+from identity so that human and automated passes converge. Whatever this question decides, a
+`parsed` record must carry the declared encoding — while being clear-eyed that it carries it
+outside the identity it silently determines. The EDS was pure ASCII and never raised this.
 
-Related and unresolved: a **record shape for structured entries**. `x-assembly_definition`
-holds `Assem100 = "Assembly 100 Input ", "20 04 24 64 30 03", 446, 0x0000` as text, which is
-legal and unqueryable. A `record_assembly` (instance, name, path, size, direction, optional
-members) would follow the `record_pinout` precedent — but Assem100 has ~223 members, so a
-record shape must say whether members are optional, or a claim becomes a file.
+**The source generator is format-dependent, not a required member.** The EDS announces
+`EZ-EDS Version 3.25.1.20181218`; the ESI declares no generator at all.
 
-## Question 8 🔴 — Can a format-defined key be promoted from one document?
+## Decision 7 — Identity keys are generic; transport-structure keys are protocol-namespaced
 
-ADR-0035 D3 promotes an `x-` key when frequency nominates and a stable cross-manufacturer
-meaning admits. Every one of these 17 keys appears in exactly one document, so by that test
-none is promotable. But `VendCode` means the same thing in **every EDS ever written** — its
-meaning is fixed by the CIP specification, not by how many vendors happen to agree.
+A key naming **what a device is** — vendor, product code, product name, catalogue number,
+revision — is minted without a protocol prefix and shared across formats. A key naming **how a
+protocol moves data** — assemblies, connections, FMMUs, sync managers, PDOs, modules and
+slots — is prefixed with its protocol (`x-cip_assembly_size`, `x-ethercat_pdo`,
+`x-profinet_module_*`).
 
-- **Option A — Format-defined keys promote on the specification's authority**, from one
-  document plus a citation to the spec that defines the field.
-- **Option B — The existing rule stands.** Wait for a second EDS; the discipline's value is
-  that it does not bend for a convincing single case.
+The reason is what happens when two descriptions of one device meet. Joined by
+`applies_to`, generic identity keys let a GSDML and an EDS corroborate or contradict each
+other on the facts they both state, while namespaced transport keys let them describe one
+device through two incompatible models without appearing to disagree about a shared one. A
+CIP assembly and an EtherCAT PDO are not two answers to one question; flattening both onto
+`x-io_size` would manufacture a conflict the specifications do not have.
+
+**This was tested, not asserted.** The EDS pass predicted the split from one document. The ESI
+pass ran it as an experiment: reach for the existing generic keys first, mint only what
+nothing fits. Five identity keys carried over unchanged — `x-vendor_id`, `x-vendor_name`,
+`x-product_code`, `x-product_name`, `x-catalog_number` — across two protocols, two formats and
+two vendors. Every transport key had to be new, and not one of the EDS's assembly or
+connection keys fit anything in an ESI. The prediction was falsifiable and survived.
+
+**Where it did not survive, and what that teaches.** The prediction also named
+`x-device_major_revision` as portable. It was not. An EDS prints `MajRev` and `MinRev` as two
+fields; the ESI prints one `RevisionNo` of `#x00100000`. The concept is shared, the granularity
+is not, and inventing a split the file does not make would have been exactly the conversion
+ADR-0014 forbids — so the ESI records `x-device_revision` and the two documents remain honest
+about their own shapes. Identity keys are portable at the level of *concept*, not at the level
+of the source field. Any promotion of one (Decision 8) must therefore define the concept and
+its value shape, and say what a format does when its granularity does not match — a question
+the key's name alone will hide.
+
+**Left unresolved by this decision:** a **record shape for structured entries**.
+`x-assembly_definition` holds `Assem100 = "Assembly 100 Input ", "20 04 24 64 30 03", 446,
+0x0000` as text, which is legal and unqueryable. A `record_assembly` (instance, name, path,
+size, direction, optional members) would follow the `record_pinout` precedent — but Assem100
+has ~223 members, so a record shape must say whether members are optional, or a claim becomes
+a file. The ESI raises the same question in its own dialect: a PDO entry carries index,
+subindex, bit length, data type and name, recorded here as one text value with the rest in
+conditions.
+
+## Decision 8 — No special promotion rule; ADR-0035 D3 stands
+
+A key defined by a format specification is promoted the same way every other key is: frequency
+nominates it, a stable cross-manufacturer meaning admits it. There is no shortcut for keys
+whose meaning a specification fixes.
+
+The question was whether to add one. `VendCode` means the same thing in every EDS ever
+written, fixed by the CIP specification rather than by how many vendors happen to agree, and
+with a corpus of one document the frequency test could never fire — so the discipline looked
+like it was blocking a key nobody disputes.
+
+It was not blocking; it was waiting, and it waited about a day. `vendor_id`, `vendor_name`,
+`product_code`, `product_name` and `catalog_number` now appear in **two documents, two
+manufacturers, two formats, two specification bodies** — the vendor identifier spelled
+`VendCode` in one and `Vendor/Id` in the other.
+That is precisely what D3 asks for, arrived at by the ordinary route. Adopting a
+specification-authority shortcut would have bought a day and spent the property that makes D3
+worth having: that it does not bend for a convincing single case, because a convincing single
+case is what every over-generalization looks like from the inside.
+
+Promotion of the identity keys is therefore unblocked on ordinary grounds. Which keys, and in
+what shape — including the granularity problem Decision 7 records — is a separate and smaller
+decision, taken against the vocabulary rather than here.
+
+## Question 9 🔴 — Does a document record name its format?
+
+Nothing in either entry says which format it is. Both are `type: device_description`, and an
+EDS is distinguishable from an ESI only by prose a human wrote in a header comment and by the
+extension of the held file. A consumer asking for ESI-sourced claims has nothing to filter on.
+
+Decision 2 remains right — a `document.type` enum growing a member per fieldbus was the worse
+option, and `device_description` is the honest kind. The schema already says as much, that
+`type` "names the KIND, not the format — which format a document is written in is a separate
+axis". The axis it names does not exist. But Decision 5 *presupposes* the format:
+a unit defined by the format can only be applied by a reader who knows which format's
+specification to consult, and the record never says. The candidate is a separate
+`document.format` (`eds`, `esi`, `gsdml`, `iodd`), optional and meaningful only for
+`device_description`, sitting outside the claim hash scope as document metadata already does.
+
+The open part is whether it is one field or two: a format has a *version* as well as a name,
+and this ESI declares `EtherCATInfo/@Version` 1.2 while the EDS declares its own schema
+differently. Recording the name without the version would leave Decision 5 pointing at a
+moving specification.
+
+## Question 10 🔴 — Where does a statement about the document itself attach?
+
+`x-vendor_id` is a fact about the file, not about a part, but every claim must carry
+`applies_to`, so the ESI pins it to the one device that pass transcribed. `applies_to` is
+**inside** the hash scope. So a partial pass and a complete 42-device pass over the same file
+produce **different ids for the same file-level statement** — not a disagreement about what
+the document says, but a disagreement manufactured by how much of the document a pass chose to
+read.
+
+That is the convergence failure ADR-0035 D6's parity test exists to detect, arriving from a
+direction the test cannot see: both passes are faithful, both are correct, and they still fail
+to corroborate. A datasheet never raised it because a datasheet describes the parts it names;
+a catalog file describing 42 devices under one vendor block does.
+
+The shapes of an answer, none yet chosen: let `applies_to` name every part the document covers
+(correct, but it makes the id depend on the scope of the *document* rather than of the pass,
+and a pass must then read the whole file before it may record anything); allow a document-level
+claim with no `applies_to` (clean, but ADR-0035 D1 says a claim is a datasheet-answerable
+statement about a part, and this would create a second kind of claim); or treat file-level
+facts as belonging to the document record rather than the claims store (simplest, and it
+concedes that vendor identity is provenance rather than a claim — which Decision 3 would then
+make correctable, unlike everything else in this list).
 
 ## Out of scope
 
-The parser itself, any GSDML/ESI/IODD ingestion, and changes to the serving contract beyond
-what Decision 4 already took, and any serving of bytes, which stays out until asked for. `docs/ingestion.md` needs a machine-readable sources section —
+The parser itself, any GSDML or IODD ingestion, changes to the serving contract beyond what
+Decision 4 already took, and any serving of bytes, which stays out until asked for. ESI
+ingestion was out of scope when this ADR was drafted and is no longer: one was mapped by hand
+to answer Decisions 7 and 8, on the same evidence-pass terms as the EDS — 26 claims, no
+parser, every strain recorded rather than fixed. `docs/ingestion.md` needs a machine-readable sources section —
 preflight and glyph fidelity are inapplicable, and saying so belongs in the discipline rather
 than in each entry's header — but that is a documentation task, not a decision.
