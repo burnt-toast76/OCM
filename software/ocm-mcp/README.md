@@ -41,24 +41,50 @@ claude mcp add --env OCM_ROOT=<REPO> --transport stdio ocm-claims \
 
 ## Remote (streamable HTTP)
 
-Same three tools, same envelopes, reached over the network by a caller holding a
-bearer token — ADR-0036's "remote Streamable HTTP with authentication ...
-without contract changes".
+Same tools, same envelopes, reached over the network — ADR-0036's "remote
+Streamable HTTP with authentication ... without contract changes".
 
-| Variable          | Default   | Meaning                                                    |
-| ----------------- | --------- | ---------------------------------------------------------- |
-| `OCM_TRANSPORT`   | `stdio`   | `stdio` or `http`. Anything else is refused, not ignored.   |
-| `OCM_HOST`        | `0.0.0.0` | Interface to bind. Used only by `http`.                     |
-| `OCM_PORT`        | `8000`    | Port to bind. Used only by `http`.                          |
-| `OCM_AUTH_TOKEN`  | unset     | The bearer token, **required** by `http`, ignored by `stdio`. |
+### Two kinds of credential
 
-**There is no unauthenticated HTTP mode.** With `OCM_TRANSPORT=http`, a missing
-`OCM_AUTH_TOKEN` — or one shorter than 32 characters — makes the server exit
-before it binds, with the reason on stderr. That is not a nag; it is the only
-behavior that keeps "we forgot to set the token" from being a deployment that
-works.
+**An operator token** is a secret you generate and hand over out of band. It is
+the credential that works when the identity provider is down, misconfigured, or
+being migrated, which is exactly why it survives now that OAuth exists. Use it
+for your own automation.
 
-Generate one:
+**An OAuth token** is issued by WorkOS AuthKit to a client that registered
+itself. That is how a stranger — a person adding this server as a connector in
+their AI client, an agent that has never met you — gets in without you minting
+anything by hand.
+
+This server's role is **resource server** and nothing else: it verifies tokens
+and publishes protected-resource metadata. It never issues a token, hosts a
+login page, or stores a user.
+
+| Variable              | Default   | Meaning                                                    |
+| --------------------- | --------- | ---------------------------------------------------------- |
+| `OCM_TRANSPORT`       | `stdio`   | `stdio` or `http`. Anything else is refused, not ignored.   |
+| `OCM_HOST`            | `0.0.0.0` | Interface to bind. Used only by `http`.                     |
+| `OCM_PORT`            | `8000`    | Port to bind. Used only by `http`.                          |
+| `OCM_AUTH_TOKEN`      | unset     | The operator's bearer token. Ignored by `stdio`.            |
+| `OCM_OAUTH_ISSUER`    | unset     | The AuthKit domain that issues tokens, e.g. `https://your-project-12345.authkit.app`. |
+| `OCM_OAUTH_AUDIENCE`  | unset     | The resource indicator clients ask tokens for — this server's public `/mcp` URL. |
+| `OCM_OAUTH_JWKS`      | derived   | Signing keys. Defaults to `<issuer>/oauth2/jwks`; set it only for an authorization server that publishes elsewhere. |
+
+**There is no unauthenticated HTTP mode.** With `OCM_TRANSPORT=http` the server
+needs the operator token, or a complete OAuth configuration, or both — which is
+the expected production state. With neither, it exits before it binds, with the
+reason on stderr. That is not a nag; it is the only behavior that keeps "we
+forgot to set the credentials" from being a deployment that works.
+
+**Half-configured OAuth is also a refusal.** `OCM_OAUTH_ISSUER` without
+`OCM_OAUTH_AUDIENCE` exits naming what is missing, rather than falling back to
+bearer-only. An operator who set one has plainly asked for OAuth, and the quiet
+fallback would leave a server that looks configured, answers `401` to every
+OAuth client, and tells nobody why. The audience is not cosmetic either: it is
+the check that stops a token minted for a *different* resource on the same
+authorization server from opening this one.
+
+Generate an operator token:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(48))"
@@ -84,16 +110,37 @@ Those two identifiers are already in every envelope this server serves and are
 commits of a public repository, so the endpoint gives away nothing the tools
 don't. Nothing else joins them.
 
-The MCP endpoint is `/mcp`, and it answers `401` to any request without a valid
+### Discovery, for OAuth clients
+
+With OAuth configured, the server publishes RFC 9728 protected-resource metadata
+and points at it from every `401`, which is how a client finds where to get a
 token:
+
+```bash
+curl http://localhost:8000/.well-known/oauth-protected-resource/mcp
+# {"resource": "...", "authorization_servers": ["https://your-project.authkit.app"], ...}
+```
+
+Without OAuth configured, no metadata is published — there is no authorization
+server to name, and advertising a flow nobody can complete would send clients
+chasing it.
+
+### Registering a client
+
+The MCP endpoint is `/mcp`, and it answers `401` to any request without a valid
+token. With an operator token, register it directly:
 
 ```bash
 claude mcp add --transport http ocm-claims http://localhost:8000/mcp \
   --header "Authorization: Bearer <token>"
 ```
 
-The same registration works against the hosted URL later — only the host part
-changes.
+The same registration works against the hosted URL — only the host part changes.
+
+An OAuth client registers itself instead: point a client that speaks the MCP
+authorization flow (the claude.ai connector UI, for instance) at the `/mcp` URL
+and let it discover AuthKit, register, and complete the flow. You mint nothing
+and add no configuration per client.
 
 ## Coverage queue (`request_coverage`)
 
@@ -121,11 +168,16 @@ With either variable unset the tool is **not registered** — a session sees the
 three serving tools and nothing broken — and the startup log states which mode is
 live. The PAT is never baked into code, config, or images.
 
-Under static-token auth every caller shares one client identity, so the daily cap
-is N per day **total**, not per user — per-client caps arrive with per-client
-identity (OAuth, phase two). A GitHub outage or bad credential answers
-`status: unavailable` without consuming the cap; the diagnosis goes to the server
-log, never the caller.
+The daily cap is **per caller**, where a caller is an OAuth `sub` or the
+operator's static token: one client exhausting its budget leaves everyone else
+untouched, and the operator's allowance is on an identity no client token can
+claim. (This is the phase-two change; before OAuth every caller shared one
+identity, so the same cap meant N per day *total*.) It stays in memory and per
+process, so a restart forgives everyone and two replicas keep two tallies — the
+honest cost of not having a shared store, and acceptable while the cap blunts
+accidents rather than metering a paid tier. A GitHub outage or bad credential
+answers `status: unavailable` without consuming the cap; the diagnosis goes to
+the server log, never the caller.
 
 ## Claim reports (`report_claim`)
 
