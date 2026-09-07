@@ -105,6 +105,26 @@ class OAuthConfig:
     audience: str
     jwks_uri: str
 
+    @property
+    def accepted_issuers(self) -> tuple[str, ...]:
+        """The configured issuer, with and without a trailing slash.
+
+        An `iss` claim is compared by exact string, and an operator pastes
+        what the console shows -- WorkOS's dashboard displays the AuthKit
+        domain with a trailing slash while the tokens it mints carry the
+        issuer without one. Configured with the slash, every token would
+        then fail as "Invalid issuer": a 401 on a correctly signed,
+        unexpired token minted for the right audience, which is about the
+        worst symptom to debug from the outside.
+
+        Accepting both spellings is tolerance about punctuation, not about
+        identity. They name the same origin, and forging either still
+        requires a key from that origin's JWKS -- so nothing an attacker
+        could not already do becomes possible.
+        """
+        bare = self.issuer.rstrip("/")
+        return (bare, bare + "/")
+
     @staticmethod
     def jwks_uri_for(issuer: str) -> str:
         """AuthKit publishes its keys at a fixed path under the domain
@@ -178,7 +198,7 @@ class AuthKitVerifier(TokenVerifier):
                 signing_key.key,
                 algorithms=list(ALLOWED_ALGORITHMS),
                 audience=self._config.audience,
-                issuer=self._config.issuer,
+                issuer=self._config.accepted_issuers,
                 leeway=CLOCK_SKEW_LEEWAY_SECONDS,
                 options={
                     "require": list(REQUIRED_CLAIMS),

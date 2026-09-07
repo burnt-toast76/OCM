@@ -439,3 +439,34 @@ def test_the_refusal_shows_the_corrected_value():
 def test_a_well_formed_configuration_is_untouched_by_the_check():
     transport = resolve_transport(_http_env(**{OAUTH_ISSUER_ENV: ISSUER, OAUTH_AUDIENCE_ENV: AUDIENCE}))
     assert transport.oauth.issuer == ISSUER and transport.oauth.audience == AUDIENCE
+
+
+# --------------------------------------------------------------------
+# The trailing slash, which the console shows and the tokens omit
+# --------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "configured", [ISSUER, ISSUER + "/"], ids=["configured-bare", "configured-with-slash"]
+)
+@pytest.mark.parametrize("in_token", [ISSUER, ISSUER + "/"], ids=["token-bare", "token-with-slash"])
+def test_the_issuers_trailing_slash_does_not_decide_authentication(keypair, configured, in_token):
+    """WorkOS's dashboard shows the AuthKit domain WITH a trailing slash and
+    its tokens carry the issuer WITHOUT one. Configured as displayed, every
+    token would fail as "Invalid issuer" -- a 401 on a correctly signed,
+    unexpired token minted for the right audience, which is the worst kind
+    of symptom to debug from outside."""
+    _, public = keypair
+    config = OAuthConfig(issuer=configured, audience=AUDIENCE, jwks_uri=OAuthConfig.jwks_uri_for(configured))
+    verifier = AuthKitVerifier(config, keys=StaticKeys(public))
+    assert _verify(verifier, _token(keypair, iss=in_token)) is not None
+
+
+def test_a_different_issuer_is_still_refused_whatever_the_punctuation(verifier, keypair):
+    """The tolerance is about punctuation, never about identity."""
+    assert _verify(verifier, _token(keypair, iss="https://attacker.authkit.app/")) is None
+    assert _verify(verifier, _token(keypair, iss=ISSUER + "x")) is None
+
+
+def test_the_jwks_uri_ignores_a_trailing_slash_too():
+    assert OAuthConfig(issuer=ISSUER + "/", audience=AUDIENCE, jwks_uri=OAuthConfig.jwks_uri_for(ISSUER + "/")).jwks_uri == f"{ISSUER}/oauth2/jwks"
