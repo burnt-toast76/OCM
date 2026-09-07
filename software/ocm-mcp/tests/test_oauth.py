@@ -380,3 +380,62 @@ def test_a_refund_returns_the_callers_own_take():
     cap.refund("user_01ALICE")
     assert cap.take("user_01ALICE")
     assert not cap.take("user_01ALICE")
+
+
+# --------------------------------------------------------------------
+# A URL variable without a scheme is a refusal, not a traceback
+# --------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "env,named",
+    [
+        pytest.param(
+            {OAUTH_ISSUER_ENV: "cellwright-12345.authkit.app", OAUTH_AUDIENCE_ENV: AUDIENCE},
+            OAUTH_ISSUER_ENV,
+            id="issuer-without-scheme",
+        ),
+        pytest.param(
+            {OAUTH_ISSUER_ENV: ISSUER, OAUTH_AUDIENCE_ENV: "mcp.cellwright.ai/mcp"},
+            OAUTH_AUDIENCE_ENV,
+            id="audience-without-scheme",
+        ),
+        pytest.param(
+            {
+                OAUTH_ISSUER_ENV: ISSUER,
+                OAUTH_AUDIENCE_ENV: AUDIENCE,
+                OAUTH_JWKS_ENV: "keys.example.com/jwks.json",
+            },
+            OAUTH_JWKS_ENV,
+            id="jwks-without-scheme",
+        ),
+    ],
+)
+def test_a_url_variable_without_a_scheme_refuses_and_names_itself(env, named):
+    """The mistake an operator actually makes: WorkOS prints the AuthKit
+    domain bare in places, and pasting it verbatim leaves a value that
+    reads perfectly and has no scheme.
+
+    Before this check it surfaced as `PyJWKClientError: Invalid JWKS URI
+    scheme ''` with a traceback, naming neither the variable nor the fix
+    -- and for the audience it would have been pydantic's vocabulary
+    instead. Both are now one refusal that names the variable while the
+    variable still has a name.
+    """
+    with pytest.raises(RuntimeError) as refusal:
+        resolve_transport(_http_env(**env))
+    message = str(refusal.value)
+    assert named in message
+    assert "absolute URL" in message
+
+
+def test_the_refusal_shows_the_corrected_value():
+    """A message an operator can act on without reading the source."""
+    with pytest.raises(RuntimeError) as refusal:
+        resolve_transport(_http_env(**{OAUTH_ISSUER_ENV: "cellwright.authkit.app", OAUTH_AUDIENCE_ENV: AUDIENCE}))
+    assert "https://cellwright.authkit.app" in str(refusal.value)
+
+
+def test_a_well_formed_configuration_is_untouched_by_the_check():
+    transport = resolve_transport(_http_env(**{OAUTH_ISSUER_ENV: ISSUER, OAUTH_AUDIENCE_ENV: AUDIENCE}))
+    assert transport.oauth.issuer == ISSUER and transport.oauth.audience == AUDIENCE

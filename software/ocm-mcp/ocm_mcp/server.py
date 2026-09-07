@@ -119,6 +119,27 @@ def _refuse_short_token(token: str) -> str:
     return token
 
 
+def _require_absolute_url(name: str, value: str) -> str:
+    """An OAuth URL variable, or a refusal naming it.
+
+    A bare domain is the mistake an operator actually makes -- WorkOS
+    prints the AuthKit domain as `your-project.authkit.app` in places, and
+    pasting it verbatim leaves a value that reads perfectly and has no
+    scheme. Without this, the failure surfaced deep in a JWKS client as
+    "Invalid JWKS URI scheme ''" with a traceback, which names neither the
+    variable nor the fix. Refused here, where the variable still has a
+    name to put in the message.
+    """
+    if not value.startswith(("http://", "https://")):
+        raise RuntimeError(
+            f"{name}={value!r} is not an absolute URL. Refusing to start: it needs the "
+            f"scheme, e.g. {name}=https://{value.lstrip('/') or 'your-project-12345.authkit.app'}. "
+            "A bare domain reads correctly and fails later, inside a JWKS fetch that "
+            "cannot tell you which variable was wrong."
+        )
+    return value
+
+
 def _resolve_oauth(env: Mapping[str, str]) -> OAuthConfig | None:
     """A complete OAuth configuration, nothing, or a refusal.
 
@@ -138,6 +159,12 @@ def _resolve_oauth(env: Mapping[str, str]) -> OAuthConfig | None:
         return None if not jwks else _refuse_partial_oauth(issuer, audience)
     if not issuer or not audience:
         return _refuse_partial_oauth(issuer, audience)
+    _require_absolute_url(OAUTH_ISSUER_ENV, issuer)
+    # The audience is the resource indicator AND becomes resource_server_url,
+    # where pydantic's AnyHttpUrl would reject it with its own vocabulary.
+    _require_absolute_url(OAUTH_AUDIENCE_ENV, audience)
+    if jwks:
+        _require_absolute_url(OAUTH_JWKS_ENV, jwks)
     return OAuthConfig(issuer=issuer, audience=audience, jwks_uri=jwks or OAuthConfig.jwks_uri_for(issuer))
 
 
