@@ -1,6 +1,6 @@
 # ADR-0038 — Machine-readable sources
 
-**Status:** Proposed — Decisions 1–5 and 7–9 taken; Questions 6 and 10–12 🔴 **OPEN**
+**Status:** Accepted — all twelve decisions taken
 
 **Builds on:** ADR-0035 (claims, citations, attestations), ADR-0036 (serving),
 ADR-0037 (corrections under append-only), ADR-0014 (zero assumption)
@@ -58,7 +58,7 @@ question about what generalizes is not answered by a second example of the same 
 - **Still no units.** 26 values, 26 text, which is Decision 5 holding rather than failing.
 - **New strains, none of them predicted:** the file is a catalog of 42 devices repeated per
   revision, it is bilingual throughout, it is ISO-8859-1, and Decision 1's line numbers work
-  on it only because Beckhoff happens to pretty-print. Decision 9 and Question 10.
+  on it only because Beckhoff happens to pretty-print. Decisions 9 and 10.
 
 ### The third pass, over the second document again
 
@@ -72,7 +72,7 @@ device stating facts about itself, `#x1000 Device type` and `#x1008 Device name`
 34 are `rw` and 24 carry `Flags/Setting 1`: values a master *writes* at commissioning. A
 setting is not a property of a component; it is a property of a configured cell. The
 transcription keeps them under separate keys so the distinction survives into the store, and
-Question 12 asks whether the settings belong in this store at all.
+Decision 12 settles what of a setting belongs in this store at all.
 
 That answer is what makes the scope question tractable. Transcribing every dictionary entry in
 this file would be roughly ten thousand records, most of them settings and all of them `x-`,
@@ -177,8 +177,9 @@ and its 40 claims and their ids are untouched.
 
 ---
 
-The remaining questions are open. Each is recorded with what the EDS pass observed, because
-the evidence is the part that gets lost.
+Each decision below records what the passes observed before it was taken, because the
+evidence is the part that gets lost — the reasoning can be re-derived from it, and cannot be
+re-derived without it.
 
 ## Decision 4 — A machine-readable source's bytes may be held; none are served
 
@@ -276,46 +277,71 @@ store carrying both populations is exactly what ADR-0035 D6 anticipates.
 
 The rejected alternatives. Leaving numerics as text forever is faithful and pushes CIP unit
 knowledge into every consumer, privately and unrecorded — the implicit knowledge this store
-exists to make explicit. Making units a property of `parsed` extraction (Question 6) breaks
+exists to make explicit. Making units a property of `parsed` extraction (Decision 6) breaks
 convergence outright: a hand pass would write text and a parser pass `{min: 1000, unit: µs}`,
 two different values and two different ids for one statement, which leaves ADR-0035 D6's
 parity test with nothing to measure. Format-defined units must therefore be applied by every
 pass or by none — which is why this is a rule about claims, not about extraction.
 
-## Question 6 🔴 — Is `parsed` a third extraction method?
+## Decision 6 — `parsed` is the third extraction method
 
-`extraction.method` is `human | automated`. A deterministic parser is neither: ADR-0035 D6's
-parity test measures automated output against hand transcription, and a parser is a third
-population whose failure modes are systematic rather than careless. This pass recorded
-`automated` with a tool string saying no parser was used — honest, and the wrong shape.
+`extraction.method` becomes `human | automated | parsed`. A **`parsed`** record was produced
+by a deterministic parser reading a format whose grammar is specified: neither hand judgment
+nor model judgment, and a third population whose failure modes are systematic rather than
+careless. When the method is `parsed`, `extraction` **requires `tool` and `tool_version`**,
+and **may** carry `source_generator` — what the file declares about its own producer, never
+required, because it is format-dependent.
 
-A `parsed` method would record parser identity and version, the format and its specification
-version, and possibly the generator string the source declares (this file announces
-`EZ-EDS Version 3.25.1.20181218` — provenance about how the source was produced, not how it
-was read). **The sharp part:** `extraction` is deliberately outside the hash scope so a human
-and an automated pass of the same statement converge on one id. A parser version must not
-re-mint ids, so it stays outside — which means the store cannot tell, from ids alone, which
-parser version produced a record.
+The evidence for a third member rather than a stretched second one. Both passes so far
+recorded `automated` with a tool string saying no parser was used — honest, and the wrong
+shape, twice. And scale makes the parser inevitable rather than optional: 26 hand claims
+covered one device at one revision out of 42 devices in 101,452 lines, about 0.03% of the
+file. Hand transcription cannot reach the rest, and when a parser does it will emit claims by
+the tens of thousands, whose provenance has to be distinguishable from those 26 by something
+better than a sentence in a header comment. `source_generator` is optional for a reason the
+two documents demonstrate between them: the EDS announces `EZ-EDS Version 3.25.1.20181218`,
+and the ESI declares no generator at all.
 
-The ESI pass recorded `automated` with the same disowning tool string, and added three things.
+`tool_version` is required where `tool` alone is not, because a parser's *version* is the
+thing that changes what it emits. Two runs of "the ESI parser" over one file are the same
+claim to a reader and potentially different transcriptions in fact, and the difference is
+exactly what a parity test needs to see.
 
-**Scale makes the parser inevitable rather than optional.** 26 hand claims covered one device
-at one revision out of 42 devices in 101,452 lines — about 0.03% of the file. Hand
-transcription cannot reach the rest, and when a parser does it will emit claims by the tens of
-thousands, whose provenance has to be distinguishable from these 26 by something better than a
-sentence in a header comment.
+**Extraction stays outside the hash scope.** A parser version must never re-mint an id: the
+whole point of excluding `extraction` is that a human pass and a machine pass of one statement
+converge on one id, and the parity test needs that convergence to have anything to measure.
+The consequence is accepted with open eyes — the store cannot tell, from ids alone, which
+parser version produced a record. It can tell from the record.
 
-**A parser's encoding decision sits inside the hash scope while the parser sits outside it.**
-The ESI is ISO-8859-1, so transcribing it means transcoding — 174 non-ASCII bytes, `°`, `µ`,
-`ä`. Two parsers that resolve the encoding differently produce different `value` strings, and
-therefore different claim ids, from identical source bytes. Nothing in the record says which
-decision was made, because everything about *how* a source was read is deliberately excluded
-from identity so that human and automated passes converge. Whatever this question decides, a
-`parsed` record must carry the declared encoding — while being clear-eyed that it carries it
-outside the identity it silently determines. The EDS was pure ASCII and never raised this.
+### The encoding division
 
-**The source generator is format-dependent, not a required member.** The EDS announces
-`EZ-EDS Version 3.25.1.20181218`; the ESI declares no generator at all.
+**A declared encoding is a property of the file, not of a pass.** It is recorded as
+`document.encoding` — optional, descriptive metadata governed by Decision 3, so correctable in
+place, and outside every hash scope. It holds what the source declares about itself
+(`ISO-8859-1` for the Beckhoff ESI, `us-ascii` for the ifm EDS). A pass's obligation is then
+simply stated: **transcode faithfully from the declared encoding.**
+
+That division is what makes the problem tractable, and it does not make it disappear. The ESI
+is ISO-8859-1, so transcribing it *is* transcoding — 174 non-ASCII bytes, `°`, `µ`, `ä`. Two
+passes that resolve the encoding differently produce different `value` strings and therefore
+different claim ids from identical source bytes. **The transcoding decision sits inside the
+value, and therefore inside the id, while everything that records it — the document's declared
+encoding, the parser, its version — sits outside.** That is the accepted trade, stated here
+rather than discovered later: identity is over what a document was read to *say*, and reading
+requires a decision that identity cannot hold. Recording the declaration on the document
+record is what makes a disagreement diagnosable instead of invisible; it is not what makes it
+impossible. The EDS was pure ASCII and never raised this, which is why one document could not
+have decided it.
+
+### Parity
+
+**Parser-produced claims for a format are trusted once a `parsed` pass matches a hand pass
+over the same document.** That is ADR-0035 D6's parity test with its third population finally
+named: the hand pass is the measuring stick, the parser is the candidate, and agreement on ids
+— not on prose, on ids — is the pass condition. Extraction being outside the hash scope is
+what makes the comparison meaningful at all, since the two records differ in nothing else.
+Trust earned this way is *per format*, not per parser: a parser that agrees on an EDS has
+demonstrated nothing about its ESI path.
 
 ## Decision 7 — Identity keys are generic; transport-structure keys are protocol-namespaced
 
@@ -419,80 +445,111 @@ industry's protocol list stops naming a kind at all. Also rejected: inferring fo
 held file's extension, which works only for entries that hold bytes and makes a queryable
 property of a document depend on whether this repository happens to store it.
 
-## Question 10 🔴 — Where does a statement about the document itself attach?
+## Decision 10 — A claim's `applies_to` carries the document's stated scope
 
-`x-vendor_id` is a fact about the file, not about a part, but every claim must carry
-`applies_to`, so the ESI pins it to the one device that pass transcribed. `applies_to` is
-**inside** the hash scope. So a partial pass and a complete 42-device pass over the same file
-produce **different ids for the same file-level statement** — not a disagreement about what
-the document says, but a disagreement manufactured by how much of the document a pass chose to
-read.
+**`applies_to` names the parts the DOCUMENT states the statement covers — never the subset a
+pass happened to transcribe.** A file-level fact applies to every part the document
+enumerates. The ESI's vendor block is a statement about all 42 devices in the file, so a claim
+transcribing it names all 42, whether the pass that wrote it read one device or every one.
 
-That is the convergence failure ADR-0035 D6's parity test exists to detect, arriving from a
-direction the test cannot see: both passes are faithful, both are correct, and they still fail
-to corroborate. A datasheet never raised it because a datasheet describes the parts it names;
-a catalog file describing 42 devices under one vendor block does.
+File-level facts stay **claims**. The alternative of moving them to the document record was
+tempting and wrong: it would concede that vendor identity is provenance rather than a
+transcription, and Decision 3 would then make it correctable — a fact cited to a line in a
+file, silently editable, while everything around it is immutable. A document-level claim with
+no `applies_to` was also rejected: ADR-0035 D1 says a claim is a datasheet-answerable
+statement about a part, and a second kind of claim with a different shape is a cost paid by
+every consumer forever.
 
-The shapes of an answer, none yet chosen: let `applies_to` name every part the document covers
-(correct, but it makes the id depend on the scope of the *document* rather than of the pass,
-and a pass must then read the whole file before it may record anything); allow a document-level
-claim with no `applies_to` (clean, but ADR-0035 D1 says a claim is a datasheet-answerable
-statement about a part, and this would create a second kind of claim); or treat file-level
-facts as belonging to the document record rather than the claims store (simplest, and it
-concedes that vendor identity is provenance rather than a claim — which Decision 3 would then
-make correctable, unlike everything else in this list).
+**Enumerating the covered parts is part of transcribing a file-level statement**, not overhead
+added to it. This is what family claims already do when a catalog states a series-wide
+specification — the scope of the statement is itself something the document says, and reading
+it is reading the document. It is also cheap: the enumeration is a list of `Type` elements.
 
-## Question 11 🔴 — What happens when an append re-states a claim already in the store?
+Convergence follows, which is the whole point. **Two faithful passes of any scope mint one id
+for one statement**, because the id no longer depends on how much of the file a transcriber
+chose to read. The failure this replaces was the sharp one: `applies_to` is inside the hash
+scope, so a one-device pass and a 42-device pass over the same vendor block produced *different
+ids for the same statement* — not a disagreement about what the document says, but one
+manufactured by the reading. Both passes faithful, both correct, and failing to corroborate.
+That is exactly the convergence failure ADR-0035 D6's parity test exists to detect, arriving
+from a direction the test cannot see. A datasheet never raised it, because a datasheet
+describes the parts it names; a catalog file describing 42 devices under one vendor block does.
 
-`append_claims` computes each claim's id and appends the record. It does not look at whether
-that id is already present (`software/ocm-api/ocm_api/claims.py`, the append loop). Two
-transcribers reading the same statement in the same document produce byte-identical records
-with the same id, and the file would hold both.
+**Not retroactive, and nothing is retracted here.** The evidence passes' narrowly-scoped
+records predate this rule. They are faithful artifacts of documented evidence passes — each
+one says truthfully what it transcribed and how far it read — and they stand. A future full
+pass over either document mints the correctly-scoped ids alongside them; whether the earlier,
+narrower records then warrant cleanup under ADR-0037 is the operator's call at that time, on
+evidence this decision does not have. Rewriting them now would be the store editing its own
+history to look as though it had known better, which is the one thing an append-only store
+exists to prevent.
 
-Nothing is corrupted by that — a matching id is *proof* the two records are identical, which
-is the property content-addressing was chosen for. But nothing catches it either, and the
-store grows a second copy of a record that says exactly what the first one says. This becomes
-ordinary rather than hypothetical the moment a document has more than one contributor: a
-2.8 MB ESI describing 42 devices is a document many passes will touch, each pass re-stating
-the file-level facts it needs (Question 10 is the same soft spot seen from the other side).
+## Decision 11 — Appends are idempotent; a store never holds one id twice
 
-The two candidate answers are not equivalent, which is why this is a question:
+Two halves, at their proper layers, and neither is safe without the other.
 
-- **A no-op** — an id already present is silently skipped, and the append reports what it
-  actually wrote. This makes appends **idempotent**, which matters as soon as a submission can
-  be retried, replayed, or run twice by a nervous operator.
-- **A refusal** — an id already present is an error naming it. This makes duplication visible
-  rather than absorbed, at the cost that a retried submission fails where it should have been
-  harmless.
+**`append_claims` is an idempotent no-op per record.** A claim whose id is already present in
+the file is skipped, not appended, and the result reports **`written`** and **`skipped`**
+counts along with the skipped ids — so a caller sees exactly what happened rather than
+inferring it. A retried, replayed, or nervously repeated submission is harmless and says so.
 
-Note what is *not* at stake: this is not corroboration. Two different documents stating the
-same fact produce different ids (the document hash is inside the hash scope) and are already
-distinct claims, correctly. This question is only about one document, one statement, twice.
+**`validate_claims` refuses a file holding two records with one id**, naming the id. That is
+the invariant, and it is what makes trusting the no-op safe: duplication can never silently
+persist, whether it arrives through the append path, a hand edit, or a merge that resolved
+badly. The no-op prevents the ordinary case; the refusal catches every other one.
 
-## Question 12 🔴 — Do a device's settings belong in the claims store?
+Refusing the append instead was rejected. It makes duplication visible at exactly the moment
+nobody needs to see it — a retry that should be harmless fails, and the caller's only recourse
+is to inspect the store and decide which of its records it already wrote. Visibility belongs
+in the validator, where it is a property of the file rather than an accident of who called
+what twice.
 
-The third pass established that a CoE dictionary holds two kinds of entry and that the file
-distinguishes them: `Access ro` entries where the device states facts about itself, and
-`Access rw` entries carrying `Flags/Setting 1`, which are values a master **writes** at
-commissioning. For ELX3184 the split is 106 to 34, with 24 flagged as settings.
+The evidence: `append_claims` computed each claim's id and appended it without ever asking
+whether that id was present. Two transcribers reading the same statement in the same document
+produce byte-identical records with the same id, and the file would hold both. Nothing is
+corrupted by that — a matching id is *proof* the two records are identical, which is the
+property content-addressing was chosen for — but nothing caught it either, and the store grew
+a second copy of a record saying exactly what the first one said. That becomes ordinary rather
+than hypothetical the moment a document has more than one contributor: a 2.8 MB ESI describing
+42 devices is a document many passes will touch, each re-stating the file-level facts it needs
+(Decision 10 is the same soft spot seen from the other side).
 
-A setting is not a property of a component. `Enable user scale = 00` is not a fact about what
-an ELX3184 *is*; it is the state some particular cell puts one *into*, and the same device in
-the next cell has a different value. The claims store exists to record what a document says
-about a part, and ADR-0035 D1 is explicit that a claim is a datasheet-answerable statement.
+What is **not** at stake here: corroboration. Two different documents stating the same fact
+produce different ids — the document hash is inside the hash scope — and are already distinct
+claims, correctly. This decision is only about one document, one statement, twice.
 
-But the document *does* state something durable about a setting: that the parameter exists, at
-this index and subindex, of this type and bit length, with this **default**, and with these
-legal values. That is a fact about the device, and a cell-design agent needs it — it is how a
-configuration is known to be expressible at all. The third pass transcribed exactly that shape
-and no actual configured values, which is a workable line, taken by one pass without a rule
-behind it.
+## Decision 12 — A parameter's shape is a claim; its configured value never is
 
-What needs deciding is whether that line is the rule: **the existence, shape and default of a
-parameter are claims; a parameter's configured value is not, and belongs to whatever describes
-a configured cell.** The consequence of getting it wrong in one direction is a store full of
-values that are true of nobody's device; in the other, a design agent that cannot tell whether
-a device can be made to do what a cell needs.
+**The existence, shape, default and legal values of a parameter are claims.** That a device
+has a parameter at this index and subindex, of this type and bit length, defaulting to this
+value, admitting these enumerated values, is a datasheet-answerable fact about the part,
+fully within ADR-0035 D1. A cell-design agent needs precisely this: it is how a configuration
+is known to be *expressible* before anything is configured.
+
+**A parameter's configured value is not a claim and never enters this store.** `Enable user
+scale = 00` in some cell is not a fact about what an ELX3184 is; it is the state one
+particular cell puts one into, and the identical device in the next cell holds a different
+value. It belongs to whatever describes a configured cell — ADR-0014's layer — and the claims
+store would be recording values true of nobody's device.
+
+**The file's own access flags are the transcription cue.** A CoE dictionary holds both kinds
+and distinguishes them itself: `Access ro` entries are the device stating facts about itself;
+`Access rw` entries carrying `Flags/Setting 1` are values a master writes at commissioning.
+For ELX3184 the split is 106 to 34, with 24 flagged as settings. A transcriber does not have
+to adjudicate what is a fact and what is configuration — the format already did, and the
+discipline records how to read that (`docs/ingestion.md`).
+
+Note what this does *not* say: an `rw` parameter is not excluded. Its existence, type, bit
+length, default and enumerated values are all transcribed — they are facts about the device.
+What is excluded is the value some deployment happens to have written into it. The third pass
+drew exactly this line in practice, transcribing shape and default and no configured values;
+this decision is that line stated as a rule rather than left as one pass's good judgment.
+
+The cost of getting it wrong in either direction is asymmetric and worth naming. Too
+permissive, and the store fills with values true of nobody's device, which is worse than
+useless because it looks authoritative. Too strict, and a design agent cannot tell whether a
+device can be made to do what a cell needs — which is most of what a device description is
+*for*.
 
 ## Out of scope
 
