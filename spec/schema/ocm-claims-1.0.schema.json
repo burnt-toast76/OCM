@@ -92,6 +92,11 @@
           ],
           "description": "The machine-readable format the document is written in (ADR-0038 D9). REQUIRED when type is 'device_description' and meaningless otherwise: 'type' names the KIND, this names the format, and Decision 5 -- a unit defined by the format is a unit -- can only be applied by a reader who knows which specification to consult. Descriptive metadata, so correctable under ADR-0038 D3; it is outside every claim's hash scope and correcting it moves no claim id. Names the format only, NOT its version: this document's own declared schema version is not pinned here, so D5 points at a specification that can move -- an honest gap, recorded in D5, rather than a field that looks precise and is not. Escape hatch 'x-' for a format with no member here yet, on the component schema's protocol pattern."
         },
+        "encoding": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the source declares about its own character encoding, as it declares it ('ISO-8859-1', 'us-ascii') -- ADR-0038 D6. A property of the FILE, not of a pass: a pass's obligation is to transcode faithfully from it. Optional and descriptive, so ADR-0038 D3 governs -- correctable in place, outside every hash scope, correcting it moves no claim id. Stated with open eyes about what it does not fix: the transcoding decision sits inside the value and therefore inside the id, while this field sits outside, so recording the declaration makes a disagreement diagnosable, not impossible."
+        },
         "revision": {
           "type": "string",
           "description": "The printed revision string, verbatim. Recorded, never trusted as identity (D5)."
@@ -333,14 +338,46 @@
         "method": {
           "enum": [
             "human",
-            "automated"
-          ]
+            "automated",
+            "parsed"
+          ],
+          "description": "How the claim was produced (ADR-0038 D6). 'human': hand transcription. 'automated': a model or script reading a document it was not built for. 'parsed': a deterministic parser reading a format whose grammar is specified -- a third population whose failure modes are systematic rather than careless, which is why it is not folded into 'automated'."
         },
         "tool": {
           "type": "string",
-          "description": "Tool identity and version, for automated extraction."
+          "description": "Tool identity, for automated or parsed extraction. REQUIRED when method is 'parsed'."
+        },
+        "tool_version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The tool's version. REQUIRED when method is 'parsed' (ADR-0038 D6): a parser's VERSION is what changes the transcription it emits, so two runs of 'the ESI parser' are one claim to a reader and potentially two different readings in fact. Extraction stays outside the hash scope, so this never re-mints an id -- the store cannot tell from ids alone which parser produced a record, and can tell from the record."
+        },
+        "source_generator": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the SOURCE declares about its own producer, verbatim (an EDS may announce 'EZ-EDS Version 3.25.1.20181218'). Provenance about how the document was made, not how it was read. Never required: format-dependent, and an ESI declares none at all."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "method": {
+                "const": "parsed"
+              }
+            },
+            "required": [
+              "method"
+            ]
+          },
+          "then": {
+            "required": [
+              "tool",
+              "tool_version"
+            ]
+          }
+        }
+      ]
     },
     "value_scalar": {
       "type": "object",

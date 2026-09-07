@@ -271,9 +271,11 @@ def build_server(repo_root: str) -> FastMCP:
         "Append reviewed claims (and optionally a transcription pass's vocabulary-pinned "
         "attestation) to an existing claims file -- ADR-0035 D7's two legal mutations, and the ONE "
         "write path. Ids are computed server-side, never supplied; the whole updated file must "
-        "pass full validation before anything is written; existing records are never touched.",
+        "pass full validation before anything is written; existing records are never touched. "
+        "Idempotent per record: a claim whose id the file already holds is skipped and reported, "
+        "so a retried submission is harmless (ADR-0038 D11).",
         '  call: append_claims(document_hash="sha256:9ce6...", claims=[{...}], attestation={"vocab_version": "1.1", "date": "2026-09-01"})\n'
-        '  response: {"ok": true, "data": {"appended": 6, "ids": ["sha256:..."], "claims": 19}}',
+        '  response: {"ok": true, "data": {"written": 6, "skipped": 0, "skipped_ids": [], "ids": ["sha256:..."], "claims": 19}}',
     ))
     def append_claims(document_hash: str, claims: list[dict[str, Any]], attestation: dict[str, Any] | None = None) -> dict[str, Any]:
         return api.append_claims(document_hash, claims, attestation=attestation).to_dict()

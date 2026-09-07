@@ -289,6 +289,30 @@ def _validate_doc(ws: Workspace, doc: dict[str, Any], addressed: str) -> tuple[l
     # entry's shape; these referential checks are the validator's half.
     claims = doc.get("claims") if isinstance(doc.get("claims"), list) else []
     claim_ids = {c.get("id") for c in claims if isinstance(c, dict)}
+
+    # No file holds one id twice (ADR-0038 D11). append_claims skips a record
+    # whose id is already present, so the ordinary path cannot produce this --
+    # but a hand edit, a badly resolved merge, or a future writer can, and a
+    # duplicate is exactly what content-addressing makes meaningless: the two
+    # records are provably identical, so the second says nothing and the store
+    # has grown for no reason. Refused rather than warned, because a store that
+    # tolerates it cannot be trusted to have deduplicated anything.
+    counted: dict[str, int] = {}
+    for claim in claims:
+        if isinstance(claim, dict) and isinstance(claim.get("id"), str):
+            counted[claim["id"]] = counted.get(claim["id"], 0) + 1
+    for duplicate_id, count in counted.items():
+        if count > 1:
+            first = next(i for i, c in enumerate(claims) if isinstance(c, dict) and c.get("id") == duplicate_id)
+            refusals.append(
+                Refusal(
+                    code=Codes.OCM_INVALID_ARGUMENT,
+                    path=f"claims[{first}].id",
+                    message=f"claim id {duplicate_id!r} appears {count} times in this file",
+                    hint="Ids are content hashes, so records sharing one are identical -- keep one and delete the rest. Appends are idempotent and skip an id already present (ADR-0038 D11); a duplicate means something else wrote this file.",
+                )
+            )
+
     retractions = doc.get("retractions") if isinstance(doc.get("retractions"), list) else []
     retracted_ids: set[str] = set()
     for index, retraction in enumerate(retractions):
@@ -445,6 +469,9 @@ def append_claims(
     structurally incapable of editing or removing an existing record --
     and the WHOLE result must pass the full validation before a byte is
     written.
+
+    Appending is IDEMPOTENT per record (ADR-0038 D11): a claim whose id the
+    file already holds is skipped and reported, never written twice.
     """
     if not ws.claims_exists(document_hash):
         return single_refusal(
@@ -492,8 +519,31 @@ def append_claims(
         return Envelope.refuse(refusals)
 
     doc = read_yaml(ws.claims_path(document_hash)) or {}
+    existing = doc.get("claims") if isinstance(doc.get("claims"), list) else []
+
+    # Idempotent per record (ADR-0038 D11). An id already in the file is
+    # SKIPPED, not appended: ids are content hashes, so a match is proof the
+    # incoming record is byte-for-byte the one already stored, and writing it
+    # twice would grow the store a second copy of a record saying exactly what
+    # the first one says. A retried or replayed submission is therefore
+    # harmless -- and the caller is told which records were skipped rather than
+    # left to infer it from a count that did not move.
+    #
+    # The batch is deduplicated against itself as well as against the file: two
+    # identical records in one call are the same duplicate arriving by a
+    # shorter route, and validate_claims would refuse the result either way.
+    seen: set[str] = {c.get("id") for c in existing if isinstance(c, dict) and isinstance(c.get("id"), str)}
+    written: list[dict[str, Any]] = []
+    skipped_ids: list[str] = []
+    for record in appended:
+        if record["id"] in seen:
+            skipped_ids.append(record["id"])
+            continue
+        seen.add(record["id"])
+        written.append(record)
+
     updated = dict(doc)
-    updated["claims"] = list(doc.get("claims") or []) + appended
+    updated["claims"] = list(existing) + written
     if attestation is not None:
         updated["attestations"] = list(doc.get("attestations") or []) + [attestation]
 
@@ -501,12 +551,18 @@ def append_claims(
     if refusals:
         return Envelope.refuse(refusals, warnings=warnings)
 
-    write_yaml(ws.claims_path(document_hash), updated)
+    # Nothing new and no attestation: the file is already exactly what this
+    # call asked for, so it is not rewritten. Idempotent means the bytes do
+    # not move either, not merely that the records do not.
+    if written or attestation is not None:
+        write_yaml(ws.claims_path(document_hash), updated)
     return Envelope.succeed(
         {
             "document": addressed,
-            "appended": len(appended),
-            "ids": [record["id"] for record in appended],
+            "written": len(written),
+            "skipped": len(skipped_ids),
+            "skipped_ids": skipped_ids,
+            "ids": [record["id"] for record in written],
             "claims": len(updated["claims"]),
         },
         warnings=warnings,

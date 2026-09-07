@@ -174,7 +174,7 @@ def test_append_computes_ids_and_never_touches_existing_records(api: OcmApi, wor
     new.pop("id", None)
     e = api.append_claims(DOC_HASH, [new], attestation={"vocab_version": "1.1", "date": "2026-09-02"})
     assert e.ok, e.refusals
-    assert e.data["appended"] == 1 and e.data["claims"] == 2
+    assert e.data["written"] == 1 and e.data["skipped"] == 0 and e.data["claims"] == 2
 
     doc = _read_file(workspace_root)
     assert doc["claims"][0]["id"] == original["id"]  # untouched
