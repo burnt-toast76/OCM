@@ -73,7 +73,24 @@
             "catalog",
             "device_description"
           ],
-          "description": "Document kind -- the component schema's source.kind minus 'measured' (a measurement is not an ingested document). device_description is the machine-readable class (EDS, GSDML, ESI, IODD): page-less, semantics fixed by a format specification rather than by prose, published to be consumed by tools (ADR-0038 D2). It names the KIND, not the format -- which format a document is written in is a separate axis."
+          "description": "Document kind -- the component schema's source.kind minus 'measured' (a measurement is not an ingested document). device_description is the machine-readable class (EDS, GSDML, ESI, IODD): page-less, semantics fixed by a format specification rather than by prose, published to be consumed by tools (ADR-0038 D2). It names the KIND, not the format -- which format a document is written in is the sibling 'format' field (ADR-0038 D9), required for this kind."
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "eds",
+                "esi",
+                "gsdml",
+                "iodd"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "^x-[a-z0-9][a-z0-9-]*$"
+            }
+          ],
+          "description": "The machine-readable format the document is written in (ADR-0038 D9). REQUIRED when type is 'device_description' and meaningless otherwise: 'type' names the KIND, this names the format, and Decision 5 -- a unit defined by the format is a unit -- can only be applied by a reader who knows which specification to consult. Descriptive metadata, so correctable under ADR-0038 D3; it is outside every claim's hash scope and correcting it moves no claim id. Names the format only, NOT its version: this document's own declared schema version is not pinned here, so D5 points at a specification that can move -- an honest gap, recorded in D5, rather than a field that looks precise and is not. Escape hatch 'x-' for a format with no member here yet, on the component schema's protocol pattern."
         },
         "revision": {
           "type": "string",
@@ -121,7 +138,26 @@
             }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "device_description"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "format"
+            ]
+          }
+        }
+      ]
     },
     "attestation": {
       "type": "object",

@@ -1,7 +1,6 @@
 # ADR-0038 — Machine-readable sources
 
-**Status:** Proposed — Decisions 1–5, 7 and 8 taken; Question 6 🔴 **OPEN**;
-Questions 9–10 🔴 **OPEN**, raised by the second document
+**Status:** Proposed — Decisions 1–5 and 7–9 taken; Questions 6 and 10 🔴 **OPEN**
 
 **Builds on:** ADR-0035 (claims, citations, attestations), ADR-0036 (serving),
 ADR-0037 (corrections under append-only), ADR-0014 (zero assumption)
@@ -59,7 +58,7 @@ question about what generalizes is not answered by a second example of the same 
 - **Still no units.** 26 values, 26 text, which is Decision 5 holding rather than failing.
 - **New strains, none of them predicted:** the file is a catalog of 42 devices repeated per
   revision, it is bilingual throughout, it is ISO-8859-1, and Decision 1's line numbers work
-  on it only because Beckhoff happens to pretty-print. Questions 9 and 10.
+  on it only because Beckhoff happens to pretty-print. Decision 9 and Question 10.
 
 ## Decision 1 — Position in a citation is the source's own smallest addressable unit
 
@@ -99,12 +98,11 @@ consumed by tools. Per-format enum values (`eds`, `gsdml`, …) were rejected fo
 kind with format — `type` does not say "PDF" for a catalog either — and because the enum
 would then grow with every fieldbus and every revision of one.
 
-The format itself is therefore *not* recorded in the document record today. `type` answers
-what kind of document this is; which format it is written in is a different axis, and no
-consumer yet needs to query it. Decision 5 is what eventually needs it — a unit attributed
-to a format specification must name that specification — and Decision 4 will need it too the
-day anything fetches bytes by format rather than inferring it from a file extension. The
-field lands with the first pass that writes such a unit, not before.
+The format itself is a different axis, recorded in its own field rather than in this enum.
+When this decision was taken no consumer needed to query it and the field was deferred; the
+second document made the absence concrete, and Decision 9 added `document.format` — required
+for this kind, meaningless for the others. `type` answers what kind of document this is;
+`format` answers which format it is written in.
 
 The name is deliberately the one the component schema already uses. That schema has carried
 a `comms.device_description` field since before any of this — a free-text string whose
@@ -218,13 +216,20 @@ Two guard rails, and they are the decision as much as the principle is:
    provenance chain — claim → document → specification — depends on that last link being
    written down.
 
-The mechanism for guard rail 2 does not exist yet: Decision 2 deliberately left format out
-of the document record because nothing needed to query it. This is what needed it, but the
-field lands with the first pass that actually writes a format-defined unit — most likely the
-parser — rather than being added speculatively here. **Until it exists, no claim may carry a
-format-defined unit**, and machine-readable numerics stay text. Deciding the principle
-without shipping the field is deliberate: the principle is what a parser must be built
-against, and the field's shape is better settled by the code that first fills it.
+The mechanism for guard rail 2 now exists: `document.format`, Decision 9, added once a second
+document made the absence concrete rather than theoretical. **A claim may carry a
+format-defined unit only where the record names the format**; until a pass actually writes
+one, machine-readable numerics stay text, as both passes so far have left them.
+
+**What the field does not carry, and what that costs.** It names the format, not the format's
+version. This ESI declares its own schema version — `EtherCATInfo/@Version` 1.2 — and the EDS
+declares its equivalent differently, so a version field would have been defined against two
+documents that could not fill it consistently. The cost is real and belongs here rather than
+in a footnote: a unit this decision treats as fixed by a specification is fixed by a
+specification that can be revised, and the record does not pin which revision it meant. That
+is an honest gap. A field that looked precise and was not would be worse, and pinning becomes
+answerable the moment a format's specification version is something a pass reads rather than
+guesses.
 
 Not retroactive. The AL1326 entry's 40 text claims stand as an honest hand pass over a file
 that states no units. A later parser pass over the same document is a *new pass*, and the
@@ -338,25 +343,33 @@ Promotion of the identity keys is therefore unblocked on ordinary grounds. Which
 what shape — including the granularity problem Decision 7 records — is a separate and smaller
 decision, taken against the vocabulary rather than here.
 
-## Question 9 🔴 — Does a document record name its format?
+## Decision 9 — The document record names the format
 
-Nothing in either entry says which format it is. Both are `type: device_description`, and an
-EDS is distinguishable from an ESI only by prose a human wrote in a header comment and by the
-extension of the held file. A consumer asking for ESI-sourced claims has nothing to filter on.
+A `device_description` record carries `document.format`: `eds`, `esi`, `gsdml`, `iodd`, with
+the component schema's `x-` escape hatch for a format not yet enumerated. It is **required for
+that kind and meaningless for every other** — a datasheet has no format in this sense.
 
-Decision 2 remains right — a `document.type` enum growing a member per fieldbus was the worse
-option, and `device_description` is the honest kind. The schema already says as much, that
-`type` "names the KIND, not the format — which format a document is written in is a separate
-axis". The axis it names does not exist. But Decision 5 *presupposes* the format:
-a unit defined by the format can only be applied by a reader who knows which format's
-specification to consult, and the record never says. The candidate is a separate
-`document.format` (`eds`, `esi`, `gsdml`, `iodd`), optional and meaningful only for
-`device_description`, sitting outside the claim hash scope as document metadata already does.
+Decision 2 said `type` names the kind, and the schema said in as many words that "which format
+a document is written in is a separate axis". The axis did not exist. Two documents made the
+absence concrete: an EDS and an ESI were distinguishable only by prose a human wrote in a
+header comment and by the extension of the held file, and a consumer asking for ESI-sourced
+claims had nothing to filter on. More sharply, Decision 5 *presupposes* the field — a unit
+defined by the format can only be applied by a reader who knows which specification to
+consult, and the record never said.
 
-The open part is whether it is one field or two: a format has a *version* as well as a name,
-and this ESI declares `EtherCATInfo/@Version` 1.2 while the EDS declares its own schema
-differently. Recording the name without the version would leave Decision 5 pointing at a
-moving specification.
+The field is **descriptive metadata**, so Decision 3 governs it: correctable, because
+misidentifying a file's format is a description error rather than a false claim. It sits
+outside every claim's hash scope, so correcting one moves no claim id — which is what made
+backfilling the two existing entries a correction rather than a rewrite.
+
+**Name only, not version.** The reasoning and its cost are recorded in Decision 5 rather than
+repeated here.
+
+Rejected: growing `document.type` a member per fieldbus, which Decision 2 already rejected for
+the same reason — kind and format are different axes, and a `type` enum that grows with the
+industry's protocol list stops naming a kind at all. Also rejected: inferring format from the
+held file's extension, which works only for entries that hold bytes and makes a queryable
+property of a document depend on whether this repository happens to store it.
 
 ## Question 10 🔴 — Where does a statement about the document itself attach?
 
