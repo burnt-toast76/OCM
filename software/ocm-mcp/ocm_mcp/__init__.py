@@ -5,12 +5,13 @@ contract is enforced in `serving`, proven by the golden evals in
 evals/golden-queries.yaml, and transported by `server`.
 """
 
-from .index import ServingIndex, build_index, normalize
+from .index import ManufacturerEntry, ServingIndex, build_index, normalize
 from .serving import SEARCH_CAP, SUMMARY_THRESHOLD, get_claims, get_document, search_parts
 
 __all__ = [
     "SEARCH_CAP",
     "SUMMARY_THRESHOLD",
+    "ManufacturerEntry",
     "ServingIndex",
     "build_index",
     "get_claims",

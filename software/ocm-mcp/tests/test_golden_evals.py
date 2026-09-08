@@ -95,6 +95,12 @@ def test_golden(eval_case: dict[str, Any], index) -> None:
             assert set(expected) <= set(results), f"missing from search: {set(expected) - set(results)}"
         elif field == "results_exclude":
             assert not set(expected) & set(results)
+        elif field == "result_manufacturers_include":
+            # ADR-0036 D9: every search result names its manufacturer, and
+            # the name is the canonical one, not the printed spelling.
+            assert set(expected) <= {r["manufacturer"] for r in response.get("results", [])}
+        elif field == "result_kinds_include":
+            assert set(expected) <= {r["kind"] for r in response.get("results", [])}
         elif field in ("manufacturer", "type"):
             assert response["record"].get(field) == expected
         elif field == "attestations":

@@ -17,6 +17,10 @@ Contract invariants enforced here, not in the transport:
 - resolution is exact after normalization; family resolution triggers
   only on the family NAME as the query, labeled matched_via: family
   (D4);
+- search_parts is approximate and OR's whitespace-separated tokens; it
+  covers part numbers, family strings, and manufacturer names, never
+  claim text, and a manufacturer hit answers with families rather than
+  the full part list (D9);
 - an unfiltered response above SUMMARY_THRESHOLD claims is a per-key
   summary; full records come by asking with keys (D7);
 - retracted claims are excluded from claims: by default and served with
@@ -222,14 +226,76 @@ def get_claims(index: ServingIndex, part_number: str, keys: list[str] | None = N
 
 
 def search_parts(index: ServingIndex, query: str) -> dict[str, Any]:
-    token = normalize(query)
-    results: list[dict[str, str]] = []
-    for norm_part, display in sorted(index.part_names.items()):
-        if token in norm_part:
-            results.append({"identifier": display, "kind": "part"})
-    for norm_family, display in sorted(index.family_names.items()):
-        if token in norm_family:
-            results.append({"identifier": display, "kind": "family"})
+    """Approximate lookup over part numbers, family strings, and
+    manufacturer names (ADR-0036 D4/D9). Never claim text.
+
+    Two behaviors beyond the substring match:
+
+    - The query is SPLIT ON WHITESPACE and its tokens are OR'd. An agent
+      that has three candidate families in hand types them in one call;
+      treating that string as a single identifier matched nothing, which
+      read as "the store has none of these" rather than "you asked one
+      question with three subjects in it". Each token is normalized on
+      its own (ADR-0036 D4), so a token is exactly the identifier it
+      would have been in a single-token query.
+
+    - A token matching a MANUFACTURER answers with that manufacturer's
+      families, not its parts. A vendor with 200 parts would otherwise
+      spend the whole 50-result cap on one token and crowd out every
+      other token in the same query -- and the families are the
+      identifiers an agent can hand straight back to get_claims. Parts no
+      family of that manufacturer covers are named individually, so the
+      shorter answer is never a smaller one.
+
+    Every result carries `manufacturer`: the canonical name, from the
+    document record the identifier was found on. It is descriptive
+    provenance, not a transcribed claim -- `vendor_name` is the claim,
+    with a citation (ADR-0036 D9).
+    """
+    # manufacturer is str | None: the schema requires the field, so the
+    # fallback is defensive rather than expected -- a row still names its
+    # identifier and kind if a record ever reaches serving without one.
+    results: list[dict[str, str | None]] = []
+    seen: set[tuple[str, str, str | None]] = set()
+
+    def add(identifier: str, kind: str, manufacturer: str | None) -> None:
+        # One row per (kind, identifier, manufacturer): a part covered by
+        # two manufacturers is two honest rows, never one row whose
+        # manufacturer field a consumer has to split.
+        marker = (kind, identifier, manufacturer)
+        if marker in seen:
+            return
+        seen.add(marker)
+        results.append({"identifier": identifier, "kind": kind, "manufacturer": manufacturer})
+
+    # Query order, de-duplicated: two consumers at the same pair of states
+    # answer identically (ADR-0036 D8), so the token walk cannot depend on
+    # set iteration order.
+    tokens: list[str] = []
+    for word in query.split():
+        token = normalize(word)
+        if token and token not in tokens:
+            tokens.append(token)
+
+    for token in tokens:
+        for norm_maker, canonical in sorted(index.manufacturer_names.items()):
+            if token not in norm_maker:
+                continue
+            maker = index.manufacturers[canonical]
+            add(canonical, "manufacturer", canonical)
+            for family in maker.families:
+                add(family, "family", canonical)
+            for part in maker.parts_outside_families:
+                add(part, "part", canonical)
+        for norm_part, display in sorted(index.part_names.items()):
+            if token in norm_part:
+                for maker_name in index.part_manufacturers.get(norm_part) or [None]:
+                    add(display, "part", maker_name)
+        for norm_family, display in sorted(index.family_names.items()):
+            if token in norm_family:
+                for maker_name in index.family_manufacturers.get(norm_family) or [None]:
+                    add(display, "family", maker_name)
+
     truncated = len(results) > SEARCH_CAP
     return _envelope(index, query=query, results=results[:SEARCH_CAP], truncated=truncated)
 

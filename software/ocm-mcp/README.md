@@ -23,6 +23,13 @@ The registry may span two checkouts, and every envelope names both states
 The index is built at startup and never reloaded (D5): restart to pick up new
 ingestion. A registry that fails `validate_claims` is not served at all.
 
+`search_parts` also covers manufacturer names (D9), joined at build time from
+each document record. The canonical names and the printed spellings that fold
+onto them live in `spec/schema/ocm-manufacturers-1.0.yaml` in the public
+checkout; `ci/check_manufacturers.py` reports what the registry prints and
+flags variants. A manufacturer the list does not know is its own canonical name
+and is searchable under its printed spelling, so the list never gates ingestion.
+
 ## Local (stdio)
 
 The default. No token, no port — the peer is whoever launched the process.

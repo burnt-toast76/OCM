@@ -1,0 +1,89 @@
+# OCM canonical manufacturer list 1.0
+#
+# Governed by ADR-0036 D9 (manufacturer lookup). This file names the
+# manufacturers the registry knows and the printed spellings that denote
+# each one, so `search_parts` can answer "Keyence" with the FS-N families
+# instead of nothing.
+#
+# WHAT THIS IS NOT: it is not a claim vocabulary and it is not a schema
+# enum. The document record's `manufacturer` stays free text
+# (spec/schema/ocm-claims-1.0.schema.json), for two reasons that both
+# matter:
+#
+#   1. ADR-0038 D3 classifies the document record as DESCRIPTIVE metadata.
+#      A manufacturer name is provenance about where a document came from,
+#      not a transcription of what it says. The transcription of a stated
+#      vendor name is the `vendor_name` claim (vocabulary 1.3), which
+#      cites the page it is printed on. A manufacturer hit in search
+#      therefore carries the authority of metadata, never of a claim, and
+#      the serving surface labels it that way.
+#
+#   2. An enum would gate ingestion. A pass that meets a manufacturer this
+#      file has never heard of would fail validation mid-session and wait
+#      on a schema pull request. Free text plus this list keeps ingestion
+#      unblocked: an unlisted manufacturer is its own canonical name and
+#      is searchable under its printed spelling from the moment it lands.
+#      Adding it here later is a pure improvement -- it merges spellings,
+#      it never rescues one from invisibility.
+#
+# NORMALIZATION AT INGEST is binding, not rewriting. A pass records
+# `manufacturer` as the document prints it and then checks it against this
+# file, adding the spelling to the matching entry (or a new entry) in the
+# same commit. No corpus file is ever edited to make a name match: the
+# printed spelling is what `get_document` serves, and ADR-0035 D5's
+# document identity does not depend on it either way.
+#
+# MATCHING. The serving index builds a search token from `canonical` and
+# from every entry in `spellings`, using ADR-0036 D4's normalization
+# (case-fold, strip space/hyphen/underscore/dot), and a query token
+# matches as a substring -- the same approximate matcher part numbers get.
+# All tokens of one entry resolve to its `canonical`, which is the name
+# every search result carries.
+#
+# `canonical` is a search and display name chosen for how an operator
+# would type it. It is deliberately NOT a legal entity name: see the
+# KEYENCE entry, whose two spellings are two real companies.
+
+ocm_version: '1.0'
+
+manufacturers:
+
+  - canonical: KEYENCE
+    spellings:
+      - KEYENCE CORPORATION
+      - KEYENCE AMERICA
+    note: >
+      Two spellings, two legal entities: KEYENCE CORPORATION is the
+      Japanese parent printed on the catalogs, KEYENCE AMERICA the US
+      subsidiary printed on the FS-N41N datasheet. They are merged for
+      SEARCH only, because an operator typing "Keyence" wants both and
+      the split is an artifact of which office published which PDF. The
+      merge is confined to this file: each document record keeps its own
+      printed spelling, get_document serves it verbatim, and a caller who
+      needs the distinction reads it there.
+
+  - canonical: SMC
+    spellings:
+      - SMC Corporation
+
+  - canonical: Beckhoff
+    spellings:
+      - Beckhoff Automation GmbH & Co. KG
+
+  - canonical: ifm
+    spellings:
+      - ifm electronic
+    note: >
+      Lowercase as the company styles it, and as both the ESI file and the
+      printed material spell it.
+
+  # The reference fixtures (public repo). Synthetic by construction, and
+  # listed so the search surface behaves identically for a contributor
+  # with no corpus checkout.
+  - canonical: Example Automation
+    spellings:
+      - Example Automation (synthetic)
+
+  - canonical: Example Dispensing
+    spellings:
+      - Example Dispensing (synthetic)

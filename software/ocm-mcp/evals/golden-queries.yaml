@@ -195,7 +195,54 @@ evals:
     args: {query: eps25}
     expect:
       results_include: [EPS25-100WC-1001, EPS25-250WC-1001, EPS25 series]
-    note: Family strings are searchable alongside part numbers (D4).
+      result_manufacturers_include: ["Example Automation"]
+    note: >
+      Family strings are searchable alongside part numbers (D4), and
+      every result names its manufacturer (D9).
+
+  - name: manufacturer_query_answers_with_families
+    tool: search_parts
+    args: {query: Automation}
+    expect:
+      results_include: ["Example Automation", "EPS25 series"]
+      results_exclude: [EPS25-100WC-1001, EPS25-250WC-1001]
+      result_kinds_include: [manufacturer, family]
+    note: >
+      D9: a manufacturer resolves and answers with its families, not its
+      part list -- the members are reachable through the family, and a
+      large vendor would otherwise spend the whole 50-result cap. The
+      canonical name is served, not the record's "Example Automation
+      (synthetic)" spelling.
+
+  - name: manufacturer_with_no_family_names_its_parts
+    tool: search_parts
+    args: {query: Dispensing}
+    expect:
+      results_include: ["Example Dispensing", DP-8]
+      result_kinds_include: [manufacturer, part]
+    note: >
+      D9: families-not-parts is not families-or-nothing. A document
+      stating no family designation still reaches its part.
+
+  - name: whitespace_tokens_are_ored
+    tool: search_parts
+    args: {query: "ZZ-NOTHING DP-8 EPS25"}
+    expect:
+      results_include: [DP-8, EPS25 series]
+    note: >
+      D9: the query splits on whitespace and the tokens are OR'd, so one
+      call carries several candidates and a token that matches nothing
+      costs only its own matches.
+
+  - name: search_over_an_unknown_name_is_empty
+    tool: search_parts
+    args: {query: "Acme Widgets"}
+    expect:
+      results_include: []
+      results_exclude: ["Example Automation", "Example Dispensing", DP-8]
+    note: >
+      Approximate lookup has no absence state to report -- D3's four
+      states govern get_claims, where a claim was actually asked for.
 
   # --- get_document (D1) ------------------------------------------------------
 
