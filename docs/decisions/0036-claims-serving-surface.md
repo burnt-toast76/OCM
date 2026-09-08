@@ -34,6 +34,8 @@ The server exposes three serving tools:
 - `search_parts(query)` — approximate lookup over part numbers and `family` strings,
   returning candidates for the agent to choose from. Not claim text: that is a different
   product with real relevance problems, added when demand shows up, not before.
+  *(Widened by Decision 9 to cover manufacturer names, which are identifiers on the
+  document record rather than claim text. The exclusion of claim text is unchanged.)*
 - `get_document(hash)` — a document record's metadata and its registry citations, never
   document bytes; the repository does not hold real manufacturer documents
   (ADR-0035 D5, `claims/README.md`) and the server cannot serve what the store
@@ -189,6 +191,102 @@ public registry alone, which a missing field would leave the consumer to infer.*
 *Two states, not N: a third claims root cannot be named in an envelope that carries two
 identities, so the index refuses to build over one rather than serve content it cannot
 identify.)*
+
+## Decision 9 — `search_parts` covers manufacturer names, and OR's query tokens
+
+*(Added by amendment, after the serving surface met its first real vendor catalogs.)*
+
+Decision 1 scoped `search_parts` to "part numbers and `family` strings," and the
+implementation followed it exactly. Two consequences showed up in use, both of which
+made the store look emptier than it is:
+
+- **A manufacturer name matched nothing.** `search_parts("Keyence")` returned zero
+  results while the registry held four KEYENCE documents, 13 families, and more than
+  200 parts. Manufacturer lives on the document record (ADR-0035 D5) and the index only
+  ever walked claims, so the field was read at build time and never reached a search
+  structure. The store knew the answer and had no path to say it.
+- **A multi-token query matched nothing.** `search_parts("PZ-G LR-Z FS-N")` returned
+  zero while FS-N existed, because the matcher normalized the whole string into one
+  identifier. An agent holding three candidates has to make three calls, and the one
+  call it naturally makes reads back as "the store has none of these."
+
+Both are fixed here, and the fix costs no re-ingestion: the join happens at index-build
+time from records already being read.
+
+**The scope of `search_parts` becomes part numbers, `family` strings, and manufacturer
+names.** Not claim text — Decision 1's exclusion is unchanged and is the reason this
+amendment enumerates what it adds rather than relaxing the rule. Manufacturer is an
+identifier, in the same sense a family designation is: it names something you can ask a
+further question about, and it appears in the store as a field, not as a transcribed
+sentence. Claim text remains a different product with real relevance problems, added
+when demand shows up.
+
+**The result `kind` enum gains `manufacturer`, and every result carries a
+`manufacturer` field.** One row per (kind, identifier, manufacturer): a part covered by
+two manufacturers' documents is two honest rows, never one row whose field a consumer
+has to split.
+
+**A manufacturer match answers with that manufacturer's families, not its parts.** The
+50-result cap (Decision 7) is the reason. KEYENCE covers 205 parts in the registry
+today; spending the whole budget on one token would crowd out every other token in the
+same query and hand back a truncated list the agent cannot act on. Families are the
+better answer anyway — they are exactly the identifiers `get_claims` resolves under
+`matched_via: family` (Decision 4). Parts that no family of that manufacturer covers are
+named individually, so the shorter answer is never a smaller one: a document stating no
+family designation still reaches its part.
+
+**Query tokens are split on whitespace and OR'd.** Each token normalizes on its own
+under Decision 4's rules, so a token means exactly what it would have meant alone, and a
+token matching nothing costs only its own matches. OR rather than AND because the query
+this fixes is a list of candidates, not a conjunction of constraints.
+
+### Manufacturer is metadata, and the surface says so
+
+The document record's `manufacturer` is descriptive provenance, correctable in place
+(ADR-0038 D3). The transcription of a stated vendor name is the `vendor_name` claim
+(vocabulary 1.3), which cites the page it is printed on and which a manifest sources
+`component.vendor` from. A manufacturer hit therefore carries the authority of metadata
+and never that of a claim, which is why the tool description says so in the same breath
+as the widened scope. Decision 2 is untouched: no served *value* gained or lost a
+citation here, because a search result was never a value.
+
+### Free text, plus a list, rather than an enum
+
+`manufacturer` stays free text in the schema. The canonical list lives beside the
+schema and the vocabulary, at `spec/schema/ocm-manufacturers-1.0.yaml`, naming each
+manufacturer and the printed spellings that denote it. The serving index builds a search
+token from every spelling and resolves all of them to one canonical name.
+
+The rejected alternative was a schema `enum`, and it fails in a specific way: a pass
+meeting a manufacturer the list had never heard of would fail validation mid-session and
+wait on a pull request. That turns a descriptive field into an ingestion gate, and
+ADR-0035 D6's trusted path is a human transcriber whose session should not stop for a
+naming decision. The list therefore *merges* spellings and never *grants* visibility: an
+unlisted manufacturer is its own canonical name and is searchable under exactly what its
+record prints, from the moment it lands. `ci/check_manufacturers.py` reports unlisted
+spellings and suspected variants without failing the build, and fails only when the list
+contradicts itself — one spelling claimed by two canonical names, which would make the
+index fold documents by load order.
+
+No corpus file is rewritten to match a canonical name. `get_document` keeps serving each
+record's printed spelling verbatim, which is what makes the merge safe: KEYENCE
+CORPORATION and KEYENCE AMERICA are two legal entities folded onto one search name
+because an operator typing "Keyence" wants both, and anyone who needs the distinction
+reads it where it was never touched.
+
+### What this amendment knowingly accepts
+
+Substring matching over manufacturer names is as approximate as it is over part numbers,
+and picks up the same kind of noise: the query `"keyence corporation"` also matches
+`SMC Corporation`, because `corporation` is a substring of its name. That is the
+matcher Decision 4 already chose for `search_parts`, applied consistently rather than
+special-cased, and `search_parts` returns candidates for the agent to choose rather than
+choosing itself. A stopword list or a scoring model would be a relevance product, which
+Decision 1 declined to build until demand shows up.
+
+The vocabulary version is untouched. This amendment adds no claim key, promotes none,
+and aliases none; `manufacturer` is document metadata and attestations pin a key-set
+version (ADR-0035 D4) that this change does not move.
 
 ## Out of scope
 

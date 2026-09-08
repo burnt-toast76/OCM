@@ -46,3 +46,9 @@ jobs:
       # promoted key -- historical records are grandfathered by frozen
       # content-hash inventory, so no git history is needed.
       - run: python ci/check_alias_drift.py
+
+      # ADR-0036 D9: the manufacturer spelling report. It flags drift for
+      # a human and fails only when the manufacturer LIST contradicts
+      # itself -- an unlisted manufacturer is never a build failure, or
+      # the list would gate ingestion.
+      - run: python ci/check_manufacturers.py

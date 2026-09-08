@@ -20,6 +20,12 @@ second claims root. Each keeps its own state -- serving_state and
 corpus_state, each with its own -dirty suffix (D8 as amended) -- because
 two registries have two identities and joining them into one string
 would only make consumers split it apart again.
+
+The index also joins each document's RECORD to the claims that document
+covers, which is what makes manufacturer searchable (ADR-0036 D9). The
+join happens here and nowhere else: the record was always read at this
+point and simply never reached the search structures, so no stored file
+changes and no re-ingestion is required.
 """
 
 from __future__ import annotations
@@ -68,6 +74,32 @@ def _dated_after(candidate: str | None, reference: str) -> bool:
 
 
 @dataclass
+class ManufacturerEntry:
+    """One manufacturer's reach across the registry (ADR-0036 D9).
+
+    Built by joining every document record's `manufacturer` to the claims
+    that document carries, then folding the printed spellings onto one
+    canonical name through the manufacturer list.
+
+    `families` and `parts_outside_families` are what a manufacturer query
+    answers with, and together they cover every part without listing them
+    all: a large vendor's parts arrive as a handful of family strings the
+    agent can query exactly, and the parts NO family of this manufacturer
+    covers are named individually so nothing becomes unreachable. A
+    manufacturer whose documents state no family at all therefore still
+    answers with its parts -- the rule degrades to naming them, never to
+    silence.
+    """
+
+    canonical: str
+    spellings: list[str] = field(default_factory=list)
+    documents: set[str] = field(default_factory=set)
+    families: list[str] = field(default_factory=list)
+    parts: list[str] = field(default_factory=list)
+    parts_outside_families: list[str] = field(default_factory=list)
+
+
+@dataclass
 class DocumentEntry:
     hash: str
     record: dict[str, Any]
@@ -109,6 +141,22 @@ class ServingIndex:
     by_family: dict[str, list[tuple[str, dict[str, Any]]]] = field(default_factory=dict)
     # normalized part -> document hashes on file for the part
     part_documents: dict[str, set[str]] = field(default_factory=dict)
+    # --- manufacturer lookup (ADR-0036 D9) ---------------------------------
+    # canonical name -> its reach. Keyed by the canonical name because
+    # that is what every search result carries; the printed spellings
+    # ride along on the entry, so get_document's verbatim answer and the
+    # search surface's merged one never disagree about what was read.
+    manufacturers: dict[str, ManufacturerEntry] = field(default_factory=dict)
+    # every searchable normalized token -> canonical name. Holds the
+    # canonical spelling AND each printed spelling, which is what lets
+    # "keyence" reach a document whose record says KEYENCE AMERICA.
+    manufacturer_names: dict[str, str] = field(default_factory=dict)
+    # normalized part / family -> the canonical manufacturers covering it,
+    # sorted. A list, not a string: one part can be covered by documents
+    # from two manufacturers, and search emits one result per pair rather
+    # than joining names into a field consumers would have to split.
+    part_manufacturers: dict[str, list[str]] = field(default_factory=dict)
+    family_manufacturers: dict[str, list[str]] = field(default_factory=dict)
 
     def covered(self, document_hash: str, key: str) -> bool:
         """A document's absence for `key` is meaningful iff some attestation
@@ -185,6 +233,44 @@ class ServingIndex:
         if canonical is None:
             return None
         return canonical if _value_shape(claim.get("value")) == self.key_shapes.get(canonical) else None
+
+
+# The canonical manufacturer list (ADR-0036 D9). Read from the PRIMARY
+# root only, beside the schema and the vocabulary -- a corpus supplies
+# documents, never the names they are searched under.
+#
+# Read here rather than through Workspace on purpose: this list is a
+# serving artifact, consulted by no validator. Routing it through
+# ocm_api would put a file validate_claims never opens into the
+# validation surface, and ADR-0016's "one validation surface" is a claim
+# about what validates, which this does not.
+MANUFACTURERS_FILE = Path("spec") / "schema" / "ocm-manufacturers-1.0.yaml"
+
+
+def _append_unique(mapping: dict[str, list[str]], token: str, value: str) -> None:
+    bucket = mapping.setdefault(token, [])
+    if value not in bucket:
+        bucket.append(value)
+
+
+def _load_manufacturers(root: Path) -> dict[str, list[str]]:
+    """canonical name -> its printed spellings, from the manufacturer
+    list. A missing or unreadable file is not an error: every document
+    record then stands as its own canonical name, which is exactly the
+    behavior for a manufacturer the list has not caught up with. The
+    list merges spellings; it never grants visibility, so its absence
+    costs merging and nothing else."""
+    try:
+        data = read_yaml(root / MANUFACTURERS_FILE) or {}
+    except OSError:
+        return {}
+    listed: dict[str, list[str]] = {}
+    for entry in data.get("manufacturers") or []:
+        canonical = str(entry.get("canonical", "")).strip()
+        if not canonical:
+            continue
+        listed[canonical] = [str(s) for s in (entry.get("spellings") or [])]
+    return listed
 
 
 # A build-time state file, for roots that are real but not checkouts.
@@ -284,6 +370,25 @@ def build_index(roots: str | Path | Sequence[str | Path]) -> ServingIndex:
         key_shapes={entry["key"]: str(entry.get("shape", "")) for entry in entries},
     )
 
+    # Printed spelling -> canonical, from the manufacturer list. Every
+    # canonical name maps to itself too, so a record already spelled
+    # canonically resolves without being listed as its own variant.
+    listed = _load_manufacturers(root)
+    canonical_of = {
+        spelling: canonical for canonical, spellings in listed.items() for spelling in [canonical, *spellings]
+    }
+    # Accumulators for the walk, materialized as sorted lists once it
+    # ends. Sets rather than the entry's own lists: a catalog appends the
+    # same part on hundreds of claims, and membership on a list would
+    # make that a scan per claim.
+    #   family_covered -- normalized parts this manufacturer reaches
+    #     through a family-carrying claim, subtracted at the end: a part
+    #     covered by SOME family of the manufacturer is reachable through
+    #     that family and is not listed on its own.
+    family_covered: dict[str, set[str]] = {}
+    seen_parts: dict[str, set[str]] = {}
+    seen_families: dict[str, set[str]] = {}
+
     for document_hash in ws.list_claims_document_hashes():
         envelope = api.validate_claims(document_hash)
         if not envelope.ok:
@@ -300,15 +405,63 @@ def build_index(roots: str | Path | Sequence[str | Path]) -> ServingIndex:
         )
         index.documents[document_hash] = entry
 
+        # The join (ADR-0036 D9). The document record is already in hand;
+        # `manufacturer` is required by the schema, so a printed spelling
+        # always exists. An UNLISTED spelling is its own canonical name --
+        # the list merges spellings and never grants visibility, so a
+        # manufacturer ingested before the list caught up is searchable
+        # under exactly what its record says.
+        printed = str(entry.record.get("manufacturer", "")).strip()
+        canonical = canonical_of.get(printed, printed)
+        maker = None
+        if canonical:
+            maker = index.manufacturers.get(canonical)
+            if maker is None:
+                maker = ManufacturerEntry(canonical=canonical, spellings=[])
+                index.manufacturers[canonical] = maker
+                for token in {normalize(s) for s in [canonical, *listed.get(canonical, [])] if s}:
+                    index.manufacturer_names[token] = canonical
+            if printed and printed not in maker.spellings:
+                maker.spellings.append(printed)
+                index.manufacturer_names.setdefault(normalize(printed), canonical)
+            maker.documents.add(document_hash)
+            family_covered.setdefault(canonical, set())
+            seen_parts.setdefault(canonical, set())
+            seen_families.setdefault(canonical, set())
+
         for claim in entry.claims:
             for part in claim["applies_to"]:
                 token = normalize(part)
                 index.part_names.setdefault(token, part)
                 index.by_part.setdefault(token, []).append((document_hash, claim))
                 index.part_documents.setdefault(token, set()).add(document_hash)
+                if maker is not None:
+                    # Retracted claims are indexed here exactly as they
+                    # always were: search is discovery, and a part whose
+                    # only live claim was retracted still exists to be
+                    # asked about -- get_claims serves the retraction
+                    # story (ADR-0037 D4). The join changes no part of
+                    # that; it only says whose part it is.
+                    _append_unique(index.part_manufacturers, token, canonical)
+                    seen_parts[canonical].add(part)
+                    if "family" in claim:
+                        family_covered[canonical].add(token)
             if "family" in claim:
                 token = normalize(claim["family"])
                 index.family_names.setdefault(token, claim["family"])
                 index.by_family.setdefault(token, []).append((document_hash, claim))
+                if maker is not None:
+                    _append_unique(index.family_manufacturers, token, canonical)
+                    seen_families[canonical].add(claim["family"])
+
+    for canonical, maker in index.manufacturers.items():
+        maker.spellings.sort()
+        maker.families = sorted(seen_families.get(canonical, set()))
+        maker.parts = sorted(seen_parts.get(canonical, set()))
+        covered = family_covered.get(canonical, set())
+        maker.parts_outside_families = [p for p in maker.parts if normalize(p) not in covered]
+    for mapping in (index.part_manufacturers, index.family_manufacturers):
+        for token in mapping:
+            mapping[token].sort()
 
     return index

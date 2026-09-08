@@ -385,8 +385,13 @@ def create_server(
         return _get_claims(index, part_number, keys)
 
     @mcp.tool(description=(
-        "Approximate lookup over part numbers and family strings (never claim text). "
-        "Returns candidates for you to choose and query exactly; capped at 50."
+        "Approximate lookup over part numbers, family strings, and manufacturer names "
+        "(never claim text). Whitespace splits the query into tokens that are OR'd, so "
+        "several candidates go in one call. A manufacturer match returns that "
+        "manufacturer's families rather than every part it makes; every result names its "
+        "manufacturer, which is document metadata -- for a vendor name with a citation, "
+        "ask get_claims for vendor_name. Returns candidates for you to choose and query "
+        "exactly; capped at 50."
     ))
     def search_parts(query: str) -> dict[str, Any]:
         return _search_parts(index, query)
